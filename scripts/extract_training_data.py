@@ -12,6 +12,7 @@ Output: data/popularity{POP}/tracks.parquet
 """
 
 import argparse
+import sqlite3
 import sys
 import time
 from pathlib import Path
@@ -19,7 +20,18 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from src.db import get_connection
+from src.db import DATABASES
+
+
+def get_combined_connection() -> sqlite3.Connection:
+    """Get a connection with both databases attached."""
+    spotify_path = DATABASES["spotify"]
+    audio_path = DATABASES["audio"]
+
+    # Connect to spotify as main, attach audio
+    conn = sqlite3.connect(f"file:{spotify_path}?mode=ro", uri=True)
+    conn.execute(f"ATTACH DATABASE 'file:{audio_path}?mode=ro' AS audio")
+    return conn
 
 
 def fetch_tracks(conn, popularity: int) -> pd.DataFrame:
@@ -97,20 +109,18 @@ def fetch_albums(conn, album_rowids: list[int]) -> pd.DataFrame:
     return pd.read_sql_query(query, conn, params=album_rowids)
 
 
-def fetch_audio_features(conn, track_ids: list[str]) -> pd.DataFrame:
-    """Fetch audio features for tracks."""
-    if not track_ids:
-        return pd.DataFrame()
-    placeholders = ",".join(["?"] * len(track_ids))
-    query = f"""
-        SELECT track_id, time_signature, tempo, key, mode,
-               danceability, energy, loudness, speechiness,
-               acousticness, instrumentalness, liveness, valence
-        FROM track_audio_features
-        WHERE track_id IN ({placeholders})
-        AND null_response = 0
+def fetch_audio_features_join(conn, popularity: int) -> pd.DataFrame:
+    """Fetch audio features using JOIN with tracks table (much faster)."""
+    query = """
+        SELECT t.id as track_id, af.time_signature, af.tempo, af.key, af.mode,
+               af.danceability, af.energy, af.loudness, af.speechiness,
+               af.acousticness, af.instrumentalness, af.liveness, af.valence
+        FROM tracks t
+        JOIN audio.track_audio_features af ON t.id = af.track_id
+        WHERE t.popularity >= ?
+        AND af.null_response = 0
     """
-    return pd.read_sql_query(query, conn, params=track_ids)
+    return pd.read_sql_query(query, conn, params=(popularity,))
 
 
 def main():
@@ -127,13 +137,12 @@ def main():
     args = parser.parse_args()
 
     total_start = time.time()
-    spotify_conn = get_connection("spotify")
-    audio_conn = get_connection("audio")
+    conn = get_combined_connection()
 
     # 1. Fetch tracks
     print(f"Fetching tracks with popularity >= {args.popularity}...")
     start = time.time()
-    tracks_df = fetch_tracks(spotify_conn, args.popularity)
+    tracks_df = fetch_tracks(conn, args.popularity)
     print(f"  {len(tracks_df):,} tracks in {time.time() - start:.1f}s")
 
     if tracks_df.empty:
@@ -144,38 +153,36 @@ def main():
     print("Fetching first artist per track...")
     start = time.time()
     track_rowids = tracks_df["track_rowid"].tolist()
-    first_artists_df = fetch_first_artists(spotify_conn, track_rowids)
+    first_artists_df = fetch_first_artists(conn, track_rowids)
     print(f"  {len(first_artists_df):,} artist mappings in {time.time() - start:.1f}s")
 
     # 3. Fetch artist metadata
     print("Fetching artist metadata...")
     start = time.time()
     artist_rowids = first_artists_df["artist_rowid"].dropna().astype(int).unique().tolist()
-    artists_df = fetch_artists(spotify_conn, artist_rowids)
+    artists_df = fetch_artists(conn, artist_rowids)
     print(f"  {len(artists_df):,} artists in {time.time() - start:.1f}s")
 
     # 4. Fetch genres
     print("Fetching genres...")
     start = time.time()
-    genres_df = fetch_genres(spotify_conn, artist_rowids)
+    genres_df = fetch_genres(conn, artist_rowids)
     print(f"  {len(genres_df):,} genre mappings in {time.time() - start:.1f}s")
 
     # 5. Fetch albums
     print("Fetching albums...")
     start = time.time()
     album_rowids = tracks_df["album_rowid"].unique().tolist()
-    albums_df = fetch_albums(spotify_conn, album_rowids)
+    albums_df = fetch_albums(conn, album_rowids)
     print(f"  {len(albums_df):,} albums in {time.time() - start:.1f}s")
 
-    # 6. Fetch audio features
+    # 6. Fetch audio features (using JOIN - much faster than IN clause)
     print("Fetching audio features...")
     start = time.time()
-    track_ids = tracks_df["track_id"].tolist()
-    audio_df = fetch_audio_features(audio_conn, track_ids)
+    audio_df = fetch_audio_features_join(conn, args.popularity)
     print(f"  {len(audio_df):,} audio features in {time.time() - start:.1f}s")
 
-    spotify_conn.close()
-    audio_conn.close()
+    conn.close()
 
     # Merge all dataframes
     print("Merging data...")
