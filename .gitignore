@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# ide
+.idea
+
+# data
+data
+
+# Virtual environments
+.venv
+
+# LLM
+CLAUDE.md
