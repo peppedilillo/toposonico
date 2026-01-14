@@ -37,7 +37,7 @@ def get_combined_connection() -> sqlite3.Connection:
 def fetch_tracks(conn, popularity: int) -> pd.DataFrame:
     """Fetch tracks with popularity >= threshold."""
     query = """
-        SELECT rowid as track_rowid, id as track_id, album_rowid,
+        SELECT rowid as track_rowid, id as track_id, name as track_name, album_rowid,
                external_id_isrc, popularity as track_popularity,
                track_number, disc_number, duration_ms, explicit
         FROM tracks
