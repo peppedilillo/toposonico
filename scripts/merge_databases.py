@@ -12,10 +12,11 @@ import sqlite3
 import time
 from pathlib import Path
 
-DATA_DIR = Path.home() / "HDD/Datasets/annas_archive_spotify_2025_07"
-MERGED_PATH = DATA_DIR / "spotify_merged.sqlite3"
-SPOTIFY_PATH = DATA_DIR / "spotify_clean.sqlite3"
-AUDIO_PATH = DATA_DIR / "spotify_clean_audio_features.sqlite3"
+
+DATA_DIR = Path.home() / "HDD/Datasets"
+MERGED_PATH = DATA_DIR / "annas_archive_spotify_2025_07_merged/spotify_merged.sqlite3"
+SPOTIFY_PATH = DATA_DIR / "annas_archive_spotify_2025_07/spotify_clean.sqlite3"
+AUDIO_PATH = DATA_DIR / "annas_archive_spotify_2025_07/spotify_clean_audio_features.sqlite3"
 
 def main():
     if MERGED_PATH.exists():
@@ -62,6 +63,8 @@ def main():
     conn.execute("CREATE UNIQUE INDEX idx_audio_features_track_id ON audio_features(track_id)")
     # New index on the integer rowid for faster joins with the local tracks table
     conn.execute("CREATE UNIQUE INDEX idx_audio_features_track_rowid ON audio_features(track_rowid)")
+    # Improves performances of genre aggregation
+    conn.execute("CREATE INDEX idx_artist_genres_covering ON artist_genres(artist_rowid, genre);")
     conn.commit()
     print(f"  Done in {time.time() - start:.1f}s")
 
