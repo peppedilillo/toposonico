@@ -1,31 +1,22 @@
 """Database utilities for querying large Spotify SQLite databases."""
 
-import random
 import sqlite3
 from pathlib import Path
 
 import pandas as pd
 
-DATA_DIR = Path.home() / "HDD/Datasets/annas_archive_spotify_2025_07"
 
-DATABASES = {
-    "spotify": DATA_DIR / "spotify_clean.sqlite3",
-    "audio": DATA_DIR / "spotify_clean_audio_features.sqlite3",
-}
+DATABASE_PATH = Path.home() / "HDD/Datasets/annas_archive_spotify_2025_07_merged/spotify_merged.sqlite3"
 
 
-def get_connection(db_name: str) -> sqlite3.Connection:
+def get_connection() -> sqlite3.Connection:
     """
-    Get a read-only connection to a database.
-
-    Args:
-        db_name: Key from DATABASES dict ('spotify' or 'audio')
+    Get a read-only connection to the database.
 
     Returns:
         sqlite3.Connection configured for read-only access
     """
-    path = DATABASES[db_name]
-    uri = f"file:{path}?mode=ro"
+    uri = f"file:{DATABASE_PATH}?mode=ro"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     return conn
