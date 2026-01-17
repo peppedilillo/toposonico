@@ -65,7 +65,7 @@ SELECT
     t.explicit, t.popularity as track_popularity,
     a.popularity as artist_popularity, a.followers_total as artist_followers,
     al.popularity as album_popularity, t.duration_ms, t.track_number, 
-    t.disc_number, al.total_tracks, ga.genre_list 
+    t.disc_number, al.total_tracks, ga.genre_list as artist_genres
 FROM tracks AS t 
 INNER JOIN audio_features AS af ON t.rowid = af.track_rowid
 INNER JOIN albums AS al ON t.album_rowid = al.rowid 
