@@ -12,7 +12,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from autoencoder.db import DATABASE_PATH
+
+DATABASE_PATH = Path.home() / "HDD/Datasets/annas_archive_spotify_2025_07_merged/spotify_merged.sqlite3"
+
 
 QUERY = """
 SELECT
