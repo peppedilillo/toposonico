@@ -11,8 +11,22 @@ requires-python = ">=3.13"
 dependencies = [
     "jupyter>=1.0.0",
     "pandas>=2.0.0",
+    "torch>=2.7.1",
     "pyarrow>=15.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["autoencoder"]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu118" },
+]
+torchvision = [
+    { index = "pytorch-cu118" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true

@@ -68,11 +68,16 @@ def extract_release_features(df: pd.DataFrame) -> pd.DataFrame:
         6: "summer", 7: "summer", 8: "summer",
         9: "fall", 10: "fall", 11: "fall",
     }
-    season = month.map(season_map).fillna("unknown").astype("category")
+    season = month.map(season_map).fillna("unknown")
+
+    # Set season to "unknown" when release_date_precision is "year"
+    # (pd.to_datetime defaults year-only dates to Jan 1st, which would be "winter")
+    if "release_date_precision" in df.columns:
+        season = season.where(df["release_date_precision"] != "year", "unknown")
 
     return pd.DataFrame({
         "release_year": year,
-        "release_season": season,
+        "release_season": season.astype("category"),
     })
 
 

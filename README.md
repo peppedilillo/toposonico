@@ -21,8 +21,16 @@ Output: `data/raw/training_pop{POP}[_genres].parquet`
 
 ### 3. Clean data
 ```bash
-python scripts/clean_data.py training_pop50_genres.parquet
+python scripts/clean_data.py <raw_dataset.parquet>
 ```
 Input defaults to `data/raw/` if filename only.
-
 Output: `data/clean/<filename>.parquet`
+
+### 4. Run feature selection
+```bash
+python scripts/engineer_features <clean_dataset.parquet>
+```
+
+Input defaults to `data/clean/` if filename only.
+Output: `data/engineered/<filename>.parquet`
+
