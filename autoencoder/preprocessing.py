@@ -1,7 +1,7 @@
+from collections import Counter
+
 import pandas as pd
 
-
-UNKNOWN_GENRE = "<GENRE_UNKNOWN>"
 
 DTYPES = {
     "track_rowid": "int64",
@@ -11,11 +11,13 @@ DTYPES = {
     "artist_name": "string",
     "album_name": "string",
     "label": "string",
+    "_label": "string",
     "release_date": "string",
     "id_isrc": "string",
     "artist_genres": "string",
-    "album_type": "category",
-    "release_date_precision": "category",
+    "_artist_genres": "string",
+    "album_type": "string",
+    "release_date_precision": "string",
     "tempo": "float32",
     "danceability": "float32",
     "energy": "float32",
@@ -27,7 +29,7 @@ DTYPES = {
     "valence": "float32",
     "time_signature": "uint8",
     "key": "uint8",
-    "mode": "uint8",
+    "mode": "bool",
     "explicit": "bool",
     "track_popularity": "uint8",
     "artist_popularity": "uint8",
@@ -40,14 +42,12 @@ DTYPES = {
 }
 
 
-def clean(df: pd.DataFrame) -> pd.DataFrame:
+def ids_fill_and_drop(df: pd.DataFrame) -> pd.DataFrame:
     """Clean raw training data: handle missing values and set proper dtypes."""
     df = df.drop(columns=["id_upc"])
     df = df.dropna(subset=["id_isrc"])
 
-    if "artist_genres" in df.columns:
-        df["artist_genres"] = df["artist_genres"].fillna(UNKNOWN_GENRE)
-
+    assert df.isna().sum().sum() == 0
     return (
         df
         .astype({k: v for k, v in DTYPES.items() if k in df.columns})
@@ -55,7 +55,7 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def extract_release_features(df: pd.DataFrame) -> pd.DataFrame:
+def release_date_to_year_and_season(df: pd.DataFrame) -> pd.DataFrame:
     """Extract release_year and release_season from release_date strings."""
     dt = pd.to_datetime(df["release_date"], format="mixed")
 
@@ -77,32 +77,29 @@ def extract_release_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return pd.DataFrame({
         "release_year": year,
-        "release_season": season.astype("category"),
+        "release_season": season,
     })
 
 
 def map_categorical_by_frequency(
-    s: pd.Series, n: int, labels: list[str], qsplit: float = 0.2
+    s: pd.Series, labels: list[str], qsplit: float = 0.2
 ) -> pd.Series:
     """
     Map a categorical series based on value frequency quantiles.
 
-    Values are bucketed into n groups based on their frequency. The most frequent
-    values (above the highest quantile threshold) keep their original names, while
+    Values are bucketed into n groups based on their frequency, where n is the number of labels.
+    The most frequent values (above the highest quantile threshold) keep their original names, while
     less frequent values are replaced with the corresponding label.
 
     Args:
         s: Categorical series to map.
-        n: Number of frequency-based buckets.
         labels: Labels for each bucket (from least to most frequent).
         qsplit: Quantile split factor. Thresholds are 1 - qsplit^i for i in 1..n.
 
     Returns:
         Series with infrequent values replaced by bucket labels.
     """
-    if len(labels) != n:
-        raise ValueError(f"labels must have exactly {n} elements, got {len(labels)}")
-
+    n = len(labels)
     counts = s.value_counts()
     thresholds = [counts.quantile(1.0 - qsplit**i) for i in range(1, n + 1)]
 
@@ -118,6 +115,43 @@ def map_categorical_by_frequency(
     return s.map(mapping)
 
 
+def genres_fill_and_mask_under_threshold(
+    s: pd.Series,
+    threshold: int,
+    separator: str = " | ",
+    unknown_token: str = "<UNKNOWN_GENRE>",
+    niche_token: str = "<NICHE_GENRE>",
+) -> pd.Series:
+    """
+    Fill missing genre values and mask infrequent genres.
+
+    Args:
+        s: Series containing delimited genre strings (e.g., "rock | pop | indie").
+        threshold: Genres appearing <= this many times are replaced with niche_token.
+        separator: Delimiter used to split genre strings.
+        unknown_token: Token for missing/null values.
+        niche_token: Token to replace infrequent genres.
+
+    Returns:
+        Series of lists with infrequent genres masked.
+    """
+    counter = Counter()
+
+    def count(xs: list[str]):
+        for x in xs:
+            counter[x] += 1
+        return xs
+
+    def mask_rare(genres: list[str]) -> list[str]:
+        return [g if counter[g] > threshold else niche_token for g in genres]
+
+    return (
+        s.fillna(unknown_token)
+        .apply(lambda x: x.split(separator))
+        .apply(count)
+        .apply(lambda xs: mask_rare(xs)).apply(str)
+    )
+
 ENGINEERED_COLUMNS = [
     # Identifiers/Metadata
     "track_rowid",
@@ -126,16 +160,18 @@ ENGINEERED_COLUMNS = [
     "artist_rowid",
     "album_rowid",
     "album_name",
+    "_label",
+    "artist_genres",
+    "_artist_genres",
     # Categorical
     "album_type",
-    "_label",
     "release_season",
-    # Numeric
-    "release_year",
-    "time_signature",
-    "tempo",
     "key",
+    "time_signature",
+    # Numeric
     "mode",
+    "tempo",
+    "release_year",
     "danceability",
     "energy",
     "loudness",
@@ -148,11 +184,12 @@ ENGINEERED_COLUMNS = [
     "duration_ms",
 ]
 
+
 ENGINEERED_YMIN_DEFAULT = 1955
 ENGINEERED_LABELBUCKETS_DEFAULT = 2
 ENGINEERED_LABELQSPLIT_DEFAULT = 0.2
 ENGINEERED_DURCLIPPING_DEFAULT = 0.9986
-
+ENGINEERED_GENRETHRESHOLD_DEFAULT = 100
 
 def engineer_features(
     df: pd.DataFrame,
@@ -160,6 +197,7 @@ def engineer_features(
     label_buckets: int = ENGINEERED_LABELBUCKETS_DEFAULT,
     label_qsplit: float = ENGINEERED_LABELQSPLIT_DEFAULT,
     duration_clip_quantile: float = ENGINEERED_DURCLIPPING_DEFAULT,
+    genre_threshold: int = ENGINEERED_GENRETHRESHOLD_DEFAULT,
 ) -> pd.DataFrame:
     """
     Apply V1 feature engineering: date filtering, release features, label bucketing,
@@ -171,32 +209,32 @@ def engineer_features(
         label_buckets: Number of frequency-based label buckets.
         label_qsplit: Quantile split factor for label bucketing.
         duration_clip_quantile: Upper quantile for duration clipping (1.0 = no clip).
+        genre_threshold: Genres appearing <= this many times are replaced with niche_token.
 
     Returns:
-        DataFrame with V1 feature set (24 columns).
+        Feature-engineered and cleaned dataframe.
     """
     df = df.copy()
 
-    # Parse release_date and drop bad/old dates
     release_date = pd.to_datetime(df["release_date"], format="mixed", errors="coerce")
     drop_mask = release_date.isna() | (release_date.dt.year < year_min)
     df = df[~drop_mask].reset_index(drop=True)
 
-    # Add release_year and release_season
-    release_features = extract_release_features(df)
+    release_features = release_date_to_year_and_season(df)
     df["release_year"] = release_features["release_year"]
     df["release_season"] = release_features["release_season"]
 
-    # Add _label (bucketed)
     label_names = [f"<{'X' * (label_buckets - i)}S_LABEL>" for i in range(label_buckets)]
-    df["_label"] = map_categorical_by_frequency(
-        df["label"], label_buckets, label_names, label_qsplit
-    ).astype("category")
+    df["_label"] = map_categorical_by_frequency(df["label"], label_names, label_qsplit)
 
-    # Clip duration_ms if requested
     if duration_clip_quantile < 1.0:
         upper = df["duration_ms"].quantile(duration_clip_quantile)
         df["duration_ms"] = df["duration_ms"].clip(upper=upper)
 
-    # Select final V1 columns
-    return df[ENGINEERED_COLUMNS].reset_index(drop=True)
+    df["_artist_genres"] = genres_fill_and_mask_under_threshold(df["artist_genres"], genre_threshold)
+    assert df.isna().sum().sum() == 0
+    return (
+        df[ENGINEERED_COLUMNS]
+        .astype({k: v for k, v in DTYPES.items() if k in ENGINEERED_COLUMNS})
+        .reset_index(drop=True)
+    )

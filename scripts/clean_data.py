@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from autoencoder.preprocessing import clean
+from autoencoder.preprocessing import ids_fill_and_drop
 
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data/clean"
@@ -34,7 +34,7 @@ def main():
     print(f"  {len(df):,} tracks")
 
     print("Cleaning...")
-    df = clean(df)
+    df = ids_fill_and_drop(df)
     print(f"  {len(df):,} tracks after cleaning")
 
     print(f"Writing {output_path}...")

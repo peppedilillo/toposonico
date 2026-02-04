@@ -12,6 +12,7 @@ from autoencoder.preprocessing import ENGINEERED_DURCLIPPING_DEFAULT
 from autoencoder.preprocessing import ENGINEERED_LABELQSPLIT_DEFAULT
 from autoencoder.preprocessing import ENGINEERED_LABELBUCKETS_DEFAULT
 from autoencoder.preprocessing import ENGINEERED_YMIN_DEFAULT
+from autoencoder.preprocessing import ENGINEERED_GENRETHRESHOLD_DEFAULT
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data/engineered"
 
@@ -49,6 +50,12 @@ def main():
         default=ENGINEERED_DURCLIPPING_DEFAULT,
         help=f"Upper quantile for duration clipping, 1.0 = no clip (default: {ENGINEERED_DURCLIPPING_DEFAULT})",
     )
+    parser.add_argument(
+        "--genre-threshold",
+        type=int,
+        default=ENGINEERED_GENRETHRESHOLD_DEFAULT,
+        help=f"Genres appearing <= this many times are replaced with niche_token (default: {ENGINEERED_DURCLIPPING_DEFAULT})",
+    )
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -71,6 +78,7 @@ def main():
     print(f"  label_buckets={args.label_buckets}")
     print(f"  label_qsplit={args.label_qsplit}")
     print(f"  duration_clip_quantile={args.duration_clip_quantile}")
+    print(f"  genre_threshold={args.genre_threshold}")
 
     df = engineer_features(
         df,
@@ -78,6 +86,7 @@ def main():
         label_buckets=args.label_buckets,
         label_qsplit=args.label_qsplit,
         duration_clip_quantile=args.duration_clip_quantile,
+        genre_threshold=args.genre_threshold,
     )
     print(f"  {len(df):,} tracks after feature engineering")
     print(f"  {len(df.columns)} columns: {list(df.columns)}")
