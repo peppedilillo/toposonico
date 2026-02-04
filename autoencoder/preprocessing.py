@@ -42,11 +42,12 @@ DTYPES = {
 }
 
 
-def ids_fill_and_drop(df: pd.DataFrame) -> pd.DataFrame:
+def fill_nans(df: pd.DataFrame, unknown_genre_token: str = "<UNKNOWN_GENRE>", ) -> pd.DataFrame:
     """Clean raw training data: handle missing values and set proper dtypes."""
     df = df.drop(columns=["id_upc"])
     df = df.dropna(subset=["id_isrc"])
-
+    if "artist_genres" in df.columns:
+        df["artist_genres"] = df["artist_genres"].fillna(unknown_genre_token)
     assert df.isna().sum().sum() == 0
     return (
         df
@@ -115,11 +116,10 @@ def map_categorical_by_frequency(
     return s.map(mapping)
 
 
-def genres_fill_and_mask_under_threshold(
+def genres_mask_under_threshold(
     s: pd.Series,
     threshold: int,
     separator: str = " | ",
-    unknown_token: str = "<UNKNOWN_GENRE>",
     niche_token: str = "<NICHE_GENRE>",
 ) -> pd.Series:
     """
@@ -145,8 +145,7 @@ def genres_fill_and_mask_under_threshold(
     def mask_rare(genres: list[str]) -> list[str]:
         return [g if counter[g] > threshold else niche_token for g in genres]
 
-    return (
-        s.fillna(unknown_token)
+    return (s
         .apply(lambda x: x.split(separator))
         .apply(count)
         .apply(lambda xs: mask_rare(xs)).apply(str)
@@ -231,7 +230,7 @@ def engineer_features(
         upper = df["duration_ms"].quantile(duration_clip_quantile)
         df["duration_ms"] = df["duration_ms"].clip(upper=upper)
 
-    df["_artist_genres"] = genres_fill_and_mask_under_threshold(df["artist_genres"], genre_threshold)
+    df["_artist_genres"] = genres_mask_under_threshold(df["artist_genres"], genre_threshold)
     assert df.isna().sum().sum() == 0
     return (
         df[ENGINEERED_COLUMNS]

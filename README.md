@@ -1,5 +1,13 @@
 # spotify-rec
 
+## Cloud Computing
+From project root
+
+```bash
+rsync -avz --exclude '.venv' --exclude '__pycache__' ./ ubuntu@<LAMBDA_IP>:~/spotify-rec/
+```
+
+
 ## Data Pipeline
 
 ### 1. Merge databases
