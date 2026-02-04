@@ -1,12 +1,15 @@
 # spotify-rec
 
 ## Cloud Computing
-From project root
-
+From project root, to vm:
 ```bash
-rsync -avz --exclude '.venv' --exclude '__pycache__' ./ ubuntu@<LAMBDA_IP>:~/spotify-rec/
+rsync -avz --exclude '.idea' --exclude 'data/raw'  --exclude 'data/clean' --exclude '.venv' --exclude '__pycache__' ./ ubuntu@150.136.147.169:~/spotify-rec/
 ```
 
+to local machine:
+```bash
+rsync -avz --exclude '.idea' --exclude 'data/raw' --exclude 'data/clean' --exclude '.venv' --exclude '__pycache__' ubuntu@150.136.147.169:~/spotify-rec/ ./
+```
 
 ## Data Pipeline
 
