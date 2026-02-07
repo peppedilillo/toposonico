@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from autoencoder.preprocessing import fill_nans
+from autoencoder.preprocessing import drop_or_fill_nans
+from autoencoder.preprocessing import deduplicate_recordings
+from autoencoder.preprocessing import cast_types
 
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data/clean"
@@ -34,8 +36,17 @@ def main():
     print(f"  {len(df):,} tracks")
 
     print("Cleaning...")
-    df = fill_nans(df)
-    print(f"  {len(df):,} tracks after cleaning")
+    initial_count = len(df)
+
+    df = drop_or_fill_nans(df)
+    print(f"  {len(df):,} tracks after dropping NaNs (-{initial_count - len(df):,})")
+
+    before_dedup = len(df)
+    df = deduplicate_recordings(df)
+    print(f"  {len(df):,} tracks after deduplication (-{before_dedup - len(df):,})")
+
+    df = cast_types(df)
+    print(f"  {len(df):,} tracks final ({100 * len(df) / initial_count:.1f}% of original)")
 
     print(f"Writing {output_path}...")
     df.to_parquet(output_path, index=False)

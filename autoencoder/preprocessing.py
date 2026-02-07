@@ -42,18 +42,30 @@ DTYPES = {
 }
 
 
-def fill_nans(df: pd.DataFrame, unknown_genre_token: str = "<UNKNOWN_GENRE>", ) -> pd.DataFrame:
+def drop_or_fill_nans(df: pd.DataFrame, unknown_genre_token: str = "<UNKNOWN_GENRE>", ) -> pd.DataFrame:
     """Clean raw training data: handle missing values and set proper dtypes."""
     df = df.drop(columns=["id_upc"])
     df = df.dropna(subset=["id_isrc"])
     if "artist_genres" in df.columns:
         df["artist_genres"] = df["artist_genres"].fillna(unknown_genre_token)
     assert df.isna().sum().sum() == 0
-    return (
-        df
-        .astype({k: v for k, v in DTYPES.items() if k in df.columns})
-        .reset_index(drop=True)
-    )
+    return df.reset_index(drop=True)
+
+
+def deduplicate_recordings(df: pd.DataFrame) -> pd.DataFrame:
+    """Deduplicate track based on their id_isrc and rowid/name."""
+    # i'm keeping last because it seems this is what spotify actually returns with partial string matching.
+    # dunno. maybe not the best solution but let's check it out and see.
+    # also. this thing still leaves a lot of duplicates, try looking for a popular historic track.
+    # we could implement something more aggressive based on regex matching but it comes with its edgecases
+    # and i don't want to lose too many track to them.
+    # so we should keep this in mind while training and split the train and valid accordingly to prevent data leakage
+    df = df.drop_duplicates("id_isrc", keep="last")
+    return df.drop_duplicates(["artist_rowid", "track_name"], keep="last").reset_index(drop=True)
+
+
+def cast_types(df: pd.DataFrame) -> pd.DataFrame:
+    return df.astype({k: v for k, v in DTYPES.items() if k in df.columns})
 
 
 def release_date_to_year_and_season(df: pd.DataFrame) -> pd.DataFrame:
