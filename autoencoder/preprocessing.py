@@ -277,8 +277,9 @@ def engineer_features(
     """
     df = df.copy()
 
-    release_date = pd.to_datetime(df["release_date"], format="mixed")
-    drop_mask = release_date.dt.year < year_min
+    release_date = pd.to_datetime(df["release_date"], format="mixed", errors="coerce")
+    # a number of track have invalid release date (e.g. `0000`), we drop them
+    drop_mask = release_date.isna() | (release_date.dt.year < year_min)
     df = df[~drop_mask].reset_index(drop=True)
 
     release_features = extract_release_features(df)
