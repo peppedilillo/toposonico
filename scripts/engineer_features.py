@@ -54,7 +54,7 @@ def main():
         "--genre-threshold",
         type=int,
         default=ENGINEERED_GENRETHRESHOLD_DEFAULT,
-        help=f"Genres appearing <= this many times are replaced with niche_token (default: {ENGINEERED_DURCLIPPING_DEFAULT})",
+        help=f"Genres appearing <= this many times are replaced with niche_token (default: {ENGINEERED_GENRETHRESHOLD_DEFAULT})",
     )
     args = parser.parse_args()
 

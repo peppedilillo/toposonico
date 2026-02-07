@@ -26,6 +26,7 @@ DTYPES = {
     "danceability": "float32",
     "energy": "float32",
     "loudness": "float32",
+    "_loudness": "float32",
     "speechiness": "float32",
     "acousticness": "float32",
     "instrumentalness": "float32",
@@ -127,6 +128,18 @@ def extract_release_features(df: pd.DataFrame) -> pd.DataFrame:
     })
 
 
+def normalize_and_clip_loudness(
+        df: pd.DataFrame,
+        clip_quantile: float = 1 / 15787 / 2,  # sigma
+) -> pd.Series:
+    """Normalizes loudness per year and clips under 4-sigma deviations."""
+    ln = (
+        (df["loudness"] - df.groupby("_release_year")["loudness"].transform("mean")) /
+        df.groupby("_release_year")["loudness"].transform("std")
+    )
+    return ln.clip(lower=ln.quantile(clip_quantile))
+
+
 def map_categorical_by_frequency(
     s: pd.Series, labels: list[str], qsplit: float = 0.2
 ) -> pd.Series:
@@ -222,7 +235,7 @@ ENGINEERED_COLUMNS = [
     "_release_yday_sin",
     "danceability",
     "energy",
-    "loudness",
+    "_loudness",
     "speechiness",
     "acousticness",
     "instrumentalness",
@@ -286,6 +299,8 @@ def engineer_features(
     if duration_clip_quantile < 1.0:
         upper = df["duration_ms"].quantile(duration_clip_quantile)
         df["duration_ms"] = df["duration_ms"].clip(upper=upper)
+
+    df["_loudness"] = normalize_and_clip_loudness(df)
 
     df["_artist_genres"] = genres_mask_under_threshold(df["artist_genres"], genre_threshold)
     assert df.isna().sum().sum() == 0
