@@ -1,5 +1,6 @@
 from collections import Counter
 
+import numpy as np
 import pandas as pd
 
 
@@ -18,6 +19,9 @@ DTYPES = {
     "_artist_genres": "string",
     "album_type": "string",
     "release_date_precision": "string",
+    "_release_year": "int16",
+    "_release_yday_cos": "float32",
+    "_release_yday_sin": "float32",
     "tempo": "float32",
     "danceability": "float32",
     "energy": "float32",
@@ -29,6 +33,8 @@ DTYPES = {
     "valence": "float32",
     "time_signature": "uint8",
     "key": "uint8",
+    "_key_cos": "float32",
+    "_key_sin": "float32",
     "mode": "bool",
     "explicit": "bool",
     "track_popularity": "uint8",
@@ -68,29 +74,48 @@ def cast_types(df: pd.DataFrame) -> pd.DataFrame:
     return df.astype({k: v for k, v in DTYPES.items() if k in df.columns})
 
 
-def release_date_to_year_and_season(df: pd.DataFrame) -> pd.DataFrame:
-    """Extract release_year and release_season from release_date strings."""
+# Circle of fifths encoding: harmonically related keys are adjacent
+_KEY_ANGLE_MAP_MAJOR = {i: (i * 7 % 12) * 2 * np.pi / 12.0 for i in range(12)}
+_KEY_ANGLE_MAP_MINOR = {i: ((i + 3) * 7 % 12) * 2 * np.pi / 12.0 for i in range(12)}
+
+
+def encode_keys(df: pd.DataFrame) -> pd.DataFrame:
+    """Encode musical key as cyclical features using circle of fifths.
+
+    Maps keys to positions on the circle of fifths, so harmonically related keys
+    (a fifth apart) are closer in the encoded space. Relative major/minor keys
+    (e.g., C major and A minor) map to the same angle.
+    """
+    angles = np.zeros(len(df))
+    mask_major = df["mode"] == 1  # Spotify API: 1 = major, 0 = minor
+    angles[mask_major] = df.loc[mask_major, "key"].map(_KEY_ANGLE_MAP_MAJOR)
+    angles[~mask_major] = df.loc[~mask_major, "key"].map(_KEY_ANGLE_MAP_MINOR)
+    return pd.DataFrame({
+        "_key_cos": np.cos(angles),
+        "_key_sin": np.sin(angles),
+    })
+
+
+def extract_release_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Extract release_year and cyclical encoding of day-of-year from release_date."""
     dt = pd.to_datetime(df["release_date"], format="mixed")
-
     year = dt.dt.year
-    month = dt.dt.month
+    yday = dt.dt.dayofyear
 
-    season_map = {
-        12: "winter", 1: "winter", 2: "winter",
-        3: "spring", 4: "spring", 5: "spring",
-        6: "summer", 7: "summer", 8: "summer",
-        9: "fall", 10: "fall", 11: "fall",
-    }
-    season = month.map(season_map).fillna("unknown")
+    days_in_year = np.where(dt.dt.is_leap_year, 366, 365)
+    yday_angle = 2 * np.pi * yday / days_in_year
+    yday_cos = np.cos(yday_angle)
+    yday_sin = np.sin(yday_angle)
 
-    # Set season to "unknown" when release_date_precision is "year"
-    # (pd.to_datetime defaults year-only dates to Jan 1st, which would be "winter")
-    if "release_date_precision" in df.columns:
-        season = season.where(df["release_date_precision"] != "year", "unknown")
+    # Set to (0, 0) when precision is "year" - equidistant from all points on the unit circle
+    mask = df["release_date_precision"] == "year"
+    yday_cos[mask] = 0.0
+    yday_sin[mask] = 0.0
 
     return pd.DataFrame({
-        "release_year": year,
-        "release_season": season,
+        "_release_year": year,
+        "_release_yday_cos": yday_cos,
+        "_release_yday_sin": yday_sin,
     })
 
 
@@ -176,13 +201,15 @@ ENGINEERED_COLUMNS = [
     "_artist_genres",
     # Categorical
     "album_type",
-    "release_season",
-    "key",
     "time_signature",
     # Numeric
+    "_key_cos",
+    "_key_sin",
     "mode",
     "tempo",
-    "release_year",
+    "_release_year",
+    "_release_yday_cos",
+    "_release_yday_sin",
     "danceability",
     "energy",
     "loudness",
@@ -227,13 +254,18 @@ def engineer_features(
     """
     df = df.copy()
 
-    release_date = pd.to_datetime(df["release_date"], format="mixed", errors="coerce")
-    drop_mask = release_date.isna() | (release_date.dt.year < year_min)
+    release_date = pd.to_datetime(df["release_date"], format="mixed")
+    drop_mask = release_date.dt.year < year_min
     df = df[~drop_mask].reset_index(drop=True)
 
-    release_features = release_date_to_year_and_season(df)
-    df["release_year"] = release_features["release_year"]
-    df["release_season"] = release_features["release_season"]
+    release_features = extract_release_features(df)
+    df["_release_year"] = release_features["_release_year"]
+    df["_release_yday_cos"] = release_features["_release_yday_cos"]
+    df["_release_yday_sin"] = release_features["_release_yday_sin"]
+
+    key_features = encode_keys(df)
+    df["_key_cos"] = key_features["_key_cos"]
+    df["_key_sin"] = key_features["_key_sin"]
 
     label_names = [f"<{'X' * (label_buckets - i)}S_LABEL>" for i in range(label_buckets)]
     df["_label"] = map_categorical_by_frequency(df["label"], label_names, label_qsplit)
