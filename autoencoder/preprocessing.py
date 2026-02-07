@@ -32,6 +32,7 @@ DTYPES = {
     "liveness": "float32",
     "valence": "float32",
     "time_signature": "uint8",
+    "_time_signature_is_four": "bool",
     "key": "uint8",
     "_key_cos": "float32",
     "_key_sin": "float32",
@@ -93,6 +94,13 @@ def encode_keys(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({
         "_key_cos": np.cos(angles),
         "_key_sin": np.sin(angles),
+    })
+
+
+def flag_odd_time_signatures(df: pd.DataFrame) -> pd.DataFrame:
+    """Flag tracks with 4/4 time signature."""
+    return pd.DataFrame({
+        "_time_signature_is_four": df["time_signature"] == 4
     })
 
 
@@ -188,6 +196,8 @@ def genres_mask_under_threshold(
         .apply(lambda xs: mask_rare(xs)).apply(str)
     )
 
+
+# leading underscores for engineered features
 ENGINEERED_COLUMNS = [
     # Identifiers/Metadata
     "track_rowid",
@@ -201,8 +211,8 @@ ENGINEERED_COLUMNS = [
     "_artist_genres",
     # Categorical
     "album_type",
-    "time_signature",
     # Numeric
+    "_time_signature_is_four",
     "_key_cos",
     "_key_sin",
     "mode",
@@ -266,6 +276,9 @@ def engineer_features(
     key_features = encode_keys(df)
     df["_key_cos"] = key_features["_key_cos"]
     df["_key_sin"] = key_features["_key_sin"]
+
+    time_sig_features = flag_odd_time_signatures(df)
+    df["_time_signature_is_four"] = time_sig_features["_time_signature_is_four"]
 
     label_names = [f"<{'X' * (label_buckets - i)}S_LABEL>" for i in range(label_buckets)]
     df["_label"] = map_categorical_by_frequency(df["label"], label_names, label_qsplit)
