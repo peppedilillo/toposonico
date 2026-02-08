@@ -9,8 +9,8 @@ import pandas as pd
 
 from autoencoder.preprocessing import engineer_features
 from autoencoder.preprocessing import ENGINEERED_DURCLIPPING_DEFAULT
-from autoencoder.preprocessing import ENGINEERED_LABELQSPLIT_DEFAULT
-from autoencoder.preprocessing import ENGINEERED_LABELBUCKETS_DEFAULT
+from autoencoder.preprocessing import ENGINEERED_LABELSIZEQSPLIT_DEFAULT
+from autoencoder.preprocessing import ENGINEERED_LABELSIZEBUCKETS_DEFAULT
 from autoencoder.preprocessing import ENGINEERED_YMIN_DEFAULT
 from autoencoder.preprocessing import ENGINEERED_GENRETHRESHOLD_DEFAULT
 
@@ -33,16 +33,16 @@ def main():
         help=f"Drop tracks released before this year (default: {ENGINEERED_YMIN_DEFAULT})",
     )
     parser.add_argument(
-        "--label-buckets",
+        "--label-size-buckets",
         type=int,
-        default=ENGINEERED_LABELBUCKETS_DEFAULT,
-        help=f"Number of frequency-based label buckets (default: {ENGINEERED_LABELBUCKETS_DEFAULT})",
+        default=ENGINEERED_LABELSIZEBUCKETS_DEFAULT,
+        help=f"Number of frequency-based label size buckets, max 7 (default: {ENGINEERED_LABELSIZEBUCKETS_DEFAULT})",
     )
     parser.add_argument(
-        "--label-qsplit",
+        "--label-size-qsplit",
         type=float,
-        default=ENGINEERED_LABELQSPLIT_DEFAULT,
-        help=f"Quantile split factor for label bucketing (default: {ENGINEERED_LABELQSPLIT_DEFAULT})",
+        default=ENGINEERED_LABELSIZEQSPLIT_DEFAULT,
+        help=f"Quantile split factor for label size bucketing (default: {ENGINEERED_LABELSIZEQSPLIT_DEFAULT})",
     )
     parser.add_argument(
         "--duration-clip-quantile",
@@ -75,16 +75,16 @@ def main():
 
     print("Engineering features...")
     print(f"  year_min={args.year_min}")
-    print(f"  label_buckets={args.label_buckets}")
-    print(f"  label_qsplit={args.label_qsplit}")
+    print(f"  label_size_buckets={args.label_size_buckets}")
+    print(f"  label_size_qsplit={args.label_size_qsplit}")
     print(f"  duration_clip_quantile={args.duration_clip_quantile}")
     print(f"  genre_threshold={args.genre_threshold}")
 
     df = engineer_features(
         df,
         year_min=args.year_min,
-        label_buckets=args.label_buckets,
-        label_qsplit=args.label_qsplit,
+        label_size_buckets=args.label_size_buckets,
+        label_size_qsplit=args.label_size_qsplit,
         duration_clip_quantile=args.duration_clip_quantile,
         genre_threshold=args.genre_threshold,
     )

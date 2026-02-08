@@ -12,7 +12,7 @@ DTYPES = {
     "artist_name": "string",
     "album_name": "string",
     "label": "string",
-    "_label": "string",
+    "_label_size": "int8",
     "release_date": "string",
     "id_isrc": "string",
     "artist_genres": "string",
@@ -141,14 +141,13 @@ def normalize_and_clip_loudness(
 
 
 def map_categorical_by_frequency(
-    s: pd.Series, labels: list[str], qsplit: float = 0.2
+    s: pd.Series, labels: list, qsplit: float = 0.2,
 ) -> pd.Series:
     """
     Map a categorical series based on value frequency quantiles.
 
     Values are bucketed into n groups based on their frequency, where n is the number of labels.
-    The most frequent values (above the highest quantile threshold) keep their original names, while
-    less frequent values are replaced with the corresponding label.
+    All values are assigned to a bucket.
 
     Args:
         s: Categorical series to map.
@@ -156,20 +155,17 @@ def map_categorical_by_frequency(
         qsplit: Quantile split factor. Thresholds are 1 - qsplit^i for i in 1..n.
 
     Returns:
-        Series with infrequent values replaced by bucket labels.
+        Series with values replaced by bucket labels.
     """
-    n = len(labels)
     counts = s.value_counts()
-    thresholds = [counts.quantile(1.0 - qsplit**i) for i in range(1, n + 1)]
+    thresholds = [counts.quantile(1.0 - qsplit**i) for i in range(1, len(labels))] + [counts.max() + 1]
 
     mapping = {}
     for val, cnt in counts.items():
-        mapped_val = val
         for i, thresh in enumerate(thresholds):
             if cnt < thresh:
-                mapped_val = labels[i]
+                mapping[val] = labels[i]
                 break
-        mapping[val] = mapped_val
 
     return s.map(mapping)
 
@@ -219,11 +215,11 @@ ENGINEERED_COLUMNS = [
     "artist_rowid",
     "album_rowid",
     "album_name",
-    "_label",
     "artist_genres",
     "_artist_genres",
     # Categorical
     "album_type",
+    "_label_size",
     # Numeric
     "_time_signature_is_four",
     "_key_cos",
@@ -247,16 +243,17 @@ ENGINEERED_COLUMNS = [
 
 
 ENGINEERED_YMIN_DEFAULT = 1955
-ENGINEERED_LABELBUCKETS_DEFAULT = 2
-ENGINEERED_LABELQSPLIT_DEFAULT = 0.2
+ENGINEERED_LABELSIZEBUCKETS_DEFAULT = 7
+ENGINEERED_LABELSIZEQSPLIT_DEFAULT = 0.2
 ENGINEERED_DURCLIPPING_DEFAULT = 0.9986
 ENGINEERED_GENRETHRESHOLD_DEFAULT = 100
+
 
 def engineer_features(
     df: pd.DataFrame,
     year_min: int = ENGINEERED_YMIN_DEFAULT,
-    label_buckets: int = ENGINEERED_LABELBUCKETS_DEFAULT,
-    label_qsplit: float = ENGINEERED_LABELQSPLIT_DEFAULT,
+    label_size_buckets: int = ENGINEERED_LABELSIZEBUCKETS_DEFAULT,
+    label_size_qsplit: float = ENGINEERED_LABELSIZEQSPLIT_DEFAULT,
     duration_clip_quantile: float = ENGINEERED_DURCLIPPING_DEFAULT,
     genre_threshold: int = ENGINEERED_GENRETHRESHOLD_DEFAULT,
 ) -> pd.DataFrame:
@@ -267,8 +264,8 @@ def engineer_features(
     Args:
         df: Input DataFrame with raw track data.
         year_min: Drop tracks released before this year.
-        label_buckets: Number of frequency-based label buckets.
-        label_qsplit: Quantile split factor for label bucketing.
+        label_size_buckets: Number of frequency-based label size buckets.
+        label_size_qsplit: Quantile split factor for label size bucketing.
         duration_clip_quantile: Upper quantile for duration clipping (1.0 = no clip).
         genre_threshold: Genres appearing <= this many times are replaced with niche_token.
 
@@ -294,8 +291,12 @@ def engineer_features(
     time_sig_features = flag_odd_time_signatures(df)
     df["_time_signature_is_four"] = time_sig_features["_time_signature_is_four"]
 
-    label_names = [f"<{'X' * (label_buckets - i)}S_LABEL>" for i in range(label_buckets)]
-    df["_label"] = map_categorical_by_frequency(df["label"], label_names, label_qsplit)
+
+    df["_label_size"] = map_categorical_by_frequency(
+        df["label"],
+        list(range(label_size_buckets)),
+        label_size_qsplit,
+    )
 
     if duration_clip_quantile < 1.0:
         upper = df["duration_ms"].quantile(duration_clip_quantile)
