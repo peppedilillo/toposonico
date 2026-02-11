@@ -140,34 +140,41 @@ def normalize_and_clip_loudness(
     return ln.clip(lower=ln.quantile(clip_quantile))
 
 
-def map_categorical_by_frequency(
-    s: pd.Series, labels: list, qsplit: float = 0.2,
-) -> pd.Series:
+def label_to_year_size(df: pd.DataFrame, bucket_num: int, qsplit: float = 0.2) -> pd.Series:
     """
-    Map a categorical series based on value frequency quantiles.
-
-    Values are bucketed into n groups based on their frequency, where n is the number of labels.
-    All values are assigned to a bucket.
+    Map a label to its size at track release time.
+    Sizes are organized in 80-20 exponential buckets.
+    Label sizes are labelled from 0 to bucket_num - 1, smallest to largest.
 
     Args:
-        s: Categorical series to map.
-        labels: Labels for each bucket (from least to most frequent).
-        qsplit: Quantile split factor. Thresholds are 1 - qsplit^i for i in 1..n.
+        df: DataFrame with 'release_date' and 'label' columns.
+        bucket_num: Number of size buckets (0 = smallest, bucket_num - 1 = largest).
+        qsplit: Quantile split factor. Thresholds are 1 - qsplit^i for i in 1..bucket_num.
 
     Returns:
-        Series with values replaced by bucket labels.
+        Series of integer bucket labels, aligned to df.index.
     """
-    counts = s.value_counts()
-    thresholds = [counts.quantile(1.0 - qsplit**i) for i in range(1, len(labels))] + [counts.max() + 1]
+    years = pd.to_datetime(df["release_date"], format="mixed").dt.year
+    counts = df.groupby([years, "label"]).size().groupby("label").cumsum().sort_index()
+    result = pd.Series(pd.NA, index=df.index)
+    for year in range(years.min(), years.max() + 1):
+        if year not in counts.index.get_level_values(0):
+            continue
+        snapshot = counts.loc[:year].groupby("label").last()
+        thresholds = [
+                         snapshot.quantile(1.0 - qsplit ** i)
+                         for i in range(1, bucket_num)
+                     ] + [snapshot.max() + 1]
 
-    mapping = {}
-    for val, cnt in counts.items():
-        for i, thresh in enumerate(thresholds):
-            if cnt < thresh:
-                mapping[val] = labels[i]
-                break
-
-    return s.map(mapping)
+        mapping = {}
+        for val, cnt in snapshot.items():
+            for i, thresh in enumerate(thresholds):
+                if cnt < thresh:
+                    mapping[val] = i
+                    break
+        mask = years == year
+        result[mask] = df.loc[mask, "label"].map(mapping)
+    return result
 
 
 def genres_mask_under_threshold(
@@ -183,7 +190,6 @@ def genres_mask_under_threshold(
         s: Series containing delimited genre strings (e.g., "rock | pop | indie").
         threshold: Genres appearing <= this many times are replaced with niche_token.
         separator: Delimiter used to split genre strings.
-        unknown_token: Token for missing/null values.
         niche_token: Token to replace infrequent genres.
 
     Returns:
@@ -292,11 +298,7 @@ def engineer_features(
     df["_time_signature_is_four"] = time_sig_features["_time_signature_is_four"]
 
 
-    df["_label_size"] = map_categorical_by_frequency(
-        df["label"],
-        list(range(label_size_buckets)),
-        label_size_qsplit,
-    )
+    df["_label_size"] = label_to_year_size(df, label_size_buckets, label_size_qsplit)
 
     if duration_clip_quantile < 1.0:
         upper = df["duration_ms"].quantile(duration_clip_quantile)
