@@ -1,5 +1,11 @@
 # spotify-rec
 
+## Setup
+```bash
+uv sync                  # default: PyTorch with latest CUDA
+uv sync --extra cu118    # PyTorch with CUDA 11.8 (older GPUs, e.g. RTX 2060)
+```
+
 ## Cloud Computing
 From project root, to vm:
 ```bash

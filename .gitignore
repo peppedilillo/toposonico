@@ -12,9 +12,13 @@ wheels/
 
 # data
 data
+notebooks/experiments/data
 
 # Virtual environments
 .venv
+
+# notebooks
+notebooks/___*
 
 # LLM
 CLAUDE.md
