@@ -50,7 +50,10 @@ DTYPES = {
 }
 
 
-def drop_or_fill_nans(df: pd.DataFrame, unknown_genre_token: str = "<UNKNOWN_GENRE>", ) -> pd.DataFrame:
+CLEAN_UNKNOWN_GENRE_DEFAULT = "<UNKNOWN_GENRE>"
+
+
+def drop_or_fill_nans(df: pd.DataFrame, unknown_genre_token: str = CLEAN_UNKNOWN_GENRE_DEFAULT, ) -> pd.DataFrame:
     """Clean raw training data: handle missing values and set proper dtypes."""
     df = df.drop(columns=["id_upc"])
     df = df.dropna(subset=["id_isrc"])
