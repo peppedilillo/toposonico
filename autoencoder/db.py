@@ -6,17 +6,14 @@ from pathlib import Path
 import pandas as pd
 
 
-DATABASE_PATH = Path.home() / "HDD/Datasets/annas_archive_spotify_2025_07_merged/spotify_merged.sqlite3"
-
-
-def get_connection() -> sqlite3.Connection:
+def get_connection(database_path: Path) -> sqlite3.Connection:
     """
     Get a read-only connection to the database.
 
     Returns:
         sqlite3.Connection configured for read-only access
     """
-    uri = f"file:{DATABASE_PATH}?mode=ro"
+    uri = f"file:{database_path}?mode=ro"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     return conn
@@ -49,22 +46,3 @@ def head_table(
     """Get the first n rows from a table (fast, non-random)."""
     query = f"SELECT * FROM {table} LIMIT {n}"
     return pd.read_sql_query(query, conn)
-
-
-def query_to_df(
-    conn: sqlite3.Connection,
-    sql: str,
-    params: tuple | dict | None = None,
-) -> pd.DataFrame:
-    """
-    Execute a query and return results as a pandas DataFrame.
-
-    Args:
-        conn: Database connection
-        sql: SQL query string
-        params: Optional query parameters
-
-    Returns:
-        pandas DataFrame with query results
-    """
-    return pd.read_sql_query(sql, conn, params=params)
