@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Clean raw training data for autoencoder."""
+"""Clean raw metadata for autoencoder."""
 
 import argparse
 import time
@@ -16,7 +16,7 @@ OUTPUT_DIR = Path(__file__).parent.parent / "data/clean"
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Clean raw training data")
+    parser = argparse.ArgumentParser(description="Clean raw metadata")
     parser.add_argument("input", help="Input parquet file (filename or path)")
     args = parser.parse_args()
 

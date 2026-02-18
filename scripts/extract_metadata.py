@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Extract training data for autoencoder from merged Spotify database.
+"""Extract metadata for autoencoder from merged Spotify database.
 
 Usage:
-    python scripts/extract_training_data.py <merged_db> [-p POP] [-g]
+    python scripts/extract_metadata.py <merged_db> [-p POP] [-g]
 
 Example:
-    python scripts/extract_training_data.py ~/data/spotify_merged.sqlite3 -p 50 -g
+    python scripts/extract_metadata.py ~/data/spotify_merged.sqlite3 -p 50 -g
 
 Requires: Run scripts/merge_databases.py first to create the merged database.
-Output: data/raw/training_pop{POP}[_genres].parquet
+Output: data/raw/metadata_pop{POP}[_genres].parquet
 """
 
 import argparse
@@ -90,7 +90,7 @@ WHERE t.popularity > ?
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Extract training data for autoencoder"
+        description="Extract metadata for autoencoder"
     )
     parser.add_argument("database", type=Path, help="Path to merged database")
     parser.add_argument(
@@ -130,8 +130,8 @@ def main():
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     filename = (
-        f"training_pop{args.popularity}_genres.parquet"
-        if args.genres else f"training_pop{args.popularity}.parquet"
+        f"metadata_pop{args.popularity}_genres.parquet"
+        if args.genres else f"metadata_pop{args.popularity}.parquet"
     )
     output_path = OUTPUT_DIR / filename
 

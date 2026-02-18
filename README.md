@@ -27,18 +27,18 @@ python scripts/merge_databases.py \
     <output_merged.sqlite3>
 ```
 
-### 2. Extract training data
+### 2. Extract metadata
 ```bash
-python scripts/extract_training_data.py <merged.sqlite3> -p 50 -g
+python scripts/extract_metadata.py <merged.sqlite3> -p 50 -g
 ```
 - `-p`: popularity threshold (default: 80)
 - `-g`: include artist genres
 
 Output: `data/raw/training_pop{POP}[_genres].parquet`
 
-### 3. Clean data
+### 3. Clean metadata
 ```bash
-python scripts/clean_data.py <raw_dataset.parquet>
+python scripts/clean_metadata.py <raw_dataset.parquet>
 ```
 Input defaults to `data/raw/` if filename only.
 Output: `data/clean/<filename>.parquet`
