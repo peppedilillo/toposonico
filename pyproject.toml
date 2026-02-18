@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["autoencoder"]
+packages = ["src"]
 
 [project.optional-dependencies]
 cu118 = ["torch"]

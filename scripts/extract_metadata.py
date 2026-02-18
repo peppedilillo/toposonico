@@ -19,7 +19,7 @@ from pathlib import Path
 import pandas as pd
 
 
-OUTPUT_DIR = Path(__file__).parent.parent / "data/raw"
+OUTPUT_DIR = Path(__file__).parent.parent / "metadata/data/raw"
 
 
 QUERY = """

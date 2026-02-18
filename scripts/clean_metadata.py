@@ -7,12 +7,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from autoencoder.preprocessing import drop_or_fill_nans
-from autoencoder.preprocessing import deduplicate_recordings
-from autoencoder.preprocessing import cast_types
+from src.autoencoder.preprocessing import drop_or_fill_nans
+from src.autoencoder.preprocessing import deduplicate_recordings
+from src.autoencoder.preprocessing import cast_types
 
 
-OUTPUT_DIR = Path(__file__).parent.parent / "data/clean"
+OUTPUT_DIR = Path(__file__).parent.parent / "metadata/data/clean"
 
 
 def main():

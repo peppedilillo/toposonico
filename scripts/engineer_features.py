@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from autoencoder.preprocessing import engineer_features
-from autoencoder.preprocessing import ENGINEERED_DURCLIPPING_DEFAULT
-from autoencoder.preprocessing import ENGINEERED_LABELSIZEQSPLIT_DEFAULT
-from autoencoder.preprocessing import ENGINEERED_LABELSIZEBUCKETS_DEFAULT
-from autoencoder.preprocessing import ENGINEERED_YMIN_DEFAULT
-from autoencoder.preprocessing import ENGINEERED_GENRETHRESHOLD_DEFAULT
+from src.autoencoder.preprocessing import engineer_features
+from src.autoencoder.preprocessing import ENGINEERED_DURCLIPPING_DEFAULT
+from src.autoencoder.preprocessing import ENGINEERED_LABELSIZEQSPLIT_DEFAULT
+from src.autoencoder.preprocessing import ENGINEERED_LABELSIZEBUCKETS_DEFAULT
+from src.autoencoder.preprocessing import ENGINEERED_YMIN_DEFAULT
+from src.autoencoder.preprocessing import ENGINEERED_GENRETHRESHOLD_DEFAULT
 
-OUTPUT_DIR = Path(__file__).parent.parent / "data/engineered"
+OUTPUT_DIR = Path(__file__).parent.parent / "metadata/data/engineered"
 
 
 def main():
