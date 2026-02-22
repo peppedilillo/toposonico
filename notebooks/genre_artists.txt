@@ -1,0 +1,166 @@
+# new-wave
+Talking Heads
+Blondie
+Devo
+The B-52's
+Duran Duran
+The Cars
+New Order
+Depeche Mode
+A Flock Of Seagulls
+Tears For Fears
+The Human League
+Gary Numan
+Orchestral Manoeuvres In The Dark
+Eurythmics
+
+# post-punk
+Joy Division
+Siouxsie and the Banshees
+The Cure
+Bauhaus
+Wire
+Gang of Four
+Killing Joke
+The Chameleons
+Echo & the Bunnymen
+The Sound
+The Fall
+Magazine
+Cocteau Twins
+Public Image Ltd
+
+# 70s-punk
+Ramones
+Sex Pistols
+The Clash
+Dead Kennedys
+Buzzcocks
+The Damned
+Richard Hell & The Voidoids
+Television
+X-Ray Spex
+Stiff Little Fingers
+The Stranglers
+Iggy Pop
+Patti Smith
+
+# grunge
+Nirvana
+Pearl Jam
+Soundgarden
+Alice In Chains
+Mudhoney
+Stone Temple Pilots
+Screaming Trees
+Melvins
+Tad
+L7
+Hole
+Dinosaur Jr.
+Meat Puppets
+
+# thrash-metal
+Metallica
+Megadeth
+Slayer
+Anthrax
+Exodus
+Testament
+Kreator
+Sodom
+Overkill
+Sepultura
+Death Angel
+Destruction
+Annihilator
+
+# black-metal
+Mayhem
+Burzum
+Darkthrone
+Emperor
+Immortal
+Bathory
+Gorgoroth
+Satyricon
+Enslaved
+Carpathian Forest
+Marduk
+1349
+Taake
+
+# dark-wave
+Clan Of Xymox
+Lebanon Hanover
+She Past Away
+Drab Majesty
+Twin Tribes
+Boy Harsher
+Molchat Doma
+Cold Cave
+Light Asylum
+Linea Aspera
+Selofan
+Rendez-Vous
+Asylum Party
+
+# 90s-west-coast-hip-hop
+2Pac
+Dr. Dre
+Snoop Dogg
+Ice Cube
+Warren G
+Tha Dogg Pound
+DJ Quik
+Xzibit
+Cypress Hill
+E-40
+Too $hort
+Mack 10
+MC Eiht
+
+# 90s-east-coast-hip-hop
+The Notorious B.I.G.
+Nas
+Wu-Tang Clan
+Mobb Deep
+Jay-Z
+Raekwon
+GZA
+A Tribe Called Quest
+Gang Starr
+Black Moon
+Big L
+Busta Rhymes
+KRS-One
+
+# conscious-hip-hop
+Kendrick Lamar
+Common
+Mos Def
+Talib Kweli
+The Roots
+Immortal Technique
+Dead Prez
+Brother Ali
+Lupe Fiasco
+Atmosphere
+Dilated Peoples
+Blackalicious
+Jurassic 5
+
+# IDM
+Aphex Twin
+Autechre
+Boards of Canada
+Squarepusher
+Plaid
+Clark
+Venetian Snares
+Amon Tobin
+Prefuse 73
+Four Tet
+Telefon Tel Aviv
+u-Ziq
+Ceephax Acid Crew

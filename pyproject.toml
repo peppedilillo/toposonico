@@ -16,6 +16,7 @@ dependencies = [
     "scikit-learn>=1.8.0",
     "matplotlib>=3.10.8",
     "tqdm>=4.67.3",
+    "umap-learn>=0.5.11",
 ]
 
 [tool.hatch.build.targets.wheel]
