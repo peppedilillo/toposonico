@@ -14,13 +14,25 @@ No deduplication is applied. Duplicate (playlist_rowid, track_rowid) pairs from
 the same track being added twice to a playlist are rare and produce negligible
 extra training pairs.
 
+The number of distinct playlists per chunk may be slightly lower than --chunk-size:
+playlists whose tracks are all episodes, local files, or have null track_rowids are
+included in the rowid batch but contribute no rows to the output.
+
+
 Usage:
     python scripts/build_playlist_chunks.py <database> [-o OUTPUT_DIR]
-                                             [--chunk-size N] [--overwrite]
+                                             [--chunk-size N] [--offset K]
+                                             [--overwrite]
 
-Example:
+The --offset argument slices the playlist list with Python semantics before
+chunking: offset=0 (default) includes all playlists; offset=K > 0 skips the
+first K playlists; offset=-K includes only the last K playlists. Valid range:
+-(n-1) to (n-1), where n is the total number of playlists.
+
+Example — build a small two-chunk mini-library from the last 32,000 playlists:
     python scripts/build_playlist_chunks.py \\
-        ~/HDD/Datasets/annas_archive_spotify_2025_07/spotify_clean_playlists.sqlite3
+        ~/HDD/Datasets/annas_archive_spotify_2025_07/spotify_clean_playlists.sqlite3 \\
+        -o data/playlist/mini_chunks --offset -32000 --chunk-size 28000
 """
 
 import argparse
@@ -71,6 +83,16 @@ def main():
         help="Number of playlists per chunk (default: 100,000)",
     )
     parser.add_argument(
+        "--offset",
+        type=int,
+        default=0,
+        help=(
+            "Slice the playlist list before chunking using Python semantics. "
+            "0 (default) = all playlists; K > 0 = skip first K; -K = last K only. "
+            "Valid range: -(n-1) to (n-1)."
+        ),
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Overwrite existing chunk files (default: skip existing)",
@@ -88,9 +110,19 @@ def main():
     print(f"Database   : {args.database}")
     print(f"Output dir : {output_dir}")
     print(f"Chunk size : {args.chunk_size:,} playlists")
+    print(f"Offset     : {args.offset}")
     print()
     print("Fetching playlist rowids...")
-    playlist_rowids = pd.read_sql_query(PLAYLIST_ROWIDS_QUERY, conn)["rowid"].tolist()
+    all_playlist_rowids = pd.read_sql_query(PLAYLIST_ROWIDS_QUERY, conn)["rowid"].tolist()
+    n = len(all_playlist_rowids)
+
+    if args.offset != 0 and not (-(n - 1) <= args.offset <= n - 1):
+        raise ValueError(
+            f"--offset {args.offset} out of range; valid range is [{-(n-1)}, {n-1}] "
+            f"for {n:,} playlists."
+        )
+
+    playlist_rowids = all_playlist_rowids[args.offset:] if args.offset != 0 else all_playlist_rowids
     total_playlists = len(playlist_rowids)
 
     batches = [
@@ -99,7 +131,10 @@ def main():
     ]
     total_chunks = len(batches)
 
-    print(f"  {total_playlists:,} playlists → {total_chunks:,} chunks")
+    if args.offset != 0:
+        print(f"  {n:,} playlists in DB, {total_playlists:,} selected (offset={args.offset}) → {total_chunks:,} chunks")
+    else:
+        print(f"  {total_playlists:,} playlists → {total_chunks:,} chunks")
     print()
 
     w = len(str(total_chunks))
@@ -142,6 +177,7 @@ def main():
         "total_chunks": total_chunks,
         "playlists_per_chunk": args.chunk_size,
         "total_playlists": total_playlists,
+        "offset": args.offset,
         "columns": ["playlist_rowid", "track_rowid", "position", "added_at", "added_by_id"],
         "filters": "is_episode=0, is_local=0, track_rowid IS NOT NULL",
         "created_at": datetime.now(timezone.utc).isoformat(),
