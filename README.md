@@ -84,3 +84,35 @@ Output: `data/playlist/track_lookup.parquet`
 - `-o`: override output path
 - `--chunk-size`: rows per chunk for streaming write (default: 500,000)
 
+### Build training artefacts (for full-scale / cloud training)
+
+Run in order:
+
+**1. Per-track playlist counts** — full scan, run once:
+```bash
+uv run scripts/build_track_counts.py <spotify_clean_playlists.sqlite3>
+```
+Output: `data/playlist/track_playlist_counts.parquet` — columns: `track_rowid, playlist_count`
+
+> Full table scan of ~1.7B rows. Takes a while on HDD.
+
+**2. Training vocabulary** — filter rare tracks, assign contiguous IDs:
+```bash
+uv run scripts/build_training_vocab.py data/playlist/track_playlist_counts.parquet \
+    [--min-count N]
+```
+Output: `data/playlist/training_vocab.parquet` — columns: `track_rowid, track_id, playlist_count`
+
+Run once without `--min-count` to inspect the count distribution and memory estimates,
+then re-run with a threshold that fits your VRAM budget.
+
+**3. Playlist chunks** — export all playlists as parquet chunks for streaming training:
+```bash
+uv run scripts/build_playlist_chunks.py <spotify_clean_playlists.sqlite3> \
+    [--chunk-size 100000]
+```
+Output: `data/playlist/chunks/chunk_NNNNNN.parquet` + `manifest.json`
+
+Chunks store raw `track_rowid`; remapping to `track_id` happens at training time via
+`training_vocab.parquet`. Resumable — existing chunks are skipped unless `--overwrite` is passed.
+
