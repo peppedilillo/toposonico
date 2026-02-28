@@ -1,0 +1,94 @@
+import random
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import torch
+from torch.optim import SparseAdam
+
+from src.data import (
+    PrefetchPairStream,
+    build_vocab_from_chunks,
+    get_nsampler,
+    init_chunk_processor,
+    split,
+)
+from src.model import Word2Vec, skipgram_loss
+
+
+def _make_chunks(tmp_path: Path, n_chunks: int, n_playlists: int, vocab_size: int, seed: int) -> list[Path]:
+    """Synthetic parquet chunks: random playlists with random track rowids."""
+    rng = np.random.default_rng(seed)
+    paths = []
+    for i in range(n_chunks):
+        rows = []
+        for pid in range(i * n_playlists, (i + 1) * n_playlists):
+            length = int(rng.integers(3, 12))
+            for tid in rng.integers(0, vocab_size, size=length):
+                rows.append({"playlist_rowid": np.int32(pid), "track_rowid": np.int64(tid)})
+        path = tmp_path / f"chunk_{i:06d}.parquet"
+        pd.DataFrame(rows).to_parquet(path, index=False)
+        paths.append(path)
+    return paths
+
+
+def _run(chunk_paths: list[Path], seed: int, n_workers: int) -> torch.Tensor:
+    """Full training loop (CPU, 2 epochs). Returns final input embeddings."""
+    SEED = seed
+    W, K, NBLOCK = 2, 5, 4
+    EMBED_DIM, BATCH_SIZE = 16, 128
+
+    train_paths, _ = split(chunk_paths, valid_fraction=0.2, seed=SEED)
+    SEED += 1
+
+    vocab = build_vocab_from_chunks(chunk_paths, cmin=1)
+
+    counts = vocab["playlist_count"].values.astype(np.float64)
+    w75 = counts ** 0.75
+    neg_sample, _ = get_nsampler(
+        torch.tensor(w75 / w75.sum(), dtype=torch.float32),
+        K, BATCH_SIZE, NBLOCK,
+    )
+    process_chunk = init_chunk_processor(vocab, W)
+
+    torch.manual_seed(SEED)
+    SEED += 1
+    model = Word2Vec(vocab_size=len(vocab), embed_dim=EMBED_DIM)
+    optimizer = SparseAdam(model.parameters(), lr=1e-3)
+
+    for epoch in range(2):
+        random.seed(SEED + epoch)
+        torch.manual_seed(SEED + epoch)
+        random.shuffle(train_paths)
+
+        stream = PrefetchPairStream(
+            train_paths, process_chunk, epoch=epoch, seed=SEED, n_workers=n_workers,
+        )
+        model.train()
+        while True:
+            batch = stream.next_batch(BATCH_SIZE)
+            if batch.shape[1] == 0:
+                break
+            c, x = batch[0], batch[1]
+            n = neg_sample(len(c))
+            optimizer.zero_grad()
+            skipgram_loss(*model(c, x, n)).backward()
+            optimizer.step()
+
+    return model.track_embeddings
+
+
+def test_deterministic_single_worker(tmp_path):
+    paths = _make_chunks(tmp_path, n_chunks=6, n_playlists=20, vocab_size=80, seed=42)
+    assert torch.equal(_run(paths, seed=0, n_workers=1), _run(paths, seed=0, n_workers=1))
+
+
+def test_deterministic_multi_worker(tmp_path):
+    paths = _make_chunks(tmp_path, n_chunks=6, n_playlists=20, vocab_size=80, seed=42)
+    assert torch.equal(_run(paths, seed=0, n_workers=4), _run(paths, seed=0, n_workers=4))
+
+
+def test_different_seeds_differ(tmp_path):
+    """Sanity check: different seeds must produce different embeddings."""
+    paths = _make_chunks(tmp_path, n_chunks=6, n_playlists=20, vocab_size=80, seed=42)
+    assert not torch.equal(_run(paths, seed=0, n_workers=1), _run(paths, seed=1, n_workers=1))
