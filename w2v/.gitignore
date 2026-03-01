@@ -10,7 +10,8 @@ wheels/
 # ide
 .idea
 
-# data
+# binaries
+models
 data
 notebooks/experiments/data
 
