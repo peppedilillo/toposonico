@@ -199,7 +199,7 @@ def init_chunk_processor(
         out["track_id"] = vocab_tids[idx[match]]
         return out
 
-    def process_chunk(path: Path, chunk_rng: np.random.RandomState) -> torch.Tensor:
+    def process_chunk(path: Path, chunk_rng: np.random.Generator) -> torch.Tensor:
         pt = reader(path)
         pt = remap_chunk(pt)
         pt = subsample(pt, chunk_rng)
