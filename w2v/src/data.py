@@ -129,25 +129,26 @@ def precompute_pairs(pt: pd.DataFrame, w: int) -> torch.Tensor:
 
 
 def make_cached_reader() -> Callable:
-    """Return a thread-safe reader that loads each parquet file once and caches it in RAM.
+    """Return a reader that loads each parquet file once and caches it in RAM.
 
     On the first call for a given path the file is read from disk; subsequent calls
     return the cached DataFrame immediately.  Useful on cloud machines with ample RAM
     (e.g. A100 + 200 GiB) to eliminate per-epoch disk I/O.
 
     Usage::
-
         reader = make_cached_reader()
         process_chunk = init_chunk_processor(vocab, W, reader=reader)
     """
     _cache: dict[Path, pd.DataFrame] = {}
-    _lock = threading.Lock()
 
     def reader(path: Path) -> pd.DataFrame:
-        with _lock:
-            if path not in _cache:
-                _cache[path] = pd.read_parquet(path, columns=["playlist_rowid", "track_rowid"])
-            return _cache[path]
+        if path not in _cache:
+            # no need to lock here: since we have exactly one future for each chunk,
+            # there is no risk for two threads to race writing to cache. it could potentially
+            # happen if cache writing happened at all epoch but it doesn't: after the first
+            # epoch, a thread comes here only to read.
+            _cache[path] = pd.read_parquet(path, columns=["playlist_rowid", "track_rowid"])
+        return _cache[path]
 
     return reader
 
