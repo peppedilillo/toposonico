@@ -38,17 +38,25 @@ def print_vram_budget(
 
     print(f"Vocab size          : {vocab_size:>10,}")
     print()
-    print(f"Embedding tables    : {embed    * GB:>6.2f} GB  (2 tables × {vocab_size:,} × {embedding_dims} × fp32)")
-    print(f"Optimizer state     : {optim    * GB:>6.2f} GB  (SparseAdam exp_avg + exp_avg_sq, dense after warmup)")
+    print(
+        f"Embedding tables    : {embed    * GB:>6.2f} GB  (2 tables × {vocab_size:,} × {embedding_dims} × fp32)"
+    )
+    print(
+        f"Optimizer state     : {optim    * GB:>6.2f} GB  (SparseAdam exp_avg + exp_avg_sq, dense after warmup)"
+    )
     print(f"Weights             : {weights_ * MB:>6.1f} MB  (negative sample weights)")
-    print(f"Neg. sample block   : {negs     * MB:>6.1f} MB  (negative sampling reservoir)")
+    print(
+        f"Neg. sample block   : {negs     * MB:>6.1f} MB  (negative sampling reservoir)"
+    )
     print(
         f"Activations fwd     : {act_fwd  * MB:>6.1f} MB  ({2 + neg_samples} tensors × {batch_size:,} × {embedding_dims})"
     )
     print(f"Activations bwd     : {act_bwd  * MB:>6.1f} MB  (sparse grad upper bound)")
     print()
     print(f"Tensor estimate     : {total      * GB:>6.2f} GB")
-    print(f"Realistic estimate  : {total_real * GB:>6.2f} GB  (×{allocator_overhead:.2f} allocator overhead)")
+    print(
+        f"Realistic estimate  : {total_real * GB:>6.2f} GB  (×{allocator_overhead:.2f} allocator overhead)"
+    )
     if torch.cuda.is_available():
         vram_total = torch.cuda.get_device_properties(0).total_memory
         vram_free, _ = torch.cuda.mem_get_info()
@@ -79,7 +87,9 @@ def print_ram_budget(vocab_size: int, embedding_dims: int):
     print(f"Vocab size          : {vocab_size:>10,}")
     print()
     print(f"Checkpoint load     : {checkpoint * GB:>6.2f} GB  (both embedding tables)")
-    print(f"Inference peak      : {inference  * GB:>6.2f} GB  (+ normalised embeddings_in)")
+    print(
+        f"Inference peak      : {inference  * GB:>6.2f} GB  (+ normalised embeddings_in)"
+    )
 
     try:
         meminfo = {}

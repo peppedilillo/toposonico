@@ -43,7 +43,9 @@ def build_vocab_from_chunks(chunk_paths: list[Path], cmin: int):
     return vocab
 
 
-def get_nsampler(weights_gpu: torch.Tensor, k: int, batch_size: int, block: int = 64) -> tuple[Callable, Callable]:
+def get_nsampler(
+    weights_gpu: torch.Tensor, k: int, batch_size: int, block: int = 64
+) -> tuple[Callable, Callable]:
     total = batch_size * k * block
     cache = [torch.empty(0, dtype=torch.long, device=weights_gpu.device), 0]
 
@@ -150,7 +152,9 @@ def make_cached_reader() -> Callable:
             # there is no risk for two threads to race writing to cache. it could potentially
             # happen if cache writing happened at all epoch but it doesn't: after the first
             # epoch, a thread comes here only to read.
-            _cache[path] = pd.read_parquet(path, columns=["playlist_rowid", "track_rowid"])
+            _cache[path] = pd.read_parquet(
+                path, columns=["playlist_rowid", "track_rowid"]
+            )
         return _cache[path]
 
     return reader
@@ -172,7 +176,9 @@ def init_chunk_processor(
             Defaults to a plain ``pd.read_parquet`` call.
     """
     if reader is None:
-        reader = lambda path: pd.read_parquet(path, columns=["playlist_rowid", "track_rowid"])
+        reader = lambda path: pd.read_parquet(
+            path, columns=["playlist_rowid", "track_rowid"]
+        )
 
     vocab_trowids = vocab["track_rowid"].values
     # we are going to binary search track row ids when filtering oov tracks
@@ -183,7 +189,9 @@ def init_chunk_processor(
     freq = counts / counts.sum()
 
     sub_threshold = float(np.quantile(freq, thr_quantile))
-    keep_probs = np.minimum(1.0, np.sqrt(sub_threshold / freq)).astype(np.float32)  # indexed by track_id
+    keep_probs = np.minimum(1.0, np.sqrt(sub_threshold / freq)).astype(
+        np.float32
+    )  # indexed by track_id
 
     def subsample(pt: pd.DataFrame, chunk_rng: np.random.Generator) -> pd.DataFrame:
         p = keep_probs[pt["track_id"].values]
@@ -250,7 +258,9 @@ class PrefetchPairStream:
         # when it gets to zero the calling thread blocks and waits.
         # this means that we can have at most queue_size buffer in memory, either still
         # processing or waiting for the consumer, effectively limiting the memory usage.
-        self._sem = threading.Semaphore(queue_size if queue_size is not None else n_workers)
+        self._sem = threading.Semaphore(
+            queue_size if queue_size is not None else n_workers
+        )
         # utilities and progress tracking
         self._n_chunks = len(chunk_paths)
         self._chunks_done = 0
@@ -267,7 +277,11 @@ class PrefetchPairStream:
         executor = ThreadPoolExecutor(max_workers=n_workers)
         # puts all chunks processing futures, ordered, into a deque
         self._futures = deque(
-            executor.submit(_process_with_sem, path, np.random.default_rng(seed + epoch * self._n_chunks + idx))
+            executor.submit(
+                _process_with_sem,
+                path,
+                np.random.default_rng(seed + epoch * self._n_chunks + idx),
+            )
             for idx, path in enumerate(chunk_paths)
         )
         executor.shutdown(wait=False)
@@ -287,7 +301,11 @@ class PrefetchPairStream:
             self._chunks_done += 1
             if tensor.shape[1] > 0:
                 self._pairs_produced += tensor.shape[1]
-                self._buffer = torch.cat([self._buffer, tensor], dim=1) if self._buffer.shape[1] > 0 else tensor
+                self._buffer = (
+                    torch.cat([self._buffer, tensor], dim=1)
+                    if self._buffer.shape[1] > 0
+                    else tensor
+                )
 
         batch = self._buffer[:, :batch_size]
         self._buffer = self._buffer[:, batch_size:]
@@ -316,7 +334,9 @@ class SerialPairStream:
         seed: Base seed for reproducibility.
     """
 
-    def __init__(self, chunk_paths: list[Path], process_chunk: Callable, epoch: int, seed: int):
+    def __init__(
+        self, chunk_paths: list[Path], process_chunk: Callable, epoch: int, seed: int
+    ):
         self._buffer = torch.empty(2, 0, dtype=torch.long)
         self._paths = deque(enumerate(chunk_paths))
         self._process_chunk = process_chunk
@@ -335,13 +355,19 @@ class SerialPairStream:
                 self._pairs_consumed += remainder.shape[1]
                 return remainder
             idx, path = self._paths.popleft()
-            chunk_rng = np.random.default_rng(self._seed + self._epoch * self._n_chunks + idx)
+            chunk_rng = np.random.default_rng(
+                self._seed + self._epoch * self._n_chunks + idx
+            )
             new = self._process_chunk(path, chunk_rng)
             self._chunks_done += 1
             if new.shape[1] == 0:
                 continue
             self._pairs_produced += new.shape[1]
-            self._buffer = torch.cat([self._buffer, new], dim=1) if self._buffer.shape[1] > 0 else new
+            self._buffer = (
+                torch.cat([self._buffer, new], dim=1)
+                if self._buffer.shape[1] > 0
+                else new
+            )
 
         batch = self._buffer[:, :batch_size]
         self._buffer = self._buffer[:, batch_size:]

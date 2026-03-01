@@ -22,7 +22,6 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-
 CHUNK_SIZE_DEFAULT = 500_000
 
 QUERY = """
@@ -97,7 +96,8 @@ def main():
         raise FileNotFoundError(f"Database not found: {args.database}")
     if args.vocab is not None and not args.vocab.exists():
         raise FileNotFoundError(
-            f"Vocab parquet not found: {args.vocab}\n" "Run 'python scripts/build_track_vocab.py' first."
+            f"Vocab parquet not found: {args.vocab}\n"
+            "Run 'python scripts/build_track_vocab.py' first."
         )
 
     output_path = args.output
@@ -112,7 +112,9 @@ def main():
     vocab_ids: pd.Index | None = None
     if args.vocab is not None:
         print("Loading vocab track_rowids for filtering...")
-        vocab_ids = pd.Index(pd.read_parquet(args.vocab, columns=["track_rowid"])["track_rowid"])
+        vocab_ids = pd.Index(
+            pd.read_parquet(args.vocab, columns=["track_rowid"])["track_rowid"]
+        )
         print(f"  {len(vocab_ids):,} track_rowids loaded")
         print()
 
@@ -138,13 +140,19 @@ def main():
             chunk["track_rowid"] = chunk["track_rowid"].astype("int64")
 
             if vocab_ids is not None:
-                mask = chunk["track_rowid"].isin(vocab_ids)  # pyright: ignore[reportArgumentType]
+                mask = chunk["track_rowid"].isin(
+                    vocab_ids
+                )  # pyright: ignore[reportArgumentType]
                 total_skipped += int((~mask).sum())
                 chunk = chunk.loc[mask]
 
             if not chunk.empty:
-                chunk["track_popularity"] = chunk["track_popularity"].fillna(0).astype("uint8")
-                writer.write_table(pa.Table.from_pandas(chunk, schema=SCHEMA, preserve_index=False))
+                chunk["track_popularity"] = (
+                    chunk["track_popularity"].fillna(0).astype("uint8")
+                )
+                writer.write_table(
+                    pa.Table.from_pandas(chunk, schema=SCHEMA, preserve_index=False)
+                )
 
             total_rows += len(chunk)
             elapsed = time.time() - t0
@@ -158,11 +166,15 @@ def main():
     elapsed = time.time() - t0
 
     size_mb = output_path.stat().st_size / 1_048_576
-    print(f"\n  {total_rows:,} written  {total_skipped:,} skipped  ({rate:,.0f} rows/s)")
+    print(
+        f"\n  {total_rows:,} written  {total_skipped:,} skipped  ({rate:,.0f} rows/s)"
+    )
     print(f"\nDone in {elapsed:.1f}s")
     print(f"Output : {output_path}  ({size_mb:.1f} MB)")
     if vocab_ids is not None:
-        print(f"Rows   : {total_rows:,}  ({100 * total_rows / len(vocab_ids):.1f}% of vocab covered)")
+        print(
+            f"Rows   : {total_rows:,}  ({100 * total_rows / len(vocab_ids):.1f}% of vocab covered)"
+        )
     else:
         print(f"Rows   : {total_rows:,}")
     if total_rows:

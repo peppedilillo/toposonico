@@ -61,7 +61,9 @@ def main():
     if args.min_count > 1:
         df = df[df["playlist_count"] >= args.min_count].reset_index(drop=True)
         n_dropped = n_total - len(df)
-        print(f"Dropped  {n_dropped:,} tracks below min_count={args.min_count} ({100 * n_dropped / n_total:.1f}%)")
+        print(
+            f"Dropped  {n_dropped:,} tracks below min_count={args.min_count} ({100 * n_dropped / n_total:.1f}%)"
+        )
 
     # Sort by track_rowid for a stable, reproducible mapping.
     df = df.sort_values("track_rowid").reset_index(drop=True)
@@ -91,7 +93,9 @@ def main():
         gb = vocab_size * dim * 4 * 2 / 1_073_741_824  # × 2 for both embedding tables
         print(f"  {dim}-dim : {gb:.1f} GB  (both tables)")
 
-    print(f"\nDone.  Vocab size: {vocab_size:,}  |  track_id range: 0 – {vocab_size - 1:,}")
+    print(
+        f"\nDone.  Vocab size: {vocab_size:,}  |  track_id range: 0 – {vocab_size - 1:,}"
+    )
 
 
 if __name__ == "__main__":
