@@ -92,3 +92,46 @@ def test_different_seeds_differ(tmp_path):
     """Sanity check: different seeds must produce different embeddings."""
     paths = _make_chunks(tmp_path, n_chunks=6, n_playlists=20, vocab_size=80, seed=42)
     assert not torch.equal(_run(paths, seed=0, n_workers=1), _run(paths, seed=1, n_workers=1))
+
+
+def test_training_completes_with_zero_valid_fraction(tmp_path):
+    paths = _make_chunks(tmp_path, n_chunks=6, n_playlists=20, vocab_size=80, seed=42)
+
+    train_paths, valid_paths = split(paths, valid_fraction=0.0, seed=0)
+
+    # All chunks go to training; nothing held out
+    assert valid_paths == []
+    assert len(train_paths) == len(paths)
+
+    # Training loop runs to completion without error
+    W, K, NBLOCK = 2, 5, 4
+    EMBED_DIM, BATCH_SIZE, SEED = 16, 128, 0
+
+    vocab = build_vocab_from_chunks(paths, cmin=1)
+    counts = vocab["playlist_count"].values.astype(np.float64)
+    w75 = counts ** 0.75
+    neg_sample, _ = get_nsampler(
+        torch.tensor(w75 / w75.sum(), dtype=torch.float32),
+        K, BATCH_SIZE, NBLOCK,
+    )
+    process_chunk = init_chunk_processor(vocab, W)
+
+    torch.manual_seed(SEED)
+    model = Word2Vec(vocab_size=len(vocab), embed_dim=EMBED_DIM)
+    optimizer = SparseAdam(model.parameters(), lr=1e-3)
+
+    stream = PrefetchPairStream(train_paths, process_chunk, epoch=0, seed=SEED, n_workers=1)
+    model.train()
+    while True:
+        batch = stream.next_batch(BATCH_SIZE)
+        if batch.shape[1] == 0:
+            break
+        c, x = batch[0], batch[1]
+        n = neg_sample(len(c))
+        optimizer.zero_grad()
+        skipgram_loss(*model(c, x, n)).backward()
+        optimizer.step()
+
+    emb = model.track_embeddings
+    assert emb.shape == (len(vocab), EMBED_DIM)
+    assert torch.isfinite(emb).all()

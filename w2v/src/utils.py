@@ -1,4 +1,5 @@
 import pandas as pd
+import random
 import torch
 
 
@@ -97,3 +98,41 @@ def print_vocab_stats(vocab: pd.DataFrame):
     print(f"Track count p99  : {vocab['playlist_count'].quantile(0.99):.0f}")
     print(f"Track count min  : {vocab['playlist_count'].min()}")
     print(f"Track count max  : {vocab['playlist_count'].max()}")
+
+
+def human_hash(sep="_"):
+    adjectives = [
+        "angry", "bold", "brave", "bright", "broad", "calm", "chief",
+        "clean", "clever", "cold", "cool", "cosmic", "cozy", "crisp",
+        "curious", "daring", "dark", "deep", "dizzy", "dry", "dusty",
+        "eager", "early", "easy", "epic", "even", "fair", "fancy",
+        "fast", "fierce", "fine", "firm", "flat", "fond", "free",
+        "fresh", "frozen", "funny", "fuzzy", "gentle", "glad", "golden",
+        "grand", "great", "green", "happy", "harsh", "hidden", "hollow",
+        "humble", "hungry", "icy", "idle", "inner", "jolly", "keen",
+        "kind", "lively", "lonely", "loud", "lucky", "magic", "merry",
+        "mighty", "misty", "modern", "mystic", "narrow", "neat", "nimble",
+        "noble", "odd", "pale", "plain", "polite", "proud", "pure",
+        "quick", "quiet", "rapid", "rare", "rigid", "rough", "round",
+        "royal", "rustic", "sharp", "shiny", "silent", "sleek", "slim",
+        "sly", "smooth", "snowy", "soft", "spicy", "steady", "steep",
+        "swift", "tiny", "vivid", "whimsical",
+    ]
+    nouns = [
+        "badger", "beacon", "bear", "bison", "bolt", "brook", "candle",
+        "cedar", "cliff", "cloud", "cobra", "comet", "condor", "coral",
+        "crane", "creek", "crow", "dawn", "dingo", "dove", "dragon",
+        "drift", "eagle", "ember", "falcon", "fern", "finch", "flame",
+        "flint", "forge", "fox", "frost", "gazelle", "glacier", "glyph",
+        "grove", "hawk", "heron", "hornet", "husky", "iris", "jackal",
+        "jade", "jaguar", "kite", "koala", "lark", "lemur", "leopard",
+        "lotus", "lynx", "maple", "marten", "meadow", "minnow", "moon",
+        "moose", "moth", "narwhal", "newt", "oak", "orbit", "orchid",
+        "osprey", "otter", "owl", "panda", "peak", "pebble", "pine",
+        "plover", "pond", "prism", "quail", "raven", "reef", "ridge",
+        "robin", "sage", "salmon", "seal", "seed", "shade", "shark",
+        "slate", "snipe", "spark", "sphinx", "squid", "stork", "stream",
+        "summit", "swan", "thorn", "tiger", "trout", "viper", "walrus",
+        "wasp", "whale", "wolf", "wren", "zenith",
+    ]
+    return f"{random.choice(adjectives)}{sep}{random.choice(nouns)}"

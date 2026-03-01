@@ -13,10 +13,12 @@ def split(chunk_paths: list[Path], valid_fraction: float, seed: int):
     """File-level test/train split."""
     rng = np.random.default_rng(seed)
     chunk_order = rng.permutation(len(chunk_paths)).tolist()
-    n_valid = max(1, int(len(chunk_paths) * valid_fraction))
-    valid_chunk_paths = [chunk_paths[i] for i in chunk_order[-n_valid:]]
-    train_chunk_paths = [chunk_paths[i] for i in chunk_order[:-n_valid]]
-    return train_chunk_paths, valid_chunk_paths
+    if valid_fraction > 0.:
+        n_valid = max(1, int(len(chunk_paths) * valid_fraction))
+        valid_chunk_paths = [chunk_paths[i] for i in chunk_order[-n_valid:]]
+        train_chunk_paths = [chunk_paths[i] for i in chunk_order[:-n_valid]]
+        return train_chunk_paths, valid_chunk_paths
+    return [chunk_paths[i] for i in chunk_order], []
 
 
 # noinspection PyUnusedLocal
@@ -182,7 +184,7 @@ def init_chunk_processor(
     sub_threshold = float(np.quantile(freq, thr_quantile))
     keep_probs = np.minimum(1.0, np.sqrt(sub_threshold / freq)).astype(np.float32)  # indexed by track_id
 
-    def subsample(pt: pd.DataFrame, chunk_rng: np.random.RandomState) -> pd.DataFrame:
+    def subsample(pt: pd.DataFrame, chunk_rng: np.random.Generator) -> pd.DataFrame:
         p = keep_probs[pt["track_id"].values]
         mask = chunk_rng.random(len(pt)) < p
         return pt[mask].reset_index(drop=True)
