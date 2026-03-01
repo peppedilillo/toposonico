@@ -1,4 +1,5 @@
-from collections import Counter, deque
+from collections import Counter
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import threading
@@ -13,7 +14,7 @@ def split(chunk_paths: list[Path], valid_fraction: float, seed: int):
     """File-level test/train split."""
     rng = np.random.default_rng(seed)
     chunk_order = rng.permutation(len(chunk_paths)).tolist()
-    if valid_fraction > 0.:
+    if valid_fraction > 0.0:
         n_valid = max(1, int(len(chunk_paths) * valid_fraction))
         valid_chunk_paths = [chunk_paths[i] for i in chunk_order[-n_valid:]]
         train_chunk_paths = [chunk_paths[i] for i in chunk_order[:-n_valid]]
@@ -23,8 +24,8 @@ def split(chunk_paths: list[Path], valid_fraction: float, seed: int):
 
 # noinspection PyUnusedLocal
 def build_vocab_from_chunks(chunk_paths: list[Path], cmin: int):
-    """ Builds a table mappings between Spotify track row-ids, counts playlist appearances
-     and filters them for tracks showing in greater-equal than `cmin` playlists.
+    """Builds a table mappings between Spotify track row-ids, counts playlist appearances
+    and filters them for tracks showing in greater-equal than `cmin` playlists.
     """
     # for each track, counts in how many playlist it appears
     counter = Counter()
@@ -97,8 +98,8 @@ def precompute_pairs(pt: pd.DataFrame, w: int) -> torch.Tensor:
     # position within playlist: 0,1,..,L-1, 0,1,..,L-1, ...
     pos -= np.repeat(np.concatenate(([0], cum[:-1])), lengths).astype(np.int32)
 
-    flat_start = np.repeat(starts, lengths)    # absolute start index per track
-    flat_len   = np.repeat(lengths, lengths)   # playlist length per track
+    flat_start = np.repeat(starts, lengths)  # absolute start index per track
+    flat_len = np.repeat(lengths, lengths)  # playlist length per track
 
     # effective window per track: min(2W, L-1), mirrors the original code
     ew = np.minimum(2 * w, flat_len - 1)
@@ -112,9 +113,9 @@ def precompute_pairs(pt: pd.DataFrame, w: int) -> torch.Tensor:
         # offset k is valid iff it falls inside range((-ew)//2, ew//2+1),
         # matching the original playlist_pairs logic exactly
         mask = ((-ew) // 2 <= k) & (k <= ew // 2)
-        m_pos   = pos[mask]
+        m_pos = pos[mask]
         m_start = flat_start[mask]
-        m_len   = flat_len[mask]
+        m_len = flat_len[mask]
 
         ctx_pos = (m_pos + k) % m_len
         ctx_idx = m_start + ctx_pos
@@ -125,7 +126,7 @@ def precompute_pairs(pt: pd.DataFrame, w: int) -> torch.Tensor:
     if not all_centers:
         return torch.empty(2, 0, dtype=torch.long)
 
-    centers  = np.concatenate(all_centers)
+    centers = np.concatenate(all_centers)
     contexts = np.concatenate(all_contexts)
     return torch.from_numpy(np.stack([centers, contexts]))
 
@@ -156,10 +157,10 @@ def make_cached_reader() -> Callable:
 
 
 def init_chunk_processor(
-        vocab: pd.DataFrame,
-        w: int,
-        thr_quantile: float = 0.99,
-        reader: Callable | None = None,
+    vocab: pd.DataFrame,
+    w: int,
+    thr_quantile: float = 0.99,
+    reader: Callable | None = None,
 ) -> Callable:
     """Initialise a stateless chunk-processing closure.
 
@@ -208,6 +209,7 @@ def init_chunk_processor(
             return pairs
         perm = torch.from_numpy(chunk_rng.permutation(pairs.shape[1]))
         return pairs[:, perm].pin_memory()
+
     return process_chunk
 
 
@@ -232,14 +234,15 @@ class PrefetchPairStream:
             loop). Defaults to ``n_workers``.  Set lower to cap memory usage
             when chunks are large.
     """
+
     def __init__(
-            self,
-            chunk_paths: list[Path],
-            process_chunk: Callable,
-            epoch: int,
-            seed: int,
-            n_workers: int = 4,
-            queue_size: int | None = None,
+        self,
+        chunk_paths: list[Path],
+        process_chunk: Callable,
+        epoch: int,
+        seed: int,
+        n_workers: int = 4,
+        queue_size: int | None = None,
     ):
         self._buffer = torch.empty(2, 0, dtype=torch.long)  # leftover buffer
         # the semaphore counter starts from its argument and decrements by one at

@@ -17,14 +17,13 @@ Example:
 """
 
 import argparse
-import time
 from pathlib import Path
 import sqlite3
+import time
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data"
 
@@ -41,16 +40,18 @@ QUERY = """
     FROM playlists
 """
 
-SCHEMA = pa.schema([
-    pa.field("playlist_rowid",      pa.int32()),
-    pa.field("name",                pa.string()),
-    pa.field("description",         pa.string()),
-    pa.field("public",              pa.bool_()),
-    pa.field("owner_id",            pa.string()),
-    pa.field("owner_display_name",  pa.string()),
-    pa.field("followers_total",     pa.int32()),
-    pa.field("tracks_total",        pa.int32()),
-])
+SCHEMA = pa.schema(
+    [
+        pa.field("playlist_rowid", pa.int32()),
+        pa.field("name", pa.string()),
+        pa.field("description", pa.string()),
+        pa.field("public", pa.bool_()),
+        pa.field("owner_id", pa.string()),
+        pa.field("owner_display_name", pa.string()),
+        pa.field("followers_total", pa.int32()),
+        pa.field("tracks_total", pa.int32()),
+    ]
+)
 
 
 def get_connection(database_path: Path) -> sqlite3.Connection:
@@ -73,7 +74,8 @@ def main():
     )
     parser.add_argument("database", type=Path, help="Path to playlist SQLite database")
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         help="Output parquet path (default: data/playlist/playlist_lookup.parquet)",
     )
@@ -98,10 +100,10 @@ def main():
     elapsed_query = time.time() - t0
     print(f"  {len(df):,} rows fetched in {elapsed_query:.1f}s")
 
-    df["playlist_rowid"]  = df["playlist_rowid"].astype("int32")
-    df["public"]          = df["public"].astype("boolean")
+    df["playlist_rowid"] = df["playlist_rowid"].astype("int32")
+    df["public"] = df["public"].astype("boolean")
     df["followers_total"] = df["followers_total"].astype("Int32")
-    df["tracks_total"]    = df["tracks_total"].astype("int32")
+    df["tracks_total"] = df["tracks_total"].astype("int32")
 
     table = pa.Table.from_pandas(df, schema=SCHEMA, preserve_index=False)
     pq.write_table(table, output_path)

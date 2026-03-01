@@ -36,14 +36,14 @@ Example — build a small two-chunk mini-library from the last 32,000 playlists:
 """
 
 import argparse
+from datetime import datetime
+from datetime import timezone
 import json
-import time
-from datetime import datetime, timezone
 from pathlib import Path
 import sqlite3
+import time
 
 import pandas as pd
-
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "train_chunks"
 
@@ -84,7 +84,8 @@ def main():
     )
     parser.add_argument("database", type=Path, help="Path to playlist SQLite database")
     parser.add_argument(
-        "-o", "--output-dir",
+        "-o",
+        "--output-dir",
         type=Path,
         help="Output directory for chunks (default: data/playlist/chunks/)",
     )
@@ -130,17 +131,13 @@ def main():
 
     if args.offset != 0 and not (-(n - 1) <= args.offset <= n - 1):
         raise ValueError(
-            f"--offset {args.offset} out of range; valid range is [{-(n-1)}, {n-1}] "
-            f"for {n:,} playlists."
+            f"--offset {args.offset} out of range; valid range is [{-(n-1)}, {n-1}] " f"for {n:,} playlists."
         )
 
-    playlist_rowids = all_playlist_rowids[args.offset:] if args.offset != 0 else all_playlist_rowids
+    playlist_rowids = all_playlist_rowids[args.offset :] if args.offset != 0 else all_playlist_rowids
     total_playlists = len(playlist_rowids)
 
-    batches = [
-        playlist_rowids[i : i + args.chunk_size]
-        for i in range(0, total_playlists, args.chunk_size)
-    ]
+    batches = [playlist_rowids[i : i + args.chunk_size] for i in range(0, total_playlists, args.chunk_size)]
     total_chunks = len(batches)
 
     if args.offset != 0:
@@ -174,11 +171,7 @@ def main():
         total_rows_written += len(df)
 
         elapsed = time.time() - t0
-        print(
-            f"  [{i+1:{w}}/{total_chunks}] {out_path.name}"
-            f"  {len(df):>10,} rows"
-            f"  {elapsed:>6.0f}s elapsed"
-        )
+        print(f"  [{i+1:{w}}/{total_chunks}] {out_path.name}" f"  {len(df):>10,} rows" f"  {elapsed:>6.0f}s elapsed")
 
     conn.close()
 
@@ -199,7 +192,9 @@ def main():
 
     print(f"\nManifest written to {manifest_path}")
     written = total_chunks - skipped
-    print(f"Done in {time.time() - t0:.0f}s  —  {written} chunk(s) written, {skipped} skipped  |  {total_rows_written:,} rows written")
+    print(
+        f"Done in {time.time() - t0:.0f}s  —  {written} chunk(s) written, {skipped} skipped  |  {total_rows_written:,} rows written"
+    )
 
 
 if __name__ == "__main__":

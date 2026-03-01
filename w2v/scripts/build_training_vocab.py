@@ -26,7 +26,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 OUTPUT_DIR = Path(__file__).parent.parent / "data"
 
 
@@ -47,7 +46,8 @@ def main():
         help="Minimum playlist count to include a track (default: 1, i.e. no filtering)",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         help="Output parquet path (default: data/playlist/training_vocab.parquet)",
     )

@@ -25,15 +25,14 @@ Example:
 """
 
 import argparse
-import time
 from pathlib import Path
+import time
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from src.db import get_connection
-
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "playlist"
 VOCAB_PATH_DEFAULT = Path(__file__).parent.parent / "data" / "playlist" / "global_track_vocab.parquet"
@@ -59,16 +58,18 @@ QUERY = """
     )
 """
 
-SCHEMA = pa.schema([
-    pa.field("track_rowid",      pa.int64()),
-    pa.field("track_name",       pa.string()),
-    pa.field("track_popularity", pa.uint8()),
-    pa.field("id_isrc",          pa.string()),
-    pa.field("artist_name",      pa.string()),
-    pa.field("album_name",       pa.string()),
-    pa.field("label",            pa.string()),
-    pa.field("release_date",     pa.string()),
-])
+SCHEMA = pa.schema(
+    [
+        pa.field("track_rowid", pa.int64()),
+        pa.field("track_name", pa.string()),
+        pa.field("track_popularity", pa.uint8()),
+        pa.field("id_isrc", pa.string()),
+        pa.field("artist_name", pa.string()),
+        pa.field("album_name", pa.string()),
+        pa.field("label", pa.string()),
+        pa.field("release_date", pa.string()),
+    ]
+)
 
 
 def main():
@@ -78,7 +79,8 @@ def main():
     )
     parser.add_argument("database", type=Path, help="Path to metadata SQLite database")
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         help="Output parquet path (default: data/playlist/track_lookup.parquet)",
     )
@@ -87,7 +89,7 @@ def main():
         type=Path,
         default=None,
         help="Global track vocab parquet — if given, only tracks whose track_rowid appears "
-             "in the vocab are written; all others are skipped. Omit to write all rows.",
+        "in the vocab are written; all others are skipped. Omit to write all rows.",
     )
     parser.add_argument(
         "--chunk-size",
@@ -101,8 +103,7 @@ def main():
         raise FileNotFoundError(f"Database not found: {args.database}")
     if args.vocab is not None and not args.vocab.exists():
         raise FileNotFoundError(
-            f"Vocab parquet not found: {args.vocab}\n"
-            "Run 'python scripts/build_track_vocab.py' first."
+            f"Vocab parquet not found: {args.vocab}\n" "Run 'python scripts/build_track_vocab.py' first."
         )
 
     output_path = args.output or OUTPUT_DIR / "track_lookup.parquet"

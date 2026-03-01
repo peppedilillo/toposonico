@@ -1,12 +1,18 @@
-import pandas as pd
 import random
+
+import pandas as pd
 import torch
 
 
-
-def print_vram_budget(vocab_size: int, batch_size: int, embedding_dims: int, neg_samples: int, neg_samples_block: int,
-                      allocator_overhead: float = 1.30):
-    """ Prints VRAM usage summary.
+def print_vram_budget(
+    vocab_size: int,
+    batch_size: int,
+    embedding_dims: int,
+    neg_samples: int,
+    neg_samples_block: int,
+    allocator_overhead: float = 1.30,
+):
+    """Prints VRAM usage summary.
 
     Args:
         allocator_overhead: multiplier for PyTorch's CUDA caching allocator.
@@ -18,14 +24,16 @@ def print_vram_budget(vocab_size: int, batch_size: int, embedding_dims: int, neg
     BYTES_IN_32BIT = 4
     BYTES_IN_64BIT = 8
 
-    embed    = 2 * vocab_size * embedding_dims * BYTES_IN_32BIT
-    optim    = 2 * embed
+    embed = 2 * vocab_size * embedding_dims * BYTES_IN_32BIT
+    optim = 2 * embed
     weights_ = vocab_size * BYTES_IN_32BIT
-    negs     = batch_size * neg_samples * neg_samples_block * BYTES_IN_64BIT # torch.long
-    act_fwd  = (2 + neg_samples) * batch_size * embedding_dims * BYTES_IN_32BIT # the ` 2 + ..` is for the centers and context
-    act_bwd  = act_fwd
+    negs = batch_size * neg_samples * neg_samples_block * BYTES_IN_64BIT  # torch.long
+    act_fwd = (
+        (2 + neg_samples) * batch_size * embedding_dims * BYTES_IN_32BIT
+    )  # the ` 2 + ..` is for the centers and context
+    act_bwd = act_fwd
 
-    total    = embed + optim + weights_ + negs + act_fwd + act_bwd
+    total = embed + optim + weights_ + negs + act_fwd + act_bwd
     total_real = total * allocator_overhead
 
     print(f"Vocab size          : {vocab_size:>10,}")
@@ -34,7 +42,9 @@ def print_vram_budget(vocab_size: int, batch_size: int, embedding_dims: int, neg
     print(f"Optimizer state     : {optim    * GB:>6.2f} GB  (SparseAdam exp_avg + exp_avg_sq, dense after warmup)")
     print(f"Weights             : {weights_ * MB:>6.1f} MB  (negative sample weights)")
     print(f"Neg. sample block   : {negs     * MB:>6.1f} MB  (negative sampling reservoir)")
-    print(f"Activations fwd     : {act_fwd  * MB:>6.1f} MB  ({2 + neg_samples} tensors × {batch_size:,} × {embedding_dims})")
+    print(
+        f"Activations fwd     : {act_fwd  * MB:>6.1f} MB  ({2 + neg_samples} tensors × {batch_size:,} × {embedding_dims})"
+    )
     print(f"Activations bwd     : {act_bwd  * MB:>6.1f} MB  (sparse grad upper bound)")
     print()
     print(f"Tensor estimate     : {total      * GB:>6.2f} GB")
@@ -64,7 +74,7 @@ def print_ram_budget(vocab_size: int, embedding_dims: int):
     BYTES_IN_32BIT = 4
 
     checkpoint = 2 * vocab_size * embedding_dims * BYTES_IN_32BIT
-    inference  = 3 * vocab_size * embedding_dims * BYTES_IN_32BIT  # + normalised emb_in
+    inference = 3 * vocab_size * embedding_dims * BYTES_IN_32BIT  # + normalised emb_in
 
     print(f"Vocab size          : {vocab_size:>10,}")
     print()
@@ -78,7 +88,7 @@ def print_ram_budget(vocab_size: int, embedding_dims: int):
                 parts = line.split()
                 if len(parts) >= 2:
                     meminfo[parts[0].rstrip(":")] = int(parts[1]) * 1024
-        ram_total     = meminfo["MemTotal"]
+        ram_total = meminfo["MemTotal"]
         ram_available = meminfo["MemAvailable"]
         headroom = ram_available - inference
         flag = "OK" if headroom > 0 else "OOM RISK"
@@ -91,7 +101,7 @@ def print_ram_budget(vocab_size: int, embedding_dims: int):
 
 
 def print_vocab_stats(vocab: pd.DataFrame):
-    """ Prints stats from a track vocabulary."""
+    """Prints stats from a track vocabulary."""
     print(f"Track vocab size : {len(vocab):>10,}")
     print(f"Total interactions : {vocab["playlist_count"].sum():>10,}")
     print(f"Track count p50  : {vocab['playlist_count'].median():.0f}")
@@ -102,37 +112,212 @@ def print_vocab_stats(vocab: pd.DataFrame):
 
 def human_hash(sep="_"):
     adjectives = [
-        "angry", "bold", "brave", "bright", "broad", "calm", "chief",
-        "clean", "clever", "cold", "cool", "cosmic", "cozy", "crisp",
-        "curious", "daring", "dark", "deep", "dizzy", "dry", "dusty",
-        "eager", "early", "easy", "epic", "even", "fair", "fancy",
-        "fast", "fierce", "fine", "firm", "flat", "fond", "free",
-        "fresh", "frozen", "funny", "fuzzy", "gentle", "glad", "golden",
-        "grand", "great", "green", "happy", "harsh", "hidden", "hollow",
-        "humble", "hungry", "icy", "idle", "inner", "jolly", "keen",
-        "kind", "lively", "lonely", "loud", "lucky", "magic", "merry",
-        "mighty", "misty", "modern", "mystic", "narrow", "neat", "nimble",
-        "noble", "odd", "pale", "plain", "polite", "proud", "pure",
-        "quick", "quiet", "rapid", "rare", "rigid", "rough", "round",
-        "royal", "rustic", "sharp", "shiny", "silent", "sleek", "slim",
-        "sly", "smooth", "snowy", "soft", "spicy", "steady", "steep",
-        "swift", "tiny", "vivid", "whimsical",
+        "angry",
+        "bold",
+        "brave",
+        "bright",
+        "broad",
+        "calm",
+        "chief",
+        "clean",
+        "clever",
+        "cold",
+        "cool",
+        "cosmic",
+        "cozy",
+        "crisp",
+        "curious",
+        "daring",
+        "dark",
+        "deep",
+        "dizzy",
+        "dry",
+        "dusty",
+        "eager",
+        "early",
+        "easy",
+        "epic",
+        "even",
+        "fair",
+        "fancy",
+        "fast",
+        "fierce",
+        "fine",
+        "firm",
+        "flat",
+        "fond",
+        "free",
+        "fresh",
+        "frozen",
+        "funny",
+        "fuzzy",
+        "gentle",
+        "glad",
+        "golden",
+        "grand",
+        "great",
+        "green",
+        "happy",
+        "harsh",
+        "hidden",
+        "hollow",
+        "humble",
+        "hungry",
+        "icy",
+        "idle",
+        "inner",
+        "jolly",
+        "keen",
+        "kind",
+        "lively",
+        "lonely",
+        "loud",
+        "lucky",
+        "magic",
+        "merry",
+        "mighty",
+        "misty",
+        "modern",
+        "mystic",
+        "narrow",
+        "neat",
+        "nimble",
+        "noble",
+        "odd",
+        "pale",
+        "plain",
+        "polite",
+        "proud",
+        "pure",
+        "quick",
+        "quiet",
+        "rapid",
+        "rare",
+        "rigid",
+        "rough",
+        "round",
+        "royal",
+        "rustic",
+        "sharp",
+        "shiny",
+        "silent",
+        "sleek",
+        "slim",
+        "sly",
+        "smooth",
+        "snowy",
+        "soft",
+        "spicy",
+        "steady",
+        "steep",
+        "swift",
+        "tiny",
+        "vivid",
+        "whimsical",
     ]
     nouns = [
-        "badger", "beacon", "bear", "bison", "bolt", "brook", "candle",
-        "cedar", "cliff", "cloud", "cobra", "comet", "condor", "coral",
-        "crane", "creek", "crow", "dawn", "dingo", "dove", "dragon",
-        "drift", "eagle", "ember", "falcon", "fern", "finch", "flame",
-        "flint", "forge", "fox", "frost", "gazelle", "glacier", "glyph",
-        "grove", "hawk", "heron", "hornet", "husky", "iris", "jackal",
-        "jade", "jaguar", "kite", "koala", "lark", "lemur", "leopard",
-        "lotus", "lynx", "maple", "marten", "meadow", "minnow", "moon",
-        "moose", "moth", "narwhal", "newt", "oak", "orbit", "orchid",
-        "osprey", "otter", "owl", "panda", "peak", "pebble", "pine",
-        "plover", "pond", "prism", "quail", "raven", "reef", "ridge",
-        "robin", "sage", "salmon", "seal", "seed", "shade", "shark",
-        "slate", "snipe", "spark", "sphinx", "squid", "stork", "stream",
-        "summit", "swan", "thorn", "tiger", "trout", "viper", "walrus",
-        "wasp", "whale", "wolf", "wren", "zenith",
+        "badger",
+        "beacon",
+        "bear",
+        "bison",
+        "bolt",
+        "brook",
+        "candle",
+        "cedar",
+        "cliff",
+        "cloud",
+        "cobra",
+        "comet",
+        "condor",
+        "coral",
+        "crane",
+        "creek",
+        "crow",
+        "dawn",
+        "dingo",
+        "dove",
+        "dragon",
+        "drift",
+        "eagle",
+        "ember",
+        "falcon",
+        "fern",
+        "finch",
+        "flame",
+        "flint",
+        "forge",
+        "fox",
+        "frost",
+        "gazelle",
+        "glacier",
+        "glyph",
+        "grove",
+        "hawk",
+        "heron",
+        "hornet",
+        "husky",
+        "iris",
+        "jackal",
+        "jade",
+        "jaguar",
+        "kite",
+        "koala",
+        "lark",
+        "lemur",
+        "leopard",
+        "lotus",
+        "lynx",
+        "maple",
+        "marten",
+        "meadow",
+        "minnow",
+        "moon",
+        "moose",
+        "moth",
+        "narwhal",
+        "newt",
+        "oak",
+        "orbit",
+        "orchid",
+        "osprey",
+        "otter",
+        "owl",
+        "panda",
+        "peak",
+        "pebble",
+        "pine",
+        "plover",
+        "pond",
+        "prism",
+        "quail",
+        "raven",
+        "reef",
+        "ridge",
+        "robin",
+        "sage",
+        "salmon",
+        "seal",
+        "seed",
+        "shade",
+        "shark",
+        "slate",
+        "snipe",
+        "spark",
+        "sphinx",
+        "squid",
+        "stork",
+        "stream",
+        "summit",
+        "swan",
+        "thorn",
+        "tiger",
+        "trout",
+        "viper",
+        "walrus",
+        "wasp",
+        "whale",
+        "wolf",
+        "wren",
+        "zenith",
     ]
     return f"{random.choice(adjectives)}{sep}{random.choice(nouns)}"

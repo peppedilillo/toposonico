@@ -1,19 +1,18 @@
-import random
 from pathlib import Path
+import random
 
 import numpy as np
 import pandas as pd
 import torch
 from torch.optim import SparseAdam
 
-from src.data import (
-    PrefetchPairStream,
-    build_vocab_from_chunks,
-    get_nsampler,
-    init_chunk_processor,
-    split,
-)
-from src.model import Word2Vec, skipgram_loss
+from src.data import build_vocab_from_chunks
+from src.data import get_nsampler
+from src.data import init_chunk_processor
+from src.data import PrefetchPairStream
+from src.data import split
+from src.model import skipgram_loss
+from src.model import Word2Vec
 
 
 def _make_chunks(tmp_path: Path, n_chunks: int, n_playlists: int, vocab_size: int, seed: int) -> list[Path]:
@@ -44,10 +43,12 @@ def _run(chunk_paths: list[Path], seed: int, n_workers: int) -> torch.Tensor:
     vocab = build_vocab_from_chunks(chunk_paths, cmin=1)
 
     counts = vocab["playlist_count"].values.astype(np.float64)
-    w75 = counts ** 0.75
+    w75 = counts**0.75
     neg_sample, _ = get_nsampler(
         torch.tensor(w75 / w75.sum(), dtype=torch.float32),
-        K, BATCH_SIZE, NBLOCK,
+        K,
+        BATCH_SIZE,
+        NBLOCK,
     )
     process_chunk = init_chunk_processor(vocab, W)
 
@@ -62,7 +63,11 @@ def _run(chunk_paths: list[Path], seed: int, n_workers: int) -> torch.Tensor:
         random.shuffle(train_paths)
 
         stream = PrefetchPairStream(
-            train_paths, process_chunk, epoch=epoch, seed=SEED, n_workers=n_workers,
+            train_paths,
+            process_chunk,
+            epoch=epoch,
+            seed=SEED,
+            n_workers=n_workers,
         )
         model.train()
         while True:
@@ -109,10 +114,12 @@ def test_training_completes_with_zero_valid_fraction(tmp_path):
 
     vocab = build_vocab_from_chunks(paths, cmin=1)
     counts = vocab["playlist_count"].values.astype(np.float64)
-    w75 = counts ** 0.75
+    w75 = counts**0.75
     neg_sample, _ = get_nsampler(
         torch.tensor(w75 / w75.sum(), dtype=torch.float32),
-        K, BATCH_SIZE, NBLOCK,
+        K,
+        BATCH_SIZE,
+        NBLOCK,
     )
     process_chunk = init_chunk_processor(vocab, W)
 
