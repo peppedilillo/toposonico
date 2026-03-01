@@ -1,41 +1,27 @@
 #!/usr/bin/env python3
 """Build a track lookup table from the metadata SQLite database.
 
-Extracts display metadata for all tracks and writes a parquet file keyed by
-track_rowid. Used for inspecting nearest-neighbour results during playlist2vec
-model evaluation.
-
-Columns: track_rowid, track_name, artist_name, album_name, track_popularity,
-         release_date, id_isrc, label.
-
-Only tracks whose track_rowid appears in the global vocab parquet are written;
-all others are silently skipped. This keeps the output bounded to the ~47M
-tracks that actually appear in playlists.
-
-The result is intentionally left uncleaned (no deduplication, no NaN dropping):
-the lookup is for display only, not for training. Tracks absent from the
-metadata database will simply be missing — callers should left-join and
-tolerate nulls.
+Writes a parquet keyed by track_rowid with display columns: track_name,
+artist_name, album_name, track_popularity, release_date, id_isrc, label.
+Used for inspecting nearest-neighbour results. Pass --vocab to restrict output
+to tracks that appear in playlists (~47M); omit to write everything.
 
 Usage:
-    python scripts/build_track_lookup.py <db> [-o OUTPUT] [--vocab VOCAB] [--chunk-size N]
+    python scripts/build_track_lookup.py <db> <output> [--vocab VOCAB] [--chunk-size N]
 
 Example:
-    python scripts/build_track_lookup.py ~/data/spotify_clean.sqlite3
+    python scripts/build_track_lookup.py spotify_clean.sqlite3 track_lookup.parquet
 """
 
 import argparse
 from pathlib import Path
+import sqlite3
 import time
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from src.db import get_connection
-
-OUTPUT_DIR = Path(__file__).parent.parent / "data" / "playlist"
-VOCAB_PATH_DEFAULT = Path(__file__).parent.parent / "data" / "playlist" / "global_track_vocab.parquet"
 
 CHUNK_SIZE_DEFAULT = 500_000
 
@@ -72,18 +58,26 @@ SCHEMA = pa.schema(
 )
 
 
+def get_connection(database_path: Path) -> sqlite3.Connection:
+    """
+    Get a read-only connection to the database.
+
+    Returns:
+        sqlite3.Connection configured for read-only access
+    """
+    uri = f"file:{database_path}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Build track lookup table from metadata database",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("database", type=Path, help="Path to metadata SQLite database")
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        help="Output parquet path (default: data/playlist/track_lookup.parquet)",
-    )
+    parser.add_argument("output", type=Path, help="Output parquet path")
     parser.add_argument(
         "--vocab",
         type=Path,
@@ -106,7 +100,7 @@ def main():
             f"Vocab parquet not found: {args.vocab}\n" "Run 'python scripts/build_track_vocab.py' first."
         )
 
-    output_path = args.output or OUTPUT_DIR / "track_lookup.parquet"
+    output_path = args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Database  : {args.database}")

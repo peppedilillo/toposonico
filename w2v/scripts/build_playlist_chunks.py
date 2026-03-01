@@ -1,38 +1,27 @@
 #!/usr/bin/env python3
 """Export playlist_tracks to parquet chunks for full-scale training.
 
-Streams the full playlist_tracks table in batches of N playlists, applying the
-standard base filters (no episodes, no local files, no null track_rowids). Each
-chunk is a self-contained parquet file holding all (playlist, track) pairs for
-that batch of playlists, with extra columns retained for future data-quality work.
+Streams playlist_tracks in batches of N playlists (filtered: no episodes, no
+local files, no null track_rowids) and writes one parquet chunk per batch.
+Chunks store raw track_rowids — remapping to track_id happens at training time
+via training_vocab.parquet, keeping chunks valid across vocab choices.
 
-No track_rowid → track_id remapping is done here. Chunks store raw track_rowids
-so they remain valid across different training vocab choices (min_count thresholds).
-Remapping and vocab filtering happen at training time using training_vocab.parquet.
-
-No deduplication is applied. Duplicate (playlist_rowid, track_rowid) pairs from
-the same track being added twice to a playlist are rare and produce negligible
-extra training pairs.
-
-The number of distinct playlists per chunk may be slightly lower than --chunk-size:
-playlists whose tracks are all episodes, local files, or have null track_rowids are
-included in the rowid batch but contribute no rows to the output.
-
+--offset slices the playlist list with Python semantics before chunking:
+0 = all, K > 0 = skip first K, -K = last K only.
 
 Usage:
-    python scripts/build_playlist_chunks.py <database> [-o OUTPUT_DIR]
+    python scripts/build_playlist_chunks.py <database> <output_dir>
                                              [--chunk-size N] [--offset K]
                                              [--overwrite]
 
-The --offset argument slices the playlist list with Python semantics before
-chunking: offset=0 (default) includes all playlists; offset=K > 0 skips the
-first K playlists; offset=-K includes only the last K playlists. Valid range:
--(n-1) to (n-1), where n is the total number of playlists.
-
-Example — build a small two-chunk mini-library from the last 32,000 playlists:
-    python scripts/build_playlist_chunks.py \\
-        ~/HDD/Datasets/annas_archive_spotify_2025_07/spotify_clean_playlists.sqlite3 \\
-        -o data/playlist/mini_chunks --offset -32000 --chunk-size 28000
+Example - build full sized chunk library, each chunk of 100_000 playlists
+    * python scripts/build_playlist_chunks.py \\
+        annas_archive_spotify_2025_07/spotify_clean_playlists.sqlite3 \\
+        ./chunks --chunk-size 100000
+Example — build a small three-chunk mini-library from the last 40,000 playlists:
+    * python scripts/build_playlist_chunks.py \\
+        annas_archive_spotify_2025_07/spotify_clean_playlists.sqlite3 \\
+        ./mini_chunks --offset -40000 --chunk-size 15000
 """
 
 import argparse
@@ -44,8 +33,6 @@ import sqlite3
 import time
 
 import pandas as pd
-
-OUTPUT_DIR = Path(__file__).parent.parent / "data" / "train_chunks"
 
 PLAYLIST_ROWIDS_QUERY = "SELECT rowid FROM playlists ORDER BY rowid"
 
@@ -83,12 +70,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("database", type=Path, help="Path to playlist SQLite database")
-    parser.add_argument(
-        "-o",
-        "--output-dir",
-        type=Path,
-        help="Output directory for chunks (default: data/playlist/chunks/)",
-    )
+    parser.add_argument("output_dir", type=Path, help="Output directory for chunks")
     parser.add_argument(
         "--chunk-size",
         type=int,
@@ -115,7 +97,7 @@ def main():
     if not args.database.exists():
         raise FileNotFoundError(f"Database not found: {args.database}")
 
-    output_dir = args.output_dir or OUTPUT_DIR
+    output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     conn = get_connection(args.database)

@@ -353,8 +353,3 @@ class SerialPairStream:
         if self._chunks_done == 0:
             return None
         return int(self._pairs_produced / self._chunks_done * self._n_chunks)
-
-
-def get_pair_stream_serial(chunk_paths: list[Path], process_chunk: Callable, epoch: int, seed: int) -> SerialPairStream:
-    """Single-threaded fallback (e.g. for validation with few chunks)."""
-    return SerialPairStream(chunk_paths, process_chunk, epoch, seed)

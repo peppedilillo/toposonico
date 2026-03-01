@@ -1,23 +1,16 @@
 #!/usr/bin/env python3
 """Build a training vocabulary from pre-computed track playlist counts.
 
-Filters tracks by a minimum playlist-count threshold, then assigns contiguous
-integer IDs (0..vocab_size-1) sorted by track_rowid for reproducibility.
-
-The output parquet is self-contained — it holds everything the training loop needs:
-  - track_rowid → track_id mapping  (for remapping playlist chunk data)
-  - playlist_count                   (for subsampling and negative-sampling weights)
-
-At training time derive what you need in two vectorised lines:
-    freq      = df["playlist_count"] / df["playlist_count"].sum()
-    keep_prob = np.minimum(1.0, np.sqrt(t / freq))          # subsampling
-    weights   = counts ** 0.75 / (counts ** 0.75).sum()     # negative sampling
+Filters by --min-count, then assigns contiguous track_ids (0..vocab_size-1)
+sorted by track_rowid. Output parquet contains track_rowid, track_id, and
+playlist_count — everything the training loop needs for OOV filtering,
+subsampling, and negative-sampling weights.
 
 Usage:
-    python scripts/build_training_vocab.py <counts> [--min-count N] [-o OUTPUT]
+    python scripts/build_training_vocab.py <counts> <output> [--min-count N]
 
 Example:
-    python scripts/build_training_vocab.py data/playlist/track_playlist_counts.parquet --min-count 5
+    python scripts/build_training_vocab.py track_playlist_counts.parquet training_vocab.parquet --min-count 5
 """
 
 import argparse
@@ -25,8 +18,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-OUTPUT_DIR = Path(__file__).parent.parent / "data"
 
 
 def main():
@@ -40,23 +31,22 @@ def main():
         help="Path to input track_playlist_counts.parquet",
     )
     parser.add_argument(
+        "output",
+        type=Path,
+        help="Output parquet path",
+    )
+    parser.add_argument(
         "--min-count",
         type=int,
         default=1,
         help="Minimum playlist count to include a track (default: 1, i.e. no filtering)",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        help="Output parquet path (default: data/playlist/training_vocab.parquet)",
     )
     args = parser.parse_args()
 
     if not args.counts.exists():
         raise FileNotFoundError(f"Counts parquet not found: {args.counts}")
 
-    output_path = args.output or OUTPUT_DIR / "training_vocab.parquet"
+    output_path = args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Counts   : {args.counts}")
