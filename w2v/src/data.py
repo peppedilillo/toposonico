@@ -226,6 +226,10 @@ class PrefetchPairStream:
             n_workers: int = 4,
     ):
         self._buffer = torch.empty(2, 0, dtype=torch.long)  # leftover buffer
+        self._n_chunks = len(chunk_paths)
+        self._chunks_done = 0
+        self._pairs_produced = 0
+        self._pairs_consumed = 0
         # the semaphore counter starts from the argument and decrements by one at
         # each `sem.acquire()` call, or increment by one at each `sem.release()` call.
         # when it gets to zero the calling thread blocks and waits.
@@ -259,35 +263,65 @@ class PrefetchPairStream:
             # this is why the thing is called semaphore.
             tensor = self._futures.popleft().result()  # blocks until chunk N is ready
             self._sem.release()
+            self._chunks_done += 1
             if tensor.shape[1] > 0:
+                self._pairs_produced += tensor.shape[1]
                 self._buffer = torch.cat([self._buffer, tensor], dim=1) if self._buffer.shape[1] > 0 else tensor
 
         batch = self._buffer[:, :batch_size]
         self._buffer = self._buffer[:, batch_size:]
+        self._pairs_consumed += batch.shape[1]
         return batch
 
+    @property
+    def estimated_total_pairs(self) -> int | None:
+        if self._chunks_done == 0:
+            return None
+        return int(self._pairs_produced / self._chunks_done * self._n_chunks)
 
-def get_pair_stream_serial(chunk_paths: list[Path], process_chunk: Callable, epoch: int, seed: int) -> Callable:
-    """Single-threaded fallback (e.g. for validation with few chunks)."""
-    buffer = torch.empty(2, 0, dtype=torch.long)
-    paths = deque(enumerate(chunk_paths))
 
-    def next_batch(batch_size: int) -> torch.Tensor:
-        nonlocal buffer
-        while buffer.shape[1] < batch_size:
-            if not paths:
-                remainder = buffer
-                buffer = torch.empty(2, 0, dtype=torch.long)
+class SerialPairStream:
+    """Single-threaded pair stream (e.g. for validation with few chunks)."""
+
+    def __init__(self, chunk_paths: list[Path], process_chunk: Callable, epoch: int, seed: int):
+        self._buffer = torch.empty(2, 0, dtype=torch.long)
+        self._paths = deque(enumerate(chunk_paths))
+        self._process_chunk = process_chunk
+        self._epoch = epoch
+        self._seed = seed
+        self._n_chunks = len(chunk_paths)
+        self._chunks_done = 0
+        self._pairs_produced = 0
+        self._pairs_consumed = 0
+
+    def next_batch(self, batch_size: int) -> torch.Tensor:
+        while self._buffer.shape[1] < batch_size:
+            if not self._paths:
+                remainder = self._buffer
+                self._buffer = torch.empty(2, 0, dtype=torch.long)
+                self._pairs_consumed += remainder.shape[1]
                 return remainder
-            idx, path = paths.popleft()
-            chunk_rng = np.random.default_rng(seed + epoch * 10_000 + idx)
-            new = process_chunk(path, chunk_rng)
+            idx, path = self._paths.popleft()
+            chunk_rng = np.random.default_rng(self._seed + self._epoch * 10_000 + idx)
+            new = self._process_chunk(path, chunk_rng)
+            self._chunks_done += 1
             if new.shape[1] == 0:
                 continue
-            buffer = torch.cat([buffer, new], dim=1) if buffer.shape[1] > 0 else new
+            self._pairs_produced += new.shape[1]
+            self._buffer = torch.cat([self._buffer, new], dim=1) if self._buffer.shape[1] > 0 else new
 
-        batch = buffer[:, :batch_size]
-        buffer = buffer[:, batch_size:]
+        batch = self._buffer[:, :batch_size]
+        self._buffer = self._buffer[:, batch_size:]
+        self._pairs_consumed += batch.shape[1]
         return batch
 
-    return next_batch
+    @property
+    def estimated_total_pairs(self) -> int | None:
+        if self._chunks_done == 0:
+            return None
+        return int(self._pairs_produced / self._chunks_done * self._n_chunks)
+
+
+def get_pair_stream_serial(chunk_paths: list[Path], process_chunk: Callable, epoch: int, seed: int) -> SerialPairStream:
+    """Single-threaded fallback (e.g. for validation with few chunks)."""
+    return SerialPairStream(chunk_paths, process_chunk, epoch, seed)
