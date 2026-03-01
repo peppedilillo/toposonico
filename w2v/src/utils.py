@@ -3,10 +3,15 @@ import torch
 
 
 
-def print_vram_budget(vocab_size: int, batch_size: int, embedding_dims: int, neg_samples: int, neg_samples_block: int):
+def print_vram_budget(vocab_size: int, batch_size: int, embedding_dims: int, neg_samples: int, neg_samples_block: int,
+                      allocator_overhead: float = 1.30):
     """ Prints VRAM usage summary.
+
+    Args:
+        allocator_overhead: multiplier for PyTorch's CUDA caching allocator.
+            nvidia-smi reports *reserved* memory which is typically 20-40%
+            above the sum of live tensor allocations.  Default 1.30 (30%).
     """
-    # it seems that nvidia-smi does not use MiB/GiB despite printing them for unit of measure?
     MB = 1 / 1_000_000
     GB = 1 / 1_000_000_000
     BYTES_IN_32BIT = 4
@@ -19,7 +24,8 @@ def print_vram_budget(vocab_size: int, batch_size: int, embedding_dims: int, neg
     act_fwd  = (2 + neg_samples) * batch_size * embedding_dims * BYTES_IN_32BIT # the ` 2 + ..` is for the centers and context
     act_bwd  = act_fwd
 
-    total    = embed + optim + weights_ + act_fwd + act_bwd
+    total    = embed + optim + weights_ + negs + act_fwd + act_bwd
+    total_real = total * allocator_overhead
 
     print(f"Vocab size          : {vocab_size:>10,}")
     print()
@@ -30,11 +36,12 @@ def print_vram_budget(vocab_size: int, batch_size: int, embedding_dims: int, neg
     print(f"Activations fwd     : {act_fwd  * MB:>6.1f} MB  ({2 + neg_samples} tensors × {batch_size:,} × {embedding_dims})")
     print(f"Activations bwd     : {act_bwd  * MB:>6.1f} MB  (sparse grad upper bound)")
     print()
-    print(f"Total estimate      : {total    * GB:>6.2f} GB")
+    print(f"Tensor estimate     : {total      * GB:>6.2f} GB")
+    print(f"Realistic estimate  : {total_real * GB:>6.2f} GB  (×{allocator_overhead:.2f} allocator overhead)")
     if torch.cuda.is_available():
         vram_total = torch.cuda.get_device_properties(0).total_memory
         vram_free, _ = torch.cuda.mem_get_info()
-        headroom = vram_free - total
+        headroom = vram_free - total_real
         flag = "OK" if headroom > 0 else "OOM RISK"
         print()
         print(f"GPU                 : {torch.cuda.get_device_properties(0).name}")
