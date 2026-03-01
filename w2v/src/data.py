@@ -216,10 +216,22 @@ class PrefetchPairStream:
 
     A thread pool preprocesses chunks in parallel. Results are always consumed
     in submission order (chunk 0, 1, 2, ...) so training is reproducible across
-    runs. A semaphore limits how many chunks are held in memory at once.
-    Each chunk gets its own deterministic RNG seeded from (seed, epoch, chunk_index).
-    """
+    runs. A semaphore limits how many processed chunks are held in memory at
+    once. Each chunk gets its own deterministic RNG seeded from
+    (seed, epoch, chunk_index).
 
+    Args:
+        chunk_paths: Ordered list of parquet chunk files to process.
+        process_chunk: ``(path, rng) -> Tensor[2, N]`` closure that loads,
+            remaps, subsamples and generates skip-gram pairs for one chunk.
+        epoch: Current epoch number (used to seed per-chunk RNGs).
+        seed: Base seed for reproducibility.
+        n_workers: Maximum number of threads processing chunks concurrently.
+        queue_size: Maximum number of chunks that can be processed but not
+            yet consumed (i.e. sitting in memory waiting for the training
+            loop). Defaults to ``n_workers``.  Set lower to cap memory usage
+            when chunks are large.
+    """
     def __init__(
             self,
             chunk_paths: list[Path],
@@ -227,28 +239,32 @@ class PrefetchPairStream:
             epoch: int,
             seed: int,
             n_workers: int = 4,
+            queue_size: int | None = None,
     ):
         self._buffer = torch.empty(2, 0, dtype=torch.long)  # leftover buffer
+        # the semaphore counter starts from its argument and decrements by one at
+        # each `sem.acquire()` call, or increment by one at each `sem.release()` call.
+        # when it gets to zero the calling thread blocks and waits.
+        # this means that we can have at most queue_size buffer in memory, either still
+        # processing or waiting for the consumer, effectively limiting the memory usage.
+        self._sem = threading.Semaphore(queue_size if queue_size is not None else n_workers)
+        # utilities and progress tracking
         self._n_chunks = len(chunk_paths)
         self._chunks_done = 0
         self._pairs_produced = 0
         self._pairs_consumed = 0
-        # the semaphore counter starts from the argument and decrements by one at
-        # each `sem.acquire()` call, or increment by one at each `sem.release()` call.
-        # when it gets to zero the calling thread blocks and waits.
-        # the goal is to have at most `n_worker` batch can be processed but not yet consumed.
-        self._sem = threading.Semaphore(n_workers)
 
         def _process_with_sem(path, rng):
             # this will cause semaphore to get to zero.
-            # when it happens, the thread will wait for some release, to start processing.
+            # when it happens, the thread will wait for some to release, before starting processing.
+            # this implies that we will never have more than `queue_size` batches loaded in memory.
             self._sem.acquire()
             return process_chunk(path, rng)
 
         executor = ThreadPoolExecutor(max_workers=n_workers)
-        # puts all chunks processing, ordered, into a deque
+        # puts all chunks processing futures, ordered, into a deque
         self._futures = deque(
-            executor.submit(_process_with_sem, path, np.random.default_rng(seed + epoch * 10_000 + idx))
+            executor.submit(_process_with_sem, path, np.random.default_rng(seed + epoch * self._n_chunks + idx))
             for idx, path in enumerate(chunk_paths)
         )
         executor.shutdown(wait=False)
@@ -261,9 +277,8 @@ class PrefetchPairStream:
                 remainder = self._buffer
                 self._buffer = torch.empty(2, 0, dtype=torch.long)
                 return remainder
-            # this enforce determinism.
-            # processing happens in parallel but we wait the first to finish before the rest can return too.
-            # this is why the thing is called semaphore.
+            # this enforces determinism.
+            # processing happens in parallel, but we wait the first to finish before the rest can return too.
             tensor = self._futures.popleft().result()  # blocks until chunk N is ready
             self._sem.release()
             self._chunks_done += 1
@@ -284,7 +299,19 @@ class PrefetchPairStream:
 
 
 class SerialPairStream:
-    """Single-threaded pair stream (e.g. for validation with few chunks)."""
+    """Single-threaded pair stream (e.g. for validation with few chunks).
+
+    Same interface as :class:`PrefetchPairStream` but processes chunks
+    one at a time in the calling thread — no background workers or
+    semaphore. Preferred when the number of chunks is small and the
+    threading overhead isn't worthwhile.
+
+    Args:
+        chunk_paths: Ordered list of parquet chunk files to process.
+        process_chunk: ``(path, rng) -> Tensor[2, N]`` chunk-processing closure.
+        epoch: Current epoch number (used to seed per-chunk RNGs).
+        seed: Base seed for reproducibility.
+    """
 
     def __init__(self, chunk_paths: list[Path], process_chunk: Callable, epoch: int, seed: int):
         self._buffer = torch.empty(2, 0, dtype=torch.long)
@@ -305,7 +332,7 @@ class SerialPairStream:
                 self._pairs_consumed += remainder.shape[1]
                 return remainder
             idx, path = self._paths.popleft()
-            chunk_rng = np.random.default_rng(self._seed + self._epoch * 10_000 + idx)
+            chunk_rng = np.random.default_rng(self._seed + self._epoch * self._n_chunks + idx)
             new = self._process_chunk(path, chunk_rng)
             self._chunks_done += 1
             if new.shape[1] == 0:
