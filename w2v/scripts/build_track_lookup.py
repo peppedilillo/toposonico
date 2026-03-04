@@ -2,7 +2,8 @@
 """Build a track lookup table from the metadata SQLite database.
 
 Writes a parquet keyed by track_rowid with display columns: track_name,
-artist_name, album_name, track_popularity, release_date, id_isrc, label.
+artist_rowid, artist_name, album_rowid, album_name, track_popularity,
+release_date, id_isrc, label.
 Used for inspecting nearest-neighbour results. Pass --vocab to restrict output
 to tracks that appear in playlists (~47M); omit to write everything.
 
@@ -30,7 +31,9 @@ QUERY = """
         t.name             AS track_name,
         t.popularity       AS track_popularity,
         t.external_id_isrc AS id_isrc,
+        ta.artist_rowid    AS artist_rowid,
         a.name             AS artist_name,
+        t.album_rowid      AS album_rowid,
         al.name            AS album_name,
         al.label           AS label,
         al.release_date    AS release_date
@@ -49,7 +52,9 @@ SCHEMA = pa.schema(
         pa.field("track_name", pa.string()),
         pa.field("track_popularity", pa.uint8()),
         pa.field("id_isrc", pa.string()),
+        pa.field("artist_rowid", pa.int64()),
         pa.field("artist_name", pa.string()),
+        pa.field("album_rowid", pa.int64()),
         pa.field("album_name", pa.string()),
         pa.field("label", pa.string()),
         pa.field("release_date", pa.string()),
