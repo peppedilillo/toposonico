@@ -66,10 +66,10 @@ def main():
     del ckpt
     print(f"  Loaded in {time.time() - t0:.1f}s  —  vocab {len(rowids):,}, dim {embed_dim}")
 
-    schema = pa.schema([
-        pa.field("track_rowid", pa.int64()),
-        pa.field("embedding", pa.list_(pa.float32(), embed_dim)),
-    ])
+    schema = pa.schema(
+        [pa.field("track_rowid", pa.int64())]
+        + [pa.field(f"e{i}", pa.float32()) for i in range(embed_dim)]
+    )
 
     vocab_size = len(rowids)
     total_written = 0
@@ -80,13 +80,11 @@ def main():
     with pq.ParquetWriter(args.output, schema) as writer:
         for lo in range(0, vocab_size, args.chunk_size):
             hi = min(lo + args.chunk_size, vocab_size)
-            chunk_emb = pa.FixedSizeListArray.from_arrays(
-                pa.array(emb[lo:hi].ravel(), type=pa.float32()), embed_dim
-            )
-            writer.write_table(pa.table({
-                "track_rowid": pa.array(rowids[lo:hi], type=pa.int64()),
-                "embedding":   chunk_emb,
-            }))
+            chunk_arr = emb[lo:hi]  # (chunk_size, D)
+            row = {"track_rowid": pa.array(rowids[lo:hi], type=pa.int64())}
+            for i in range(embed_dim):
+                row[f"e{i}"] = pa.array(chunk_arr[:, i], type=pa.float32())
+            writer.write_table(pa.table(row, schema=schema))
             total_written += hi - lo
             elapsed = time.time() - t1
             rate = total_written / elapsed if elapsed > 0 else 0.0
@@ -97,7 +95,7 @@ def main():
     print(f"  {total_written:,} rows written  ({rate:,.0f} rows/s)      ")
     print(f"\nDone in {elapsed:.1f}s")
     print(f"Output : {args.output}  ({size_mb:.1f} MB)")
-    print(f"Schema : track_rowid int64, embedding float32[{embed_dim}]")
+    print(f"Schema : track_rowid int64, e0…e{embed_dim - 1} float32")
 
 
 if __name__ == "__main__":
