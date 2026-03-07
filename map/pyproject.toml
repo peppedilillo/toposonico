@@ -1,0 +1,10 @@
+[project]
+name = "tmap"
+version = "0.1.0"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.4.2",
+    "pandas>=3.0.1",
+    "pyarrow>=23.0.1",
+]
