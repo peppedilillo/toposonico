@@ -17,6 +17,7 @@ dependencies = [
     "matplotlib>=3.10.8",
     "tqdm>=4.67.3",
     "umap-learn>=0.5.11",
+    "rapidfuzz>=3.14.3",
 ]
 
 [tool.hatch.build.targets.wheel]
