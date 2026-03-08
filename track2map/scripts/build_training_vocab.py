@@ -7,13 +7,14 @@ playlist_count — everything the training loop needs for OOV filtering,
 subsampling, and negative-sampling weights.
 
 Usage:
-    python scripts/build_training_vocab.py <counts> <output> [--min-count N]
+    python scripts/build_training_vocab.py [--counts COUNTS] [--output OUTPUT] [--min-count N]
 
 Example:
-    python scripts/build_training_vocab.py track_playlist_counts.parquet training_vocab.parquet --min-count 5
+    python scripts/build_training_vocab.py --counts track_playlist_counts.parquet --output training_vocab.parquet --min-count 5
 """
 
 import argparse
+import os
 from pathlib import Path
 
 import numpy as np
@@ -26,13 +27,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "counts",
-        type=Path,
+        "--counts",
+        default=os.environ.get("T2M_TRACK_COUNT"),
         help="Path to input track_playlist_counts.parquet",
     )
     parser.add_argument(
-        "output",
-        type=Path,
+        "--output",
+        default=os.environ.get("T2M_TRAINING_VOCAB"),
         help="Output parquet path",
     )
     parser.add_argument(
@@ -43,18 +44,34 @@ def main():
     )
     args = parser.parse_args()
 
-    if not args.counts.exists():
-        raise FileNotFoundError(f"Counts parquet not found: {args.counts}")
+    if args.min_count < 1:
+        raise ValueError(
+            "Argument --min_count must be >= 1."
+        )
 
-    output_path = args.output
+    if args.counts is None:
+        raise ValueError(
+            "No `T2M_TRACK_COUNT` environment variable set. "
+            "Either run with --counts argument or define the environment variable."
+        )
+    counts_path = Path(args.counts)
+    if not counts_path.exists():
+        raise FileNotFoundError(f"Counts parquet not found: {counts_path}")
+
+    if args.output is None:
+        raise ValueError(
+            "No `T2M_TRAINING_VOCAB` environment variable set. "
+            "Either run with --output argument or define the environment variable."
+        )
+    output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"Counts   : {args.counts}")
+    print(f"Counts   : {counts_path}")
     print(f"Output   : {output_path}")
     print(f"Min count: {args.min_count}")
     print()
 
-    df = pd.read_parquet(args.counts)
+    df = pd.read_parquet(counts_path)
     n_total = len(df)
     print(f"Loaded {n_total:,} tracks from counts parquet")
 
@@ -65,7 +82,6 @@ def main():
             f"Dropped  {n_dropped:,} tracks below min_count={args.min_count} ({100 * n_dropped / n_total:.1f}%)"
         )
 
-    # Sort by track_rowid for a stable, reproducible mapping.
     df = df.sort_values("track_rowid").reset_index(drop=True)
     df["track_id"] = np.arange(len(df), dtype=np.int32)
     df = df[["track_rowid", "track_id", "playlist_count"]]

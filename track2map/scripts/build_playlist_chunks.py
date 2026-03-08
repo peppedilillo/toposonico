@@ -10,18 +10,15 @@ via training_vocab.parquet, keeping chunks valid across vocab choices.
 0 = all, K > 0 = skip first K, -K = last K only.
 
 Usage:
-    python scripts/build_playlist_chunks.py <database> <output_dir>
+    python scripts/build_playlist_chunks.py output_dir [--database DB]
                                              [--chunk-size N] [--offset K]
                                              [--overwrite]
 
-Example - build full sized chunk library, each chunk of 100_000 playlists
-    * python scripts/build_playlist_chunks.py \\
-        annas_archive_spotify_2025_07/spotify_clean_playlists.sqlite3 \\
-        ./chunks --chunk-size 100000
-Example — build a small three-chunk mini-library from the last 40,000 playlists:
-    * python scripts/build_playlist_chunks.py \\
-        annas_archive_spotify_2025_07/spotify_clean_playlists.sqlite3 \\
-        ./mini_chunks --offset -40000 --chunk-size 15000
+Examples:
+    python scripts/build_playlist_chunks.py ./chunks --chunk-size 100000
+
+    python scripts/build_playlist_chunks.py ./mini_chunks \\
+        --offset -40000 --chunk-size 15000
 """
 
 import argparse
@@ -31,10 +28,12 @@ import json
 from pathlib import Path
 import sqlite3
 import time
+import os
 
 import pandas as pd
 
 PLAYLIST_ROWIDS_QUERY = "SELECT rowid FROM playlists ORDER BY rowid"
+
 
 CHUNK_QUERY = """
     SELECT
@@ -52,16 +51,8 @@ CHUNK_QUERY = """
 
 
 def get_connection(database_path: Path) -> sqlite3.Connection:
-    """
-    Get a read-only connection to the database.
-
-    Returns:
-        sqlite3.Connection configured for read-only access
-    """
     uri = f"file:{database_path}?mode=ro"
-    conn = sqlite3.connect(uri, uri=True)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return sqlite3.connect(uri, uri=True)
 
 
 def main():
@@ -69,8 +60,12 @@ def main():
         description="Export playlist_tracks to parquet chunks for training",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("database", type=Path, help="Path to playlist SQLite database")
     parser.add_argument("output_dir", type=Path, help="Output directory for chunks")
+    parser.add_argument(
+        "--database",
+        default=os.environ.get("T2M_PLAYLIST_DB"),
+        help="Path to playlist SQLite database. Set to `T2M_PLAYLIST_DB` by default.",
+    )
     parser.add_argument(
         "--chunk-size",
         type=int,
@@ -94,15 +89,21 @@ def main():
     )
     args = parser.parse_args()
 
-    if not args.database.exists():
-        raise FileNotFoundError(f"Database not found: {args.database}")
+    if args.database is None:
+        raise ValueError(
+            "No `T2M_PLAYLIST_DB` environment variable set. "
+            "Either run with --database argument or define the environment variable."
+        )
+    db_path = Path(args.database)
+    if not db_path.exists():
+        raise FileNotFoundError(f"Database not found: {db_path}")
 
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    conn = get_connection(args.database)
+    conn = get_connection(db_path)
 
-    print(f"Database   : {args.database}")
+    print(f"Database   : {db_path}")
     print(f"Output dir : {output_dir}")
     print(f"Chunk size : {args.chunk_size:,} playlists")
     print(f"Offset     : {args.offset}")

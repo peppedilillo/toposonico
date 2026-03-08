@@ -8,16 +8,18 @@ Used for inspecting nearest-neighbour results. Pass --vocab to restrict output
 to tracks that appear in playlists (~47M); omit to write everything.
 
 Usage:
-    python scripts/build_track_lookup.py <db> <output> [--vocab VOCAB] [--chunk-size N]
+    python scripts/build_track_lookup.py [--database DB] [--output OUTPUT]
+                                          [--vocab VOCAB] [--chunk-size N]
 
 Example:
-    python scripts/build_track_lookup.py spotify_clean.sqlite3 track_lookup.parquet
+    python scripts/build_track_lookup.py --vocab training_vocab.parquet
 """
 
 import argparse
 from pathlib import Path
 import sqlite3
 import time
+import os
 
 import pandas as pd
 import pyarrow as pa
@@ -63,16 +65,8 @@ SCHEMA = pa.schema(
 
 
 def get_connection(database_path: Path) -> sqlite3.Connection:
-    """
-    Get a read-only connection to the database.
-
-    Returns:
-        sqlite3.Connection configured for read-only access
-    """
     uri = f"file:{database_path}?mode=ro"
-    conn = sqlite3.connect(uri, uri=True)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return sqlite3.connect(uri, uri=True)
 
 
 def main():
@@ -80,14 +74,22 @@ def main():
         description="Build track lookup table from metadata database",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("database", type=Path, help="Path to metadata SQLite database")
-    parser.add_argument("output", type=Path, help="Output parquet path")
+    parser.add_argument(
+        "--database",
+        default=os.environ.get("T2M_PLAYLIST_DB"),
+        help="Path to playlist SQLite database. Set to `T2M_PLAYLIST_DB` by default.",
+    )
+    parser.add_argument(
+        "--output",
+        default=os.environ.get("T2M_TRACK_LOOKUP"),
+        help="Output parquet path. Set to `T2M_TRACK_LOOKUP` by default."
+    )
     parser.add_argument(
         "--vocab",
-        type=Path,
-        default=None,
+        default=os.environ.get("T2M_TRAINING_VOCAB"),
         help="Global track vocab parquet — if given, only tracks whose track_rowid appears "
-        "in the vocab are written; all others are skipped. Omit to write all rows.",
+        "in the vocab are written; all others are skipped. Omit to write all rows. "
+        "Set to `T2M_TRAINING_VOCAB` by default.",
     )
     parser.add_argument(
         "--chunk-size",
@@ -97,18 +99,32 @@ def main():
     )
     args = parser.parse_args()
 
-    if not args.database.exists():
-        raise FileNotFoundError(f"Database not found: {args.database}")
-    if args.vocab is not None and not args.vocab.exists():
-        raise FileNotFoundError(
-            f"Vocab parquet not found: {args.vocab}\n"
-            "Run 'python scripts/build_track_vocab.py' first."
-        )
 
-    output_path = args.output
+    if args.database is None:
+        raise ValueError(
+            "No `T2M_PLAYLIST_DB` environment variable set. "
+            "Either run with --database argument or define the environment variable."
+        )
+    db_path = Path(args.database)
+    if not db_path.exists():
+        raise FileNotFoundError(f"Database not found: {db_path}")
+
+    if args.output is None:
+        raise ValueError(
+            "No `T2M_TRACK_LOOKUP` environment variable set. "
+            "Either run with --output argument or define the environment variable."
+        )
+    output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"Database  : {args.database}")
+    if args.vocab is not None and not Path(args.vocab).exists():
+        raise FileNotFoundError(
+            f"Vocab parquet not found: {args.vocab}\n"
+        )
+    args.vocab = Path(args.vocab) if args.vocab is not None else None
+
+
+    print(f"Database  : {db_path}")
     print(f"Vocab     : {args.vocab or '(none — no filtering)'}")
     print(f"Output    : {output_path}")
     print(f"Chunk size: {args.chunk_size:,} rows")
@@ -126,7 +142,7 @@ def main():
     print("Querying tracks (streaming in chunks)...")
     print("(This may take a while on a large database.)")
 
-    conn = get_connection(args.database)
+    conn = get_connection(db_path)
     cursor = conn.execute(QUERY)
     col_names: list[str] = [desc[0] for desc in cursor.description]
 

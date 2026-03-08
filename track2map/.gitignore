@@ -13,5 +13,8 @@ wheels/
 # binaries
 outs
 
+# private
+config.env
+
 # Virtual environments
 .venv
