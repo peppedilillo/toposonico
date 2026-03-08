@@ -7,13 +7,13 @@ name = "track2map"
 version = "0.1.0"
 description = "Trains Word2Vec track embeddings from Spotify playlists."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
     "jupyter>=1.0.0",
-    "pandas>=2.0.0",
-    "pyarrow>=15.0.0",
-    "matplotlib>=3.10.8",
-    "tqdm>=4.67.3",
+    "pandas~=2.3",
+    "pyarrow~=23.0",
+    "matplotlib~=3.10",
+    "tqdm~=4.67",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -21,7 +21,7 @@ packages = ["src"]
 
 [dependency-groups]
 dev = [
-    "black>=26.1.0",
-    "isort>=8.0.1",
-    "pytest>=9.0.2",
+    "black~=26.3",
+    "isort~=8.0",
+    "pytest~=9.0",
 ]
