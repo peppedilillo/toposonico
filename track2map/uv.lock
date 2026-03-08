@@ -2360,9 +2360,9 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "black", specifier = ">=26.1.0" },
-    { name = "isort", specifier = ">=8.0.1" },
-    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "black", specifier = "~=26.3" },
+    { name = "isort", specifier = "~=8.0" },
+    { name = "pytest", specifier = "~=9.0" },
 ]
 
 [[package]]

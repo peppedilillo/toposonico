@@ -7,7 +7,7 @@ name = "track2map"
 version = "0.1.0"
 description = "Trains Word2Vec track embeddings from Spotify playlists."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "jupyter>=1.0.0",
     "pandas~=2.3",
