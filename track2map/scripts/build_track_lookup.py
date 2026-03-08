@@ -76,8 +76,8 @@ def main():
     )
     parser.add_argument(
         "--database",
-        default=os.environ.get("T2M_PLAYLIST_DB"),
-        help="Path to playlist SQLite database. Set to `T2M_PLAYLIST_DB` by default.",
+        default=os.environ.get("T2M_TRACKS_DB"),
+        help="Path to track SQLite database. Set to `T2M_TRACKS_DB` by default.",
     )
     parser.add_argument(
         "--output",
@@ -102,7 +102,7 @@ def main():
 
     if args.database is None:
         raise ValueError(
-            "No `T2M_PLAYLIST_DB` environment variable set. "
+            "No `T2M_TRACKS_DB` environment variable set. "
             "Either run with --database argument or define the environment variable."
         )
     db_path = Path(args.database)
@@ -117,27 +117,25 @@ def main():
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if args.vocab is not None and not Path(args.vocab).exists():
+    if args.vocab is None:
         raise FileNotFoundError(
             f"Vocab parquet not found: {args.vocab}\n"
         )
-    args.vocab = Path(args.vocab) if args.vocab is not None else None
-
+    vocab_path = Path(args.vocab)
+    if not vocab_path.exists():
+        raise FileNotFoundError(f"Track vocab not found: {vocab_path}")
 
     print(f"Database  : {db_path}")
-    print(f"Vocab     : {args.vocab or '(none — no filtering)'}")
+    print(f"Vocab     : {vocab_path or '(none — no filtering)'}")
     print(f"Output    : {output_path}")
     print(f"Chunk size: {args.chunk_size:,} rows")
     print()
 
-    vocab_ids: pd.Index | None = None
-    if args.vocab is not None:
-        print("Loading vocab track_rowids for filtering...")
-        vocab_ids = pd.Index(
-            pd.read_parquet(args.vocab, columns=["track_rowid"])["track_rowid"]
-        )
-        print(f"  {len(vocab_ids):,} track_rowids loaded")
-        print()
+    print("Loading vocab for filtering...")
+    vocab_ids = pd.Index(pd.read_parquet(vocab_path, columns=["track_rowid"])["track_rowid"])
+    print(f"  {len(vocab_ids):,} track_rowids loaded")
+
+    print()
 
     print("Querying tracks (streaming in chunks)...")
     print("(This may take a while on a large database.)")
@@ -160,12 +158,9 @@ def main():
             chunk = pd.DataFrame.from_records(rows, columns=col_names)
             chunk["track_rowid"] = chunk["track_rowid"].astype("int64")
 
-            if vocab_ids is not None:
-                mask = chunk["track_rowid"].isin(
-                    vocab_ids
-                )  # pyright: ignore[reportArgumentType]
-                total_skipped += int((~mask).sum())
-                chunk = chunk.loc[mask]
+            mask = chunk["track_rowid"].isin(vocab_ids)  # pyright: ignore[reportArgumentType]
+            total_skipped += int((~mask).sum())
+            chunk = chunk.loc[mask]
 
             if not chunk.empty:
                 chunk["track_popularity"] = (
