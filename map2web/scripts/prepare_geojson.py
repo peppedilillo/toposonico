@@ -1,27 +1,28 @@
-"""Build line-delimited GeoJSON for tippecanoe from a UMAP projection + track lookup.
+"""Join a geo-parquet + lookup and stream ndjson to stdout for tippecanoe.
 
-Maps UMAP coordinates to a fake geographic square centred on the origin so that
-Mercator distortion is negligible. Tracks with missing name or artist are dropped.
-Each feature carries a ``tippecanoe-minzoom`` property derived from track_popularity
-so that popular tracks appear at low zoom and the long tail only at max zoom.
+Each entity type (track, album, artist, label) has its own join key and property
+set. The geo-parquet is produced by normalize_coords.py; the lookup parquet comes
+from track2map/outs/.
 
-Output is streamed to stdout; progress and stats go to stderr.
+Per-feature tippecanoe-minzoom encodes LOD: popular entities appear at low zoom,
+the long tail only at max zoom. Labels get a fixed minzoom of 3.
+
+Progress is printed to stderr every --log-every features.
 
 Usage:
-    python scripts/prepare_geojson.py <umap> <lookup> [options]
+    python scripts/prepare_geojson.py <entity> <geo_parquet> <lookup_parquet> \\
+        [--max-zoom Z] [--log-every N]
+
+    entity ∈ {track, album, artist, label}
 
 Examples:
-    python scripts/prepare_geojson.py \\
-        ../umap/outs/umap/umap_2d_pure_bolt_nn100_md0d01_cosine.parquet \\
-        ../w2v/outs/track_lookup.parquet \\
-        | tippecanoe -e web/public/tiles -z7 -Z0 -l tracks --force
+    python scripts/prepare_geojson.py track \\
+        assets/geo/track_geo.parquet ../track2map/outs/track_lookup.parquet \\
+        > assets/tracks.ndjson
 
-    # write ndjson to file first (easier to re-run tippecanoe without re-generating):
-    python scripts/prepare_geojson.py \\
-        ../umap/outs/umap/umap_2d_pure_bolt_nn100_md0d01_cosine.parquet \\
-        ../w2v/outs/track_lookup.parquet \\
-        > /tmp/tracks.ndjson
-    tippecanoe -e web/public/tiles -z7 -Z0 -l tracks --force /tmp/tracks.ndjson
+    python scripts/prepare_geojson.py label \\
+        assets/geo/label_geo.parquet ../track2map/outs/label_lookup.parquet \\
+        > assets/labels.ndjson
 """
 
 import argparse
@@ -33,36 +34,52 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-LOG_EVERY_DEFAULT = 500_000
-EXTENT_DEFAULT = 45.0  # degrees; UMAP space maps to [-EXTENT, +EXTENT] on both axes
 MAX_ZOOM_DEFAULT = 7
+LOG_EVERY_DEFAULT = 500_000
+LABEL_MINZOOM = 3
+
+ENTITY_CONFIGS = {
+    "track": {
+        "key": "track_rowid",
+        "lookup_cols": ["track_rowid", "track_name", "artist_name", "track_popularity"],
+        "name_cols": ["track_name", "artist_name"],
+    },
+    "album": {
+        "key": "album_rowid",
+        "lookup_cols": ["album_rowid", "album_name", "track_count", "mean_popularity"],
+        "name_cols": ["album_name"],
+    },
+    "artist": {
+        "key": "artist_rowid",
+        "lookup_cols": ["artist_rowid", "artist_name", "track_count", "mean_popularity"],
+        "name_cols": ["artist_name"],
+    },
+    "label": {
+        "key": "label",
+        "lookup_cols": ["label", "track_count", "mean_popularity"],
+        "name_cols": ["label"],
+    },
+}
 
 
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+def minzoom_from_pop(pop: np.ndarray, max_zoom: int) -> np.ndarray:
+    return np.clip(max_zoom - (pop.astype(np.int32) * max_zoom // 100), 0, max_zoom)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Stream ndjson for tippecanoe from UMAP projection + track lookup",
+        description="Stream ndjson for tippecanoe from a geo-parquet + lookup",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__.split("Usage:")[1],
     )
-    parser.add_argument("umap", type=Path, help="Path to UMAP projection parquet")
-    parser.add_argument("lookup", type=Path, help="Path to track lookup parquet")
-    parser.add_argument(
-        "--extent",
-        type=float,
-        default=EXTENT_DEFAULT,
-        metavar="DEG",
-        help=f"Half-width in degrees of the fake lon/lat square (default: {EXTENT_DEFAULT})",
-    )
+    parser.add_argument("entity", choices=list(ENTITY_CONFIGS), help="Entity type")
+    parser.add_argument("geo", type=Path, help="Path to geo-parquet (from normalize_coords.py)")
+    parser.add_argument("lookup", type=Path, help="Path to lookup parquet")
     parser.add_argument(
         "--max-zoom",
         type=int,
         default=MAX_ZOOM_DEFAULT,
         metavar="Z",
-        help=f"Maximum zoom level passed to tippecanoe (default: {MAX_ZOOM_DEFAULT})",
+        help=f"Maximum zoom level (default: {MAX_ZOOM_DEFAULT})",
     )
     parser.add_argument(
         "--log-every",
@@ -73,80 +90,114 @@ def main():
     )
     args = parser.parse_args()
 
-    if not args.umap.exists():
-        raise FileNotFoundError(f"UMAP parquet not found: {args.umap}")
-    if not args.lookup.exists():
-        raise FileNotFoundError(f"Lookup parquet not found: {args.lookup}")
+    for path, label in [(args.geo, "geo"), (args.lookup, "lookup")]:
+        if not path.exists():
+            print(f"Error: {label} parquet not found: {path}", file=sys.stderr)
+            sys.exit(1)
 
-    eprint(f"UMAP    : {args.umap}")
-    eprint(f"Lookup  : {args.lookup}")
-    eprint(f"Extent  : ±{args.extent}°  (lon/lat)")
-    eprint(f"Max zoom: {args.max_zoom}")
-    eprint()
+    cfg = ENTITY_CONFIGS[args.entity]
+    key = cfg["key"]
+    Z = args.max_zoom
 
+    print(f"Entity  : {args.entity}", file=sys.stderr)
+    print(f"Geo     : {args.geo}", file=sys.stderr)
+    print(f"Lookup  : {args.lookup}", file=sys.stderr)
+    print(f"Max zoom: {Z}", file=sys.stderr)
+    print(file=sys.stderr)
 
     t0 = time.time()
-    eprint("Loading UMAP projection …")
-    umap = pd.read_parquet(args.umap, columns=["track_rowid", "umap_x", "umap_y"])
-    eprint(f"  {len(umap):,} tracks")
 
-    eprint("Loading track lookup …")
-    lookup = pd.read_parquet(
-        args.lookup,
-        columns=["track_rowid", "track_name", "artist_name", "track_popularity"],
-    )
-    eprint(f"  {len(lookup):,} rows")
+    print("Loading geo …", file=sys.stderr)
+    geo = pd.read_parquet(args.geo, columns=[key, "lon", "lat"])
+    print(f"  {len(geo):,} rows", file=sys.stderr)
 
-    eprint("Joining …")
-    df = umap.merge(lookup, on="track_rowid", how="inner")
-    eprint(f"  {len(df):,} tracks after join")
+    print("Loading lookup …", file=sys.stderr)
+    lookup = pd.read_parquet(args.lookup, columns=cfg["lookup_cols"])
+    print(f"  {len(lookup):,} rows", file=sys.stderr)
+
+    print("Joining …", file=sys.stderr)
+    df = geo.merge(lookup, on=key, how="inner")
+    print(f"  {len(df):,} rows after join", file=sys.stderr)
 
     before = len(df)
-    df = df.dropna(subset=["track_name", "artist_name"])
+    df = df.dropna(subset=cfg["name_cols"])
+    df = df[~df[cfg["name_cols"]].apply(lambda col: col.str.strip() == "").any(axis=1)]
     dropped = before - len(df)
-    eprint(f"  {dropped:,} dropped (missing name or artist)  →  {len(df):,} remaining")
+    print(f"  {dropped:,} dropped (null/empty name)  →  {len(df):,} remaining", file=sys.stderr)
 
-    df["track_popularity"] = df["track_popularity"].fillna(0).astype(np.uint8)
-    df["track_name"] = df["track_name"].astype(str)
-    df["artist_name"] = df["artist_name"].astype(str)
+    # Build minzoom array
+    if args.entity == "label":
+        minzooms = np.full(len(df), LABEL_MINZOOM, dtype=np.int32)
+    else:
+        pop = df["mean_popularity"].fillna(0).values if "mean_popularity" in df.columns else df["track_popularity"].fillna(0).values
+        minzooms = minzoom_from_pop(pop, Z)
 
-    e = args.extent
-    x_min, x_max = df.umap_x.min(), df.umap_x.max()
-    y_min, y_max = df.umap_y.min(), df.umap_y.max()
-    x_norm = (df.umap_x - x_min) / (x_max - x_min)  # [0, 1]
-    y_norm = (df.umap_y - y_min) / (y_max - y_min)  # [0, 1]
-    lons = (x_norm * 2 * e - e).round(6).values  # [-e, +e]
-    lats = (y_norm * 2 * e - e).round(6).values  # [-e, +e]
+    lons = df["lon"].values
+    lats = df["lat"].values
+    keys = df[key].values
 
-    # ---------------------------------- tippecanoe-minzoom from popularity
-    # popularity 100 → minzoom 0 (always visible)
-    # popularity   0 → minzoom max_zoom (only at full detail)
-    pop = df.track_popularity.values.astype(np.int32)
-    minzooms = np.clip(args.max_zoom - (pop * args.max_zoom // 100), 0, args.max_zoom)
+    # Pre-extract property arrays per entity
+    artists: np.ndarray = np.empty(0)
+    counts: np.ndarray = np.empty(0)
+    if args.entity == "track":
+        names = df["track_name"].astype(str).values
+        artists = df["artist_name"].astype(str).values
+        pops = df["track_popularity"].fillna(0).astype(np.int32).values
+    elif args.entity == "album":
+        names = df["album_name"].astype(str).values
+        counts = df["track_count"].fillna(0).astype(np.int32).values
+        pops = df["mean_popularity"].fillna(0).astype(np.float32).values
+    elif args.entity == "artist":
+        names = df["artist_name"].astype(str).values
+        counts = df["track_count"].fillna(0).astype(np.int32).values
+        pops = df["mean_popularity"].fillna(0).astype(np.float32).values
+    else:  # label
+        names = df["label"].astype(str).values
+        counts = df["track_count"].fillna(0).astype(np.int32).values
+        pops = df["mean_popularity"].fillna(0).astype(np.float32).values
 
-    rowids = df.track_rowid.values
-    names = df.track_name.values
-    artists = df.artist_name.values
-
-    eprint("Streaming ndjson to stdout …")
+    print("Streaming ndjson to stdout …", file=sys.stderr)
     n = len(df)
     t1 = time.time()
     out = sys.stdout
 
     for i in range(n):
-        feature = {
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [float(lons[i]), float(lats[i])],
-            },
-            "properties": {
-                "track_rowid": int(rowids[i]),
+        if args.entity == "track":
+            props = {
+                "track_rowid": int(keys[i]),
                 "track_name": names[i],
                 "artist_name": artists[i],
-                "track_popularity": int(pop[i]),
+                "track_popularity": int(pops[i]),
                 "tippecanoe-minzoom": int(minzooms[i]),
-            },
+            }
+        elif args.entity == "album":
+            props = {
+                "album_rowid": int(keys[i]),
+                "album_name": names[i],
+                "track_count": int(counts[i]),
+                "mean_popularity": round(float(pops[i]), 2),
+                "tippecanoe-minzoom": int(minzooms[i]),
+            }
+        elif args.entity == "artist":
+            props = {
+                "artist_rowid": int(keys[i]),
+                "artist_name": names[i],
+                "track_count": int(counts[i]),
+                "mean_popularity": round(float(pops[i]), 2),
+                "tippecanoe-minzoom": int(minzooms[i]),
+            }
+        else:  # label
+            props = {
+                "label": names[i],
+                "track_count": int(counts[i]),
+                "mean_popularity": round(float(pops[i]), 2),
+                "tippecanoe-minzoom": int(minzooms[i]),
+            }
+
+        feature = {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [float(lons[i]), float(lats[i])]},
+            "properties": props,
         }
         out.write(json.dumps(feature, ensure_ascii=False))
         out.write("\n")
@@ -154,13 +205,13 @@ def main():
         if i > 0 and i % args.log_every == 0:
             elapsed = time.time() - t1
             rate = i / elapsed
-            eprint(f"  {i:>9,} / {n:,}  ({rate:,.0f} features/s)", end="\r")
+            print(f"  {i:>9,} / {n:,}  ({rate:,.0f} features/s)", end="\r", file=sys.stderr)
 
     elapsed = time.time() - t0
     rate = n / (time.time() - t1)
-    eprint(f"  {n:>9,} / {n:,}  ({rate:,.0f} features/s)     ")
-    eprint()
-    eprint(f"Done in {elapsed:.1f}s  —  {n:,} features written")
+    print(f"  {n:>9,} / {n:,}  ({rate:,.0f} features/s)     ", file=sys.stderr)
+    print(file=sys.stderr)
+    print(f"Done in {elapsed:.1f}s  —  {n:,} features written", file=sys.stderr)
 
 
 if __name__ == "__main__":

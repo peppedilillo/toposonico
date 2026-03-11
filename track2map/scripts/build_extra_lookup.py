@@ -31,7 +31,7 @@ def main():
     )
     parser.add_argument(
         "--output-dir",
-        default=None,
+        default=os.environ.get("T2M_LOOKUP_DIR"),
         help="Directory for output parquets. Defaults to the parent dir of --lookup.",
     )
     args = parser.parse_args()
@@ -45,7 +45,12 @@ def main():
     if not lookup_path.exists():
         raise FileNotFoundError(f"Lookup parquet not found: {lookup_path}")
 
-    output_dir = Path(args.output_dir) if args.output_dir else lookup_path.parent
+    if args.output_dir is None:
+        raise ValueError(
+            "No `T2M_LOOKUP_DIR` environment variable set. "
+            "Either run with --output_dir argument or define the environment variable."
+        )
+    output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Lookup    : {lookup_path}")

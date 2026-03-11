@@ -39,8 +39,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--model",
-        default=os.environ.get("T2M_MODEL_DEFAULT"),
+        "model",
+        type=Path,
         help="Path to .pt model checkpoint file"
     )
     parser.add_argument(
@@ -56,11 +56,6 @@ def main():
     )
     args = parser.parse_args()
 
-    if args.model is None:
-        raise ValueError(
-            "No `T2M_MODEL_DEFAULT` environment variable set. "
-            "Either run with --model argument or define the environment variable."
-        )
     model_path = Path(args.model)
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}")
