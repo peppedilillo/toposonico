@@ -81,6 +81,12 @@ def main():
         df.groupby(["album_rowid", "album_name"], as_index=False)
         .agg(track_count=("track_rowid", "count"), mean_popularity=("track_popularity", "mean"))
     )
+    primary_artist = (
+        df.groupby("album_rowid")[["artist_rowid", "artist_name"]]
+        .first()
+        .reset_index()
+    )
+    album = album.merge(primary_artist, on="album_rowid", how="left")
     album["album_rowid"] = album["album_rowid"].astype("int64")
     album["track_count"] = album["track_count"].astype("int32")
     album["mean_popularity"] = album["mean_popularity"].astype("float32")
