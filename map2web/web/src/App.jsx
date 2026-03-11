@@ -2,138 +2,139 @@ import {useEffect, useRef, useState} from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-const TILE_URL = `${window.location.origin}/tiles/{z}/{x}/{y}.pbf`;
+
+const LAYERS = [
+    {
+        id: 'tracks', sourceLayer: 'tracks', char: '·', size: 16, color: '#3bda28', opacity: 0.7,
+        tooltip: (p) => ({entityType: 'track', line1: p.artist_name, line2: p.track_name})
+    },
+    {
+        id: 'artists', sourceLayer: 'artists', char: '*', size: 12, color: '#00ffbe', opacity: 1.0,
+        tooltip: (p) => ({entityType: 'artist', line2: p.artist_name})
+    },
+    {
+        id: 'albums', sourceLayer: 'albums', char: 'o', size: 12, color: '#f8edb0', opacity: 0.7,
+        tooltip: (p) => ({entityType: 'album', line1: p.artist_name, line2: p.album_name})
+    },
+    {
+        id: 'labels', sourceLayer: 'labels', char: 'P', size: 24, color: '#ca53fa', opacity: 1.0,
+        tooltip: (p) => ({entityType: 'label', line2: p.label})
+    },
+];
 
 const STYLE = {
     version: 8,
-    sources: {},
     glyphs: '/fonts/IBMPlexMono/{fontstack}/{range}.pbf',
-    layers: [{id: 'background', type: 'background', paint: {'background-color': '#0d0d12'}}],
-};
+    sources: {},
+    layers: [{id: 'background', type: 'background', paint: {'background-color': '#000000'}}],
+}
+
+const STYLE_DEBUG = {
+    position: 'absolute', bottom: 12, left: 12,
+    color: 'white', fontFamily: 'monospace', fontSize: 11,
+    pointerEvents: 'none',
+}
+
+const STYLE_HOVER = {
+    position: 'absolute',
+    background: 'rgba(13, 13, 18, 0.85)',
+    color: 'rgba(220, 230, 255, 0.9)',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    lineHeight: '1.5',
+    padding: '6px 10px',
+    whiteSpace: 'nowrap',
+}
+
+const gridLines = {type: 'FeatureCollection', features: []};
+for (let lon = -180; lon <= 180; lon += 5) {
+    gridLines.features.push({
+        type: 'Feature', geometry: {
+            type: 'LineString', coordinates: [[lon, -90], [lon, 90]]
+        }
+    });
+}
+for (let lat = -90; lat <= 90; lat += 5) {
+    gridLines.features.push({
+        type: 'Feature', geometry: {
+            type: 'LineString', coordinates: [[-180, lat], [180, lat]]
+        }
+    });
+}
 
 export default function App() {
     const containerRef = useRef(null);
-    const [tooltip, setTooltip] = useState(null); // {x, y, artist_name, track_name}
+    const [tooltip, setTooltip] = useState(null); // {x, y, entityType, line1, line2}
+    const [zoom, setZoom] = useState(3);
+    const [cursor, setCursor] = useState({x: 0, y: 0});
 
     useEffect(() => {
+
         const map = new maplibregl.Map({
             container: containerRef.current,
             style: STYLE,
-            center: [0, 0],
+            center: [0., 0.],
+            zoom: 4,
             minZoom: 3,
         });
 
         map.on('load', () => {
-            map.addSource('tracks', {
+            map.addSource('grid', {type: 'geojson', data: gridLines});
+            map.addSource('tiles', {
                 type: 'vector',
-                tiles: [TILE_URL],
+                tiles: [`${window.location.origin}/tiles/{z}/{x}/{y}.pbf`],
                 maxzoom: 11,
             });
-
             map.addLayer({
-                id: 'tracks',
-                type: 'circle',
-                source: 'tracks',
-                'source-layer': 'tracks',
-                paint: {
-                    'circle-radius': [
-                        'interpolate', ['linear'], ['zoom'],
-                        0, ['interpolate', ['linear'], ['get', 'track_popularity'], 0, 1,   100, 2.5],
-                        5, ['interpolate', ['linear'], ['get', 'track_popularity'], 0, 1.5, 100, 4],
-                        7, ['interpolate', ['linear'], ['get', 'track_popularity'], 0, 2,   100, 6],
-                        14,['interpolate', ['linear'], ['get', 'track_popularity'], 0, 3,   100, 9],
-                    ],
-                    'circle-opacity': [
-                        'interpolate', ['linear'], ['zoom'],
-                        2, 0.4,
-                        5, 0.6,
-                        8, 0.85,
-                    ],
-                    'circle-color': [
-                        'interpolate', ['linear'], ['get', 'track_popularity'],
-                        0,   '#0033ff',
-                        20,  '#6600ff',
-                        40,  '#cc00ff',
-                        60,  '#ff00aa',
-                        80,  '#ff3300',
-                        100, '#ffee00',
-                    ],
-                },
+                id: 'grid',
+                type: 'line',
+                source: 'grid',
+                paint: {'line-color': '#303030', 'line-width': 1},
             });
-
-            map.addLayer({
-                id: 'tracks-labels',
-                type: 'symbol',
-                source: 'tracks',
-                'source-layer': 'tracks',
-                minzoom: 4,
-                filter: ['>', ['get', 'track_popularity'],
-                    ['step', ['zoom'],
-                        70,
-                        6, 60,
-                        7, 55,
-                        8, 50,
-                        9, 45,
-                    ]
-                ],
-                layout: {
-                    'text-field': ['format',
-                        ['get', 'artist_name'], {'font-scale': 0.85},
-                        '\n', {},
-                        ['get', 'track_name'], {'font-scale': 1},
-                    ],
-                    'text-font': ['IBM Plex Mono Regular'],
-                    'text-size': 11,
-                    'text-offset': [0, 1.2],
-                    'text-anchor': 'top',
-                    'text-max-width': 12,
-                },
-                paint: {
-                    'text-color': '#ffffff',
-                    'text-halo-color': 'rgba(6, 8, 16, 0.95)',
-                    'text-halo-width': 1.2,
-                },
-            });
-
-            map.on('mousemove', 'tracks', (e) => {
-                map.getCanvas().style.cursor = 'pointer';
-                const props = e.features[0].properties;
-                setTooltip({
-                    x: e.point.x,
-                    y: e.point.y,
-                    artist_name: props.artist_name,
-                    track_name: props.track_name,
+            LAYERS.forEach(({id, sourceLayer, char, size, color, opacity, tooltip}) => {
+                map.addLayer({
+                    id,
+                    type: 'symbol',
+                    source: 'tiles',
+                    'source-layer': sourceLayer,
+                    layout: {
+                        'text-field': char,
+                        'text-size': size,
+                        'text-font': ['IBM Plex Mono Regular'],
+                        'text-allow-overlap': true,
+                    },
+                    paint: {
+                        'text-color': color,
+                        'text-opacity': opacity,
+                    },
                 });
-            });
-
-            map.on('mouseleave', 'tracks', () => {
-                map.getCanvas().style.cursor = '';
-                setTooltip(null);
-            });
+                map.on('mousemove', id, (e) => {
+                    map.getCanvas().style.cursor = 'pointer';
+                    setTooltip({x: e.point.x, y: e.point.y, ...tooltip(e.features[0].properties)});
+                });
+                map.on('mouseleave', id, () => {
+                    map.getCanvas().style.cursor = '';
+                    setTooltip(null);
+                })
+            })
         });
 
+        map.on('zoom', () => setZoom(map.getZoom()));
+        map.on('mousemove', (e) => setCursor({x: e.lngLat.lng, y: e.lngLat.lat}));
         return () => map.remove();
     }, []);
 
     return (
         <div style={{position: 'relative', width: '100vw', height: '100vh'}}>
             <div ref={containerRef} style={{width: '100%', height: '100%'}}/>
+            <div style={STYLE_DEBUG}>
+                z {zoom.toFixed(2)} x {cursor.x.toFixed(4)} y {cursor.y.toFixed(4)}
+            </div>
             {tooltip && (
-                <div style={{
-                    position: 'absolute',
-                    left: tooltip.x + 12,
-                    top: tooltip.y + 12,
-                    pointerEvents: 'none',
-                    background: 'rgba(13, 13, 18, 0.85)',
-                    color: 'rgba(220, 230, 255, 0.9)',
-                    fontFamily: 'monospace',
-                    fontSize: '12px',
-                    lineHeight: '1.5',
-                    padding: '6px 10px',
-                    whiteSpace: 'nowrap',
-                }}>
-                    <div style={{opacity: 0.6}}>{tooltip.artist_name}</div>
-                    <div>{tooltip.track_name}</div>
+                <div style={{...STYLE_HOVER, left: tooltip.x + 12, top: tooltip.y + 12}}>
+                    <div style={{opacity: 0.6}}>{tooltip.entityType}</div>
+                    <div style={{opacity: 0.6}}>{tooltip.line1}</div>
+                    <div>{tooltip.line2}</div>
                 </div>
             )}
         </div>

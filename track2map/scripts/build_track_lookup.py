@@ -21,6 +21,7 @@ import sqlite3
 import time
 import os
 
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -60,6 +61,7 @@ SCHEMA = pa.schema(
         pa.field("album_name", pa.string()),
         pa.field("label", pa.string()),
         pa.field("release_date", pa.string()),
+        pa.field("logcounts", pa.float32()),
     ]
 )
 
@@ -132,7 +134,9 @@ def main():
     print()
 
     print("Loading vocab for filtering...")
-    vocab_ids = pd.Index(pd.read_parquet(vocab_path, columns=["track_rowid"])["track_rowid"])
+    vocab = pd.read_parquet(vocab_path, columns=["track_rowid", "playlist_count"])
+    vocab_ids = pd.Index(vocab["track_rowid"])
+    vocab_counts = vocab.set_index("track_rowid")["playlist_count"]
     print(f"  {len(vocab_ids):,} track_rowids loaded")
 
     print()
@@ -165,6 +169,9 @@ def main():
             if not chunk.empty:
                 chunk["track_popularity"] = (
                     chunk["track_popularity"].fillna(0).astype("uint8")
+                )
+                chunk["logcounts"] = (
+                    np.log10(chunk["track_rowid"].map(vocab_counts)).astype("float32")
                 )
                 writer.write_table(
                     pa.Table.from_pandas(chunk, schema=SCHEMA, preserve_index=False)
