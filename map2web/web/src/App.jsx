@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+import Search from "./Search.jsx";
 
 const LAYERS = [
     {
@@ -64,6 +65,7 @@ for (let lat = -90; lat <= 90; lat += 5) {
 
 export default function App() {
     const containerRef = useRef(null);
+    const mapRef = useRef(null);
     const [tooltip, setTooltip] = useState(null); // {x, y, entityType, line1, line2}
     const [zoom, setZoom] = useState(3);
     const [cursor, setCursor] = useState({x: 0, y: 0});
@@ -77,6 +79,7 @@ export default function App() {
             zoom: 4,
             minZoom: 3,
         });
+        mapRef.current = map;
 
         map.on('load', () => {
             map.addSource('grid', {type: 'geojson', data: gridLines});
@@ -127,6 +130,7 @@ export default function App() {
     return (
         <div style={{position: 'relative', width: '100vw', height: '100vh'}}>
             <div ref={containerRef} style={{width: '100%', height: '100%'}}/>
+            <Search mapRef={mapRef} />
             <div style={STYLE_DEBUG}>
                 z {zoom.toFixed(2)} x {cursor.x.toFixed(4)} y {cursor.y.toFixed(4)}
             </div>
