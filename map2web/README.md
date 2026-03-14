@@ -32,6 +32,9 @@ source config.env
 | `M2W_LABEL_GEO` | Path to label geo-parquet |
 | `M2W_LABEL_LOOKUP` | Path to `label_lookup.parquet` |
 | `M2W_GEOJSON_DIR` | Output directory for `.ndjson` files (e.g. `$M2W_ROOT/assets/`) |
+| `MEILI_MASTER_KEY` | Meilisearch master key |
+| `MEILI_INDEX_NAME` | Meilisearch index name (e.g. `entities`) |
+| `MEILI_URL` | Meilisearch URL (default: `http://localhost:7700`) |
 
 ## Pipeline
 
@@ -69,8 +72,37 @@ If the `.ndjson` files are already up to date, skip step 1:
 bash scripts/build_tiles.sh --tiles-only
 ```
 
-## Dev server
+### Step 3 — Build the search index
+
+Start Meilisearch, then index all entities (tracks filtered to `logcounts >= 2.0`):
 
 ```sh
+docker compose up -d
+uv run python scripts/build_search_index.py
+```
+
+To wipe and rebuild from scratch:
+
+```sh
+curl -X DELETE http://localhost:7700/indexes/entities -H "Authorization: Bearer $MEILI_MASTER_KEY"
+uv run python scripts/build_search_index.py
+```
+
+Indexing is asynchronous — allow a few minutes before querying.
+
+## Running in dev
+
+Three processes, each in its own terminal:
+
+```sh
+# 1. Search engine
+docker compose up
+
+# 2. API backend
+source config.env && uv run fastapi dev backend/main.py
+
+# 3. Frontend (proxies /api/* to :8000)
 cd web && npm run dev
 ```
+
+Open `http://localhost:5173`.

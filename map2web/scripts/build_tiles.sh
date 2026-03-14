@@ -64,7 +64,7 @@ echo ""
 tippecanoe -e "$TILES_DIR" \
     -z11 -Z2 -pS -rg -g 1 -d 8 \
     --drop-densest-as-needed \
-    --order-descending-by=popularity \
+    --order-descending-by=logcounts \
     --read-parallel --force \
     --named-layer=tracks:"$M2W_GEOJSON_DIR/track.ndjson" \
     --named-layer=albums:"$M2W_GEOJSON_DIR/album.ndjson" \

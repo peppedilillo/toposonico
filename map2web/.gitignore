@@ -16,3 +16,6 @@ web/public/tiles
 
 # Virtual environments
 .venv
+
+# dotfiles
+config.env

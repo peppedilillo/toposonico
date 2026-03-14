@@ -59,8 +59,7 @@ def main():
     print(f"Output dir: {output_dir}")
     print()
 
-    cols = ["track_rowid", "artist_rowid", "artist_name", "album_rowid", "album_name",
-            "label", "logcounts"]
+    cols = ["track_rowid", "artist_rowid", "artist_name", "album_rowid", "album_name", "label", "logcounts"]
     print("Loading track_lookup.parquet...")
     df = pd.read_parquet(lookup_path, columns=cols)
     print(f"  {len(df):,} rows loaded")

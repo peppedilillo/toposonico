@@ -21,5 +21,8 @@ export default defineConfig({
     watch: {
       ignored: ['**/public/tiles/**'],
     },
+    proxy: {
+      '/api': 'http://localhost:8000',
+    },
   },
 })

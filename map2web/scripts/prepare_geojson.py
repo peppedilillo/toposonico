@@ -157,7 +157,7 @@ def main():
     if args.entity == "track":
         names = df["track_name"].astype(str).values
         artists = df["artist_name"].astype(str).values
-        pops = df["logcounts"].fillna(0).astype(np.int32).values
+        pops = df["logcounts"].fillna(0).astype(np.float32).values
     elif args.entity == "album":
         names = df["album_name"].astype(str).values
         artists = df["artist_name"].astype(str).values
@@ -184,13 +184,16 @@ def main():
                     "track_rowid": int(keys[i]),
                     "track_name": names[i],
                     "artist_name": artists[i],
-                    "logcounts": int(pops[i]),
+                    "logcounts": round(float(pops[i]), 2),
                 }
             elif args.entity == "album":
                 props = {
                     "album_rowid": int(keys[i]),
                     "album_name": names[i],
                     "artist_name": artists[i],
+                    # for extra entitites we keep the track counts.
+                    # this is because logcounts is here a mean and not doing so
+                    # would result in losing the "size" of entity
                     "track_count": int(counts[i]),
                     "logcounts": round(float(pops[i]), 2),
                 }
