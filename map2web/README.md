@@ -12,6 +12,8 @@ uv sync
 cd web && npm install
 ```
 
+Format JS with Prettier: `cd web && npx prettier --write src/`
+
 ## Environment
 
 ```sh
