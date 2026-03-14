@@ -1,8 +1,11 @@
-"""Build the Meilisearch search index from geo-parquets + lookup parquets.
+"""Build the Meilisearch search index from ndjson files produced by prepare_geojson.py.
 
 One index, four entity types: track, album, artist, label.
 Tracks are filtered to logcounts >= --track-threshold (default 2.0, ≈100 playlists).
 Albums, artists, and labels are indexed in full.
+
+Field names are identical to tile feature properties, guaranteeing consistency with
+the map layer tooltips.
 
 Usage:
     source config.env && uv run python scripts/build_search_index.py [options]
@@ -10,115 +13,96 @@ Usage:
 Examples:
     uv run python scripts/build_search_index.py --dry-run
     uv run python scripts/build_search_index.py
-    uv run python scripts/build_search_index.py --track-threshold 2.5 --index entities_v2
+    uv run python scripts/build_search_index.py --track-threshold 2.5
 
 To delete an index and start fresh:
     curl -X DELETE http://localhost:7700/indexes/entities -H "Authorization: Bearer $MEILI_MASTER_KEY"
 """
 
 import argparse
+import json
 import os
 import sys
 import time
 from pathlib import Path
 
 import meilisearch
-import pandas as pd
 
 
 INDEX_SETTINGS = {
     "searchableAttributes": ["search_text", "track_name", "album_name", "artist_name", "label"],
     "filterableAttributes": ["entity_type"],
     "sortableAttributes": ["logcounts", "entity_rank"],
-    "rankingRules": ["exactness", "entity_rank:asc", "words", "typo", "proximity", "attribute", "sort",  "logcounts:desc"],
+    "rankingRules": ["exactness", "entity_rank:asc", "words", "typo", "proximity", "attribute", "sort", "logcounts:desc"],
 }
 
 ENTITY_RANK = {"label": 0, "artist": 1, "album": 2, "track": 3}
 
 
-def load_entity(geo_path: Path, lookup_path: Path, key: str, lookup_cols: list[str]) -> pd.DataFrame:
-    geo = pd.read_parquet(geo_path, columns=[key, "lon", "lat"])
-    lookup = pd.read_parquet(lookup_path, columns=lookup_cols)
-    return geo.merge(lookup, on=key, how="inner")
+def iter_docs(path: Path, entity: str, threshold: float | None = None):
+    with open(path) as f:
+        for i, line in enumerate(f):
+            feature = json.loads(line)
+            props = feature["properties"]
+            lon, lat = feature["geometry"]["coordinates"]
+
+            if threshold is not None and props.get("logcounts", 0) < threshold:
+                continue
+
+            doc = {
+                "entity_type": entity,
+                "entity_rank": ENTITY_RANK[entity],
+                "lon": lon,
+                "lat": lat,
+                "logcounts": props["logcounts"],
+            }
+
+            if entity == "track":
+                doc.update({
+                    "id": f"track_{props['track_rowid']}",
+                    "rowid": props["track_rowid"],
+                    "track_name": props["track_name"],
+                    "artist_name": props["artist_name"],
+                    "search_text": f"{props['artist_name']} - {props['track_name']}",
+                })
+            elif entity == "album":
+                doc.update({
+                    "id": f"album_{props['album_rowid']}",
+                    "rowid": props["album_rowid"],
+                    "album_name": props["album_name"],
+                    "artist_name": props["artist_name"],
+                    "search_text": f"{props['artist_name']} - {props['album_name']}",
+                })
+            elif entity == "artist":
+                doc.update({
+                    "id": f"artist_{props['artist_rowid']}",
+                    "rowid": props["artist_rowid"],
+                    "artist_name": props["artist_name"],
+                })
+            else:  # label
+                doc.update({
+                    "id": f"label_{props['label_rowid']}",
+                    "rowid": props["label_rowid"],
+                    "label": props["label"],
+                })
+
+            yield doc
 
 
-def build_docs_track(df: pd.DataFrame) -> list[dict]:
-    docs = []
-    for row in df.itertuples(index=False):
-        docs.append({
-            "id": f"track_{row.track_rowid}",
-            "entity_type": "track",
-            "track_name": row.track_name,
-            "artist_name": row.artist_name,
-            "search_text": f"{row.artist_name} - {row.track_name}",
-            "rowid": int(row.track_rowid),
-            "entity_rank": ENTITY_RANK["track"],
-            "lon": round(float(row.lon), 6),
-            "lat": round(float(row.lat), 6),
-            "logcounts": round(float(row.logcounts), 3),
-        })
-    return docs
-
-
-def build_docs_album(df: pd.DataFrame) -> list[dict]:
-    docs = []
-    for row in df.itertuples(index=False):
-        docs.append({
-            "id": f"album_{row.album_rowid}",
-            "entity_type": "album",
-            "album_name": row.album_name,
-            "artist_name": row.artist_name,
-            "search_text": f"{row.artist_name} - {row.album_name}",
-            "rowid": int(row.album_rowid),
-            "entity_rank": ENTITY_RANK["album"],
-            "lon": round(float(row.lon), 6),
-            "lat": round(float(row.lat), 6),
-            "logcounts": round(float(row.logcounts), 3),
-        })
-    return docs
-
-
-def build_docs_artist(df: pd.DataFrame) -> list[dict]:
-    docs = []
-    for row in df.itertuples(index=False):
-        docs.append({
-            "id": f"artist_{row.artist_rowid}",
-            "entity_type": "artist",
-            "artist_name": row.artist_name,
-            "rowid": int(row.artist_rowid),
-            "entity_rank": ENTITY_RANK["artist"],
-            "lon": round(float(row.lon), 6),
-            "lat": round(float(row.lat), 6),
-            "logcounts": round(float(row.logcounts), 3),
-        })
-    return docs
-
-
-def build_docs_label(df: pd.DataFrame, id_offset: int) -> list[dict]:
-    docs = []
-    for i, row in enumerate(df.itertuples(index=False)):
-        docs.append({
-            "id": f"label_{id_offset + i}",
-            "entity_type": "label",
-            "label": row.label,
-            "entity_rank": ENTITY_RANK["label"],
-            "lon": round(float(row.lon), 6),
-            "lat": round(float(row.lat), 6),
-            "logcounts": round(float(row.logcounts), 3),
-        })
-    return docs
-
-
-def upload(index, docs: list[dict], batch_size: int, label: str) -> None:
-    total = len(docs)
-    t0 = time.time()
-    for start in range(0, total, batch_size):
-        batch = docs[start:start + batch_size]
+def upload(index, docs, batch_size: int, label: str) -> int:
+    batch, total, t0 = [], 0, time.time()
+    for doc in docs:
+        batch.append(doc)
+        if len(batch) == batch_size:
+            index.add_documents(batch, primary_key="id")
+            total += len(batch)
+            print(f"  {label}: {total:,}  ({time.time() - t0:.1f}s)", end="\r")
+            batch = []
+    if batch:
         index.add_documents(batch, primary_key="id")
-        end = min(start + batch_size, total)
-        elapsed = time.time() - t0
-        print(f"  {label}: {end:>8,} / {total:,}  ({elapsed:.1f}s)", end="\r")
-    print(f"  {label}: {total:>8,} / {total:,}  ({time.time() - t0:.1f}s)     ")
+        total += len(batch)
+    print(f"  {label}: {total:,}  ({time.time() - t0:.1f}s)     ")
+    return total
 
 
 def env_path(var: str) -> Path:
@@ -131,84 +115,62 @@ def env_path(var: str) -> Path:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Build Meilisearch search index",
+        description="Build Meilisearch search index from ndjson files",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--track-threshold", type=float, default=2.0,
-                        help="Min logcounts for tracks (default: 2.0 ≈ 100 playlists)")
-    parser.add_argument(
-        "--index",
-        default=os.environ.get("MEILI_INDEX_NAME"),
-        help="Index name (default: entities)",
-    )
-    parser.add_argument("--batch-size", type=int, default=50_000)
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Print counts only, skip upload")
-    parser.add_argument("--url", default=None, help="Meilisearch URL (overrides MEILI_URL)")
-    parser.add_argument("--key", default=None, help="Meilisearch master key (overrides MEILI_MASTER_KEY)")
+                        help="Min logcounts for tracks (default: 2.0 ≈ 100 playlists)",)
+    parser.add_argument("--index", default=os.environ.get("MEILI_INDEX_NAME"),
+                        help="Index name (overrides MEILI_INDEX_NAME)",)
+    parser.add_argument("--batch-size", type=int, default=50_000,)
+    parser.add_argument("--dry-run", action="store_true", help="Print counts only, skip upload",)
+    parser.add_argument("--url", default=os.environ.get("MEILI_URL"), help="Meilisearch URL (overrides MEILI_URL)",)
+    parser.add_argument("--key", default=os.environ.get("MEILI_MASTER_KEY"), help="Meilisearch master key (overrides MEILI_MASTER_KEY)",)
     args = parser.parse_args()
+
 
     if args.index is None:
         raise ValueError(
             "No `MEILI_INDEX_NAME` environment variable set. "
             "Either run with --index argument or define the environment variable."
         )
+    if args.url is None:
+        raise ValueError(
+            "No `MELILI_URL` environment variable set. "
+            "Either run with --url argument or define the environment variable."
+        )
+    if args.key is None:
+        raise ValueError(
+            "No `MEILI_MASTER_KEY` environment variable set. "
+            "Either run with --key argument or define the environment variable."
+        )
 
-    meili_url = args.url or os.environ.get("MEILI_URL", "http://localhost:7700")
-    meili_key = args.key or os.environ.get("MEILI_MASTER_KEY")
 
-    print("Loading track data …")
-    track_df = load_entity(
-        env_path("M2W_TRACK_GEO"), env_path("M2W_TRACK_LOOKUP"),
-        "track_rowid", ["track_rowid", "track_name", "artist_name", "logcounts"],
-    )
-    track_df = track_df.dropna(subset=["track_name", "artist_name"])
-    track_df = track_df[track_df["logcounts"] >= args.track_threshold]
-    print(f"  {len(track_df):,} tracks (logcounts >= {args.track_threshold})")
+    geojson_dir = env_path("M2W_GEOJSON_DIR")
 
-    print("Loading album data …")
-    album_df = load_entity(
-        env_path("M2W_ALBUM_GEO"), env_path("M2W_ALBUM_LOOKUP"),
-        "album_rowid", ["album_rowid", "album_name", "artist_name", "logcounts"],
-    )
-    album_df = album_df.dropna(subset=["album_name", "artist_name"])
-    print(f"  {len(album_df):,} albums")
-
-    print("Loading artist data …")
-    artist_df = load_entity(
-        env_path("M2W_ARTIST_GEO"), env_path("M2W_ARTIST_LOOKUP"),
-        "artist_rowid", ["artist_rowid", "artist_name", "logcounts"],
-    )
-    artist_df = artist_df.dropna(subset=["artist_name"])
-    print(f"  {len(artist_df):,} artists")
-
-    print("Loading label data …")
-    label_df = load_entity(
-        env_path("M2W_LABEL_GEO"), env_path("M2W_LABEL_LOOKUP"),
-        "label", ["label", "logcounts"],
-    )
-    label_df = label_df.dropna(subset=["label"])
-    print(f"  {len(label_df):,} labels")
-
-    total = len(track_df) + len(album_df) + len(artist_df) + len(label_df)
-    print(f"\nTotal documents: {total:,}")
+    entities = [
+        ("track",  geojson_dir / "track.ndjson",  args.track_threshold),
+        ("album",  geojson_dir / "album.ndjson",  None),
+        ("artist", geojson_dir / "artist.ndjson", None),
+        ("label",  geojson_dir / "label.ndjson",  None),
+    ]
 
     if args.dry_run:
-        print("Dry run — skipping upload.")
+        for entity, path, threshold in entities:
+            n = sum(1 for _ in iter_docs(path, entity, threshold))
+            print(f"  {n:>8,} {entity}s")
         return
 
-    print(f"\nConnecting to Meilisearch at {meili_url} …")
-    client = meilisearch.Client(meili_url, meili_key)
-    index = client.index(args.index)
+    print(f"Connecting to Meilisearch at {args.url} …")
+    index = meilisearch.Client(args.url, args.key).index(args.index)
 
     print("Configuring index settings …")
     index.update_settings(INDEX_SETTINGS)
 
-    print("\nUploading …")
-    upload(index, build_docs_track(track_df), args.batch_size, "tracks")
-    upload(index, build_docs_album(album_df), args.batch_size, "albums")
-    upload(index, build_docs_artist(artist_df), args.batch_size, "artists")
-    upload(index, build_docs_label(label_df, id_offset=0), args.batch_size, "labels")
+    print("Uploading …")
+    total = 0
+    for entity, path, threshold in entities:
+        total += upload(index, iter_docs(path, entity, threshold), args.batch_size, entity)
 
     print(f"\nDone. {total:,} documents queued in index '{args.index}'.")
     print("Note: Meilisearch indexes asynchronously — allow a few minutes before querying.")

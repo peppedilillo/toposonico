@@ -52,7 +52,7 @@ ENTITY_CONFIGS = {
     },
     "label": {
         "key": "label",
-        "lookup_cols": ["label", "track_count", "logcounts"],
+        "lookup_cols": ["label", "label_rowid", "track_count", "logcounts"],
         "name_cols": ["label"],
     },
 }
@@ -91,8 +91,8 @@ def main():
         val = os.environ.get(f"M2W_{entity_upper}_GEO")
         if val is None:
             raise ValueError(
-                f"M2W_{entity_upper}_GEO is not set. "
-                f"Run with --geo or source config.env."
+                f"No `M2W_{entity_upper}_GEO` environment variable set. "
+                f"Either run with --geo or define the environment variable."
             )
         args.geo = Path(val)
 
@@ -100,8 +100,8 @@ def main():
         val = os.environ.get(f"M2W_{entity_upper}_LOOKUP")
         if val is None:
             raise ValueError(
-                f"M2W_{entity_upper}_LOOKUP is not set. "
-                f"Run with --lookup or source config.env."
+                f"No `M2W_{entity_upper}_LOOKUP` environment variable set. "
+                f"Either run with --lookup or define the environment variable."
             )
         args.lookup = Path(val)
 
@@ -109,8 +109,8 @@ def main():
         geojson_dir = os.environ.get("M2W_GEOJSON_DIR")
         if geojson_dir is None:
             raise ValueError(
-                "M2W_GEOJSON_DIR is not set. "
-                "Run with --output or source config.env."
+                "No `M2W_GEOJSON_DIR` environment variable set. "
+                "Either run with --output or define the environment variable."
             )
         args.output = Path(geojson_dir) / f"{args.entity}.ndjson"
 
@@ -169,6 +169,7 @@ def main():
         pops = df["logcounts"].fillna(0).astype(np.float32).values
     else:  # label
         names = df["label"].astype(str).values
+        rowids = df["label_rowid"].values
         counts = df["track_count"].fillna(0).astype(np.int32).values
         pops = df["logcounts"].fillna(0).astype(np.float32).values
 
@@ -206,6 +207,7 @@ def main():
                 }
             else:  # label
                 props = {
+                    "label_rowid": int(rowids[i]),
                     "label": names[i],
                     "track_count": int(counts[i]),
                     "logcounts": round(float(pops[i]), 2),

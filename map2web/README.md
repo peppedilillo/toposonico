@@ -102,7 +102,7 @@ docker compose up
 source config.env && uv run fastapi dev backend/main.py
 
 # 3. Frontend (proxies /api/* to :8000)
-cd web && npm run dev
+cd web && npm run dev -- --host
 ```
 
 Open `http://localhost:5173`.

@@ -51,8 +51,8 @@ def label_lookup(df: pd.DataFrame, mintracks=100) -> pd.DataFrame:
 
     df must contain a logcounts (float32) column (from track_lookup.parquet).
 
-    Returns columns: label, track_count (int32), logcounts (float32) — mean of
-    per-track logcounts across the label's tracks.
+    Returns columns: label_rowid (int32), label, track_count (int32), logcounts (float32).
+    label_rowid is a stable sequential int assigned in alphabetical label order.
     """
     df = df[df["label"].notna() & (df["label"] != "")]
     df = df[df.groupby("label")["label"].transform("count") > mintracks]
@@ -62,4 +62,5 @@ def label_lookup(df: pd.DataFrame, mintracks=100) -> pd.DataFrame:
     )
     out["track_count"] = out["track_count"].astype("int32")
     out["logcounts"] = out["logcounts"].astype("float32")
+    out.insert(0, "label_rowid", pd.RangeIndex(len(out), dtype="int32"))
     return out
