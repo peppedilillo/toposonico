@@ -17,3 +17,9 @@
     --font-mono: 'IBM Plex Mono', monospace;
     --font-sans: 'Roboto', sans-serif;
 }
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+}

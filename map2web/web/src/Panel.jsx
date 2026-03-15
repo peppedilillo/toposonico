@@ -16,8 +16,8 @@ export default function Panel({ selection, onClose }) {
             onPointerDown={e => e.stopPropagation()}
             onPointerMove={e => e.stopPropagation()}
         >
-            <div className="italic font-medium leading-tight pr-5">{selection.line1}</div>
-            <div className="text-lg font-semibold">{selection.line2}</div>
+            <div className="text-lg font-semibold">{selection.line1}</div>
+            {selection.line2 && <div className="italic font-medium leading-tight pr-5">{selection.line2}</div>}
             <div className="text-muted text-sm mt-2">
                 <span className="uppercase tracking-wider text-[10px] bg-muted/10 px-1.5 py-0.5 rounded">
                     {selection.entityType}

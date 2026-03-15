@@ -46,12 +46,14 @@ for (let lat = -90; lat <= 90; lat += 5) {
     });
 }
 
+const STARTZOOM = 4;
+
 export default function App() {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const [selection, setSelection] = useState(null); // {entityType, line1, line2}
     const [results, setResults] = useState([]);
-    const [zoom, setZoom] = useState(3);
+    const [zoom, setZoom] = useState(STARTZOOM);
     const [cursor, setCursor] = useState({x: 0, y: 0});
 
     useEffect(() => {
@@ -59,12 +61,13 @@ export default function App() {
             container: containerRef.current,
             style: STYLE,
             center: [0, 0],
-            zoom: 4,
+            zoom: STARTZOOM,
             minZoom: 3,
             maxBounds: [
                 [-60, -60],
                 [60, 60],
             ],
+            attributionControl: false,
         });
         mapRef.current = map;
 
@@ -118,7 +121,7 @@ export default function App() {
     }, []);
 
     return (
-        <div className="relative w-screen h-screen">
+        <div className="relative w-screen h-screen text-white font-normal">
             <div ref={containerRef} className="w-full h-full"/>
             <Search mapRef={mapRef} setSelection={setSelection} results={results} setResults={setResults}/>
             <Panel selection={selection} onClose={() => setSelection(null)}/>

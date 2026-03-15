@@ -10,8 +10,8 @@ const LAYERS = [
         opacity: 0.7,
         info: (p) => ({
             entityType: "track",
-            line1: p.artist_name,
-            line2: p.track_name,
+            line1: p.track_name,
+            line2: p.artist_name,
         }),
     },
     {
@@ -21,7 +21,10 @@ const LAYERS = [
         size: 12,
         color: colors.artist,
         opacity: 1.0,
-        info: (p) => ({ entityType: "artist", line2: p.artist_name }),
+        info: (p) => ({
+            entityType: "artist",
+            line2: p.artist_name,
+        }),
     },
     {
         id: "albums",
@@ -32,8 +35,8 @@ const LAYERS = [
         opacity: 0.7,
         info: (p) => ({
             entityType: "album",
-            line1: p.artist_name,
-            line2: p.album_name,
+            line1: p.album_name,
+            line2: p.artist_name,
         }),
     },
     {
@@ -43,7 +46,10 @@ const LAYERS = [
         size: 24,
         color: colors.label,
         opacity: 1.0,
-        info: (p) => ({ entityType: "label", line2: p.label }),
+        info: (p) => ({
+            entityType: "label",
+            line1: p.label,
+        }),
     },
 ];
 
