@@ -13,13 +13,17 @@ import { MAP_ET2LAYER } from "./layers.js";
  * @property {number} lat
  */
 /** @param {Hit} hit */
-function hitlabel(hit) {
-    if (hit.entity_type === "track")
-        return `${hit.artist_name} - ${hit.track_name}`;
-    if (hit.entity_type === "album")
-        return `${hit.artist_name} - ${hit.album_name}`;
-    if (hit.entity_type === "artist") return `${hit.artist_name}`;
-    if (hit.entity_type === "label") return `${hit.label}`;
+function HitContent({ hit }) {
+    const type = hit.entity_type;
+    const top = type === "track" || type === "album" ? hit.artist_name : null;
+    const name = type === "track" ? hit.track_name
+        : type === "album" ? hit.album_name
+        : type === "label" ? hit.label
+        : hit.artist_name;
+    return <>
+        <div className="truncate">{name}</div>
+        <div className="truncate text-muted text-sm">({type}){top && ` ${top}`}</div>
+    </>;
 }
 
 export default function Search({ mapRef, setTooltip }) {
@@ -64,12 +68,12 @@ export default function Search({ mapRef, setTooltip }) {
     };
 
     return (
-        <div className="absolute top-3 left-3 z-10 font-mono text-base">
+        <div className="absolute top-3 z-10 font-sans text-base left-1/2 -translate-x-1/2 w-11/12 sm:left-3 sm:translate-x-0 sm:w-md">
             <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="search…"
-                className="bg-transparent border-0 outline-none"
+                className="w-full bg-surface text-white placeholder:text-muted p-2 pl-5 rounded-xl"
                 onKeyDown={(e) => {
                     if (e.key === "ArrowDown")
                         setActiveIdx((i) =>
@@ -93,18 +97,18 @@ export default function Search({ mapRef, setTooltip }) {
                 }}
             />
             {results.length > 0 && (
-                <ul className="m-0 p-0 list-none">
-                    {results.map((hit, i) => (
+                <ul className="bg-surface mt-1 py-2 list-none rounded-xl">
+                    {results.slice(0, 5).map((hit, i) => (
                         <li
                             key={hit.id}
                             onClick={() => fly(hit)}
                             className={i === activeIdx
-                                ? "cursor-pointer py-0.5 px-1 text-foreground bg-overlay"
-                                : "cursor-pointer py-0.5 px-1 text-muted"}
+                                ? "cursor-pointer py-0.5 px-5 bg-overlay"
+                                : "cursor-pointer py-0.5 px-5"}
                             onMouseEnter={() => setActiveIdx(i)}
                             onMouseLeave={() => setActiveIdx(null)}
                         >
-                            [{MAP_ET2LAYER[hit.entity_type].char}] {hitlabel(hit)}
+                            <HitContent hit={hit} />
                         </li>
                     ))}
                 </ul>

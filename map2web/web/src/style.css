@@ -15,4 +15,5 @@
 
 @theme {
     --font-mono: 'IBM Plex Mono', monospace;
+    --font-sans: 'Roboto', sans-serif;
 }

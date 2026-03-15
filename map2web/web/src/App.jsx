@@ -125,18 +125,18 @@ export default function App() {
         <div className="relative w-screen h-screen">
             <div ref={containerRef} className="w-full h-full"/>
             <Search mapRef={mapRef} setTooltip={setTooltip}/>
-            <div className="absolute bottom-3 left-3 text-foreground font-mono text-base pointer-events-none">
+            <div className="absolute bottom-3 left-3 text-muted text-xs font-sans pointer-events-none">
                 z {zoom.toFixed(2)} x {cursor.x.toFixed(4)} y{" "}
                 {cursor.y.toFixed(4)}
             </div>
             {tooltip && (
                 <div
-                    className="absolute bg-overlay text-foreground font-mono text-base leading-normal py-1.5 px-2.5 whitespace-nowrap"
+                    className="absolute bg-overlay text-foreground font-sans text-base leading-normal py-1.5 px-2.5 whitespace-nowrap"
                     style={{left: tooltip.x + 12, top: tooltip.y + 12}}
                 >
-                    <div className="text-muted">{tooltip.entityType}</div>
                     <div className="italic">{tooltip.line1}</div>
                     <div>{tooltip.line2}</div>
+                    <div className="text-muted">{tooltip.entityType}</div>
                 </div>
             )}
         </div>
