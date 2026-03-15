@@ -4,6 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 import colors from "./theme.js";
 import Search from "./Search.jsx";
+import Panel from "./Panel.jsx";
 import {LAYERS} from "./layers.js";
 
 const STYLE = {
@@ -48,7 +49,8 @@ for (let lat = -90; lat <= 90; lat += 5) {
 export default function App() {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
-    const [tooltip, setTooltip] = useState(null); // {x, y, entityType, line1, line2}
+    const [selection, setSelection] = useState(null); // {entityType, line1, line2}
+    const [results, setResults] = useState([]);
     const [zoom, setZoom] = useState(3);
     const [cursor, setCursor] = useState({x: 0, y: 0});
 
@@ -80,7 +82,7 @@ export default function App() {
                 paint: {"line-color": colors.border, "line-width": 1},
             });
             LAYERS.forEach(
-                ({id, sourceLayer, char, size, color, opacity, tooltip}) => {
+                ({id, sourceLayer, char, size, color, opacity, info}) => {
                     map.addLayer({
                         id,
                         type: "symbol",
@@ -97,23 +99,17 @@ export default function App() {
                             "text-opacity": opacity,
                         },
                     });
-                    map.on("mousemove", id, (e) => {
-                        map.getCanvas().style.cursor = "pointer";
-                        setTooltip({
-                            x: e.point.x,
-                            y: e.point.y,
-                            ...tooltip(e.features[0].properties),
-                        });
-                    });
-                    map.on("mouseleave", id, () => {
-                        map.getCanvas().style.cursor = "";
-                        setTooltip(null);
-                    });
+                    map.on("mousemove", id, () => { map.getCanvas().style.cursor = "pointer"; });
+                    map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+                    map.on("click", id, (e) => setSelection(info(e.features[0].properties)));
                 },
             );
+            map.on("click", (e) => {
+                const hit = map.queryRenderedFeatures(e.point, { layers: LAYERS.map(l => l.id) });
+                if (!hit.length) { setSelection(null); setResults([]); }
+            });
         });
 
-        map.on("movestart", () => setTooltip(null));
         map.on("zoom", () => setZoom(map.getZoom()));
         map.on("mousemove", (e) =>
             setCursor({x: e.lngLat.lng, y: e.lngLat.lat}),
@@ -124,21 +120,12 @@ export default function App() {
     return (
         <div className="relative w-screen h-screen">
             <div ref={containerRef} className="w-full h-full"/>
-            <Search mapRef={mapRef} setTooltip={setTooltip}/>
-            <div className="absolute bottom-3 left-3 text-muted text-xs font-sans pointer-events-none">
+            <Search mapRef={mapRef} setSelection={setSelection} results={results} setResults={setResults}/>
+            <Panel selection={selection} onClose={() => setSelection(null)}/>
+            <div className="absolute top-3 right-3 text-muted text-xs font-sans pointer-events-none">
                 z {zoom.toFixed(2)} x {cursor.x.toFixed(4)} y{" "}
                 {cursor.y.toFixed(4)}
             </div>
-            {tooltip && (
-                <div
-                    className="absolute bg-overlay text-foreground font-sans text-base leading-normal py-1.5 px-2.5 whitespace-nowrap"
-                    style={{left: tooltip.x + 12, top: tooltip.y + 12}}
-                >
-                    <div className="italic">{tooltip.line1}</div>
-                    <div>{tooltip.line2}</div>
-                    <div className="text-muted">{tooltip.entityType}</div>
-                </div>
-            )}
         </div>
     );
 }

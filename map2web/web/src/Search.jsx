@@ -15,20 +15,24 @@ import { MAP_ET2LAYER } from "./layers.js";
 /** @param {Hit} hit */
 function HitContent({ hit }) {
     const type = hit.entity_type;
-    const top = type === "track" || type === "album" ? hit.artist_name : null;
-    const name = type === "track" ? hit.track_name
+    const line1 = type === "track" || type === "album" ? hit.artist_name : null;
+    const line2 = type === "track" ? hit.track_name
         : type === "album" ? hit.album_name
         : type === "label" ? hit.label
         : hit.artist_name;
     return <>
-        <div className="truncate">{name}</div>
-        <div className="truncate text-muted text-sm">({type}){top && ` ${top}`}</div>
+        {line1 && <div className="italic font-medium leading-tight text-sm truncate">{line1}</div>}
+        <div className="font-semibold truncate">{line2}</div>
+        <div className="text-muted text-xs mt-0.5">
+            <span className="uppercase tracking-wider text-[9px] bg-muted/10 px-1.5 py-0.5 rounded">
+                {type}
+            </span>
+        </div>
     </>;
 }
 
-export default function Search({ mapRef, setTooltip }) {
+export default function Search({ mapRef, setSelection, results, setResults }) {
     const [query, setQuery] = useState("");
-    const [results, setResults] = useState([]);
     const [activeIdx, setActiveIdx] = useState(null);
 
     useEffect(() => {
@@ -55,20 +59,17 @@ export default function Search({ mapRef, setTooltip }) {
         const map = mapRef.current;
         const layer = MAP_ET2LAYER[hit.entity_type];
         map.flyTo({ center: [hit.lon, hit.lat], zoom: 11 });
-        map.once("moveend", () => {
-            const { clientWidth: w, clientHeight: h } = map.getContainer();
-            setTooltip({
-                x: w / 2,
-                y: h / 2,
-                ...layer.tooltip(hit),
-            });
-        });
+        map.once("moveend", () => setSelection(layer.info(hit)));
         setQuery("");
         setResults([]);
     };
 
     return (
-        <div className="absolute top-3 z-10 font-sans text-base left-1/2 -translate-x-1/2 w-11/12 sm:left-3 sm:translate-x-0 sm:w-md">
+        <div
+            className="absolute top-3 z-100 font-sans text-base left-1/2 -translate-x-1/2 w-11/12 sm:left-3 sm:translate-x-0 sm:w-md touch-none sm:touch-auto"
+            onPointerDown={e => e.stopPropagation()}
+            onPointerMove={e => e.stopPropagation()}
+        >
             <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -98,13 +99,13 @@ export default function Search({ mapRef, setTooltip }) {
             />
             {results.length > 0 && (
                 <ul className="bg-surface mt-1 py-2 list-none rounded-xl">
-                    {results.slice(0, 5).map((hit, i) => (
+                    {results.slice(0, 3).map((hit, i) => (
                         <li
                             key={hit.id}
                             onClick={() => fly(hit)}
                             className={i === activeIdx
-                                ? "cursor-pointer py-0.5 px-5 bg-overlay"
-                                : "cursor-pointer py-0.5 px-5"}
+                                ? "cursor-pointer px-5 py-2 bg-overlay"
+                                : "cursor-pointer px-5 py-2 "}
                             onMouseEnter={() => setActiveIdx(i)}
                             onMouseLeave={() => setActiveIdx(null)}
                         >

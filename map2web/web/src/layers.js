@@ -8,7 +8,7 @@ const LAYERS = [
         size: 16,
         color: colors.track,
         opacity: 0.7,
-        tooltip: (p) => ({
+        info: (p) => ({
             entityType: "track",
             line1: p.artist_name,
             line2: p.track_name,
@@ -21,7 +21,7 @@ const LAYERS = [
         size: 12,
         color: colors.artist,
         opacity: 1.0,
-        tooltip: (p) => ({ entityType: "artist", line2: p.artist_name }),
+        info: (p) => ({ entityType: "artist", line2: p.artist_name }),
     },
     {
         id: "albums",
@@ -30,7 +30,7 @@ const LAYERS = [
         size: 12,
         color: colors.album,
         opacity: 0.7,
-        tooltip: (p) => ({
+        info: (p) => ({
             entityType: "album",
             line1: p.artist_name,
             line2: p.album_name,
@@ -43,7 +43,7 @@ const LAYERS = [
         size: 24,
         color: colors.label,
         opacity: 1.0,
-        tooltip: (p) => ({ entityType: "label", line2: p.label }),
+        info: (p) => ({ entityType: "label", line2: p.label }),
     },
 ];
 
