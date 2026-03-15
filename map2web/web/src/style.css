@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+      --color-black: #000000;
+      --color-near-black: #191919;
+      --color-dark-gray: #303030;
+      --color-gray: #7e7d7d;
+      --color-white: #ffffff;
+      --color-green: #3bda28;
+      --color-cyan: #00ffbe;
+      --color-cream: #f8edb0;
+      --color-violet: #ca53fa;
+
+      --color-background: var(--color-black);
+      --color-surface: var(--color-near-black);
+      --color-border: var(--color-dark-gray);
+      --color-foreground: var(--color-white);
+      --color-muted: var(--color-gray);
+      --color-overlay: rgba(25, 25, 25, 0.8);
+
+      --color-track: var(--color-green);
+      --color-artist: var(--color-cyan);
+      --color-album: var(--color-cream);
+      --color-label: var(--color-violet);
+}

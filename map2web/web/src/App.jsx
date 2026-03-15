@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {useEffect, useRef, useState} from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import colors from "./theme.js";
 import Search from "./Search.jsx";
-import { LAYERS } from "./layers.js";
+import {LAYERS} from "./layers.js";
 
 const STYLE = {
     version: 8,
@@ -14,7 +14,7 @@ const STYLE = {
         {
             id: "background",
             type: "background",
-            paint: { "background-color": colors.background },
+            paint: {"background-color": colors.background},
         },
     ],
 };
@@ -25,7 +25,7 @@ const STYLE_DEBUG = {
     left: 12,
     color: colors.foreground,
     fontFamily: "monospace",
-    fontSize: 11,
+    fontSize: 16,
     pointerEvents: "none",
 };
 
@@ -34,13 +34,13 @@ const STYLE_TOOLTIP = {
     background: colors.overlay,
     color: colors.foreground,
     fontFamily: "'IBM Plex Mono', monospace",
-    fontSize: "12px",
+    fontSize: 16,
     lineHeight: "1.5",
     padding: "6px 10px",
     whiteSpace: "nowrap",
 };
 
-const gridLines = { type: "FeatureCollection", features: [] };
+const gridLines = {type: "FeatureCollection", features: []};
 for (let lon = -180; lon <= 180; lon += 5) {
     gridLines.features.push({
         type: "Feature",
@@ -71,7 +71,7 @@ export default function App() {
     const mapRef = useRef(null);
     const [tooltip, setTooltip] = useState(null); // {x, y, entityType, line1, line2}
     const [zoom, setZoom] = useState(3);
-    const [cursor, setCursor] = useState({ x: 0, y: 0 });
+    const [cursor, setCursor] = useState({x: 0, y: 0});
 
     useEffect(() => {
         const map = new maplibregl.Map({
@@ -88,7 +88,7 @@ export default function App() {
         mapRef.current = map;
 
         map.on("load", () => {
-            map.addSource("grid", { type: "geojson", data: gridLines });
+            map.addSource("grid", {type: "geojson", data: gridLines});
             map.addSource("tiles", {
                 type: "vector",
                 tiles: [`${window.location.origin}/tiles/{z}/{x}/{y}.pbf`],
@@ -98,10 +98,10 @@ export default function App() {
                 id: "grid",
                 type: "line",
                 source: "grid",
-                paint: { "line-color": colors.border, "line-width": 1 },
+                paint: {"line-color": colors.border, "line-width": 1},
             });
             LAYERS.forEach(
-                ({ id, sourceLayer, char, size, color, opacity, tooltip }) => {
+                ({id, sourceLayer, char, size, color, opacity, tooltip}) => {
                     map.addLayer({
                         id,
                         type: "symbol",
@@ -134,17 +134,18 @@ export default function App() {
             );
         });
 
+        map.on("movestart", () => setTooltip(null));
         map.on("zoom", () => setZoom(map.getZoom()));
         map.on("mousemove", (e) =>
-            setCursor({ x: e.lngLat.lng, y: e.lngLat.lat }),
+            setCursor({x: e.lngLat.lng, y: e.lngLat.lat}),
         );
         return () => map.remove();
     }, []);
 
     return (
-        <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
-            <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
-            <Search mapRef={mapRef} setTooltip={setTooltip} />
+        <div style={{position: "relative", width: "100vw", height: "100vh"}}>
+            <div ref={containerRef} style={{width: "100%", height: "100%"}}/>
+            <Search mapRef={mapRef} setTooltip={setTooltip}/>
             <div style={STYLE_DEBUG}>
                 z {zoom.toFixed(2)} x {cursor.x.toFixed(4)} y{" "}
                 {cursor.y.toFixed(4)}
@@ -157,10 +158,10 @@ export default function App() {
                         top: tooltip.y + 12,
                     }}
                 >
-                    <div style={{ color: colors.muted }}>
+                    <div style={{color: colors.muted}}>
                         {tooltip.entityType}
                     </div>
-                    <div style={{ fontStyle: "italic" }}>{tooltip.line1}</div>
+                    <div style={{fontStyle: "italic"}}>{tooltip.line1}</div>
                     <div>{tooltip.line2}</div>
                 </div>
             )}

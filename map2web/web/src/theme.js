@@ -13,7 +13,7 @@ const palette = {
 
 const colors = {
     background: palette.black,
-    surface: palette.darkGray,
+    surface: palette.nearBlack,
     border: palette.darkGray,
     foreground: palette.white,
     muted: palette.gray,

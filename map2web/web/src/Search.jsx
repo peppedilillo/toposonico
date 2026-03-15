@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import colors from "./theme.js";
-import { LAYERS, MAP_ET2LAYER } from "./layers.js";
+import { MAP_ET2LAYER } from "./layers.js";
 
 const STYLE_SEARCH = {
     position: "absolute",
@@ -8,7 +8,7 @@ const STYLE_SEARCH = {
     left: 12,
     zIndex: 10,
     fontFamily: "'IBM Plex Mono', monospace",
-    fontSize: 12,
+    fontSize: 16,
 };
 const STYLE_INPUT = {
     background: "transparent",
@@ -68,7 +68,8 @@ export default function Search({ mapRef, setTooltip }) {
                 .then((hits) => {
                     setResults(hits);
                     setActiveIdx(null);
-                });
+                })
+                .catch(() => setResults([]));
         }, 300);
 
         return () => clearTimeout(timer);
@@ -80,15 +81,13 @@ export default function Search({ mapRef, setTooltip }) {
         const layer = MAP_ET2LAYER[hit.entity_type];
         map.flyTo({ center: [hit.lon, hit.lat], zoom: 11 });
         map.once("moveend", () => {
+            const { clientWidth: w, clientHeight: h } = map.getContainer();
             setTooltip({
-                x: window.innerWidth / 2,
-                y: window.innerHeight / 2,
+                x: w / 2,
+                y: h / 2,
                 ...layer.tooltip(hit),
             });
         });
-        // without this, searching again for something else will cause
-        // the stale tooltip to fly with us!
-        map.once('movestart', () => setTooltip(null))
         setQuery("");
         setResults([]);
     };
@@ -132,7 +131,7 @@ export default function Search({ mapRef, setTooltip }) {
                             onMouseEnter={() => setActiveIdx(i)}
                             onMouseLeave={() => setActiveIdx(null)}
                         >
-                            {hit.entity_type} - {hitlabel(hit)}
+                            [{MAP_ET2LAYER[hit.entity_type].char}] {hitlabel(hit)}
                         </li>
                     ))}
                 </ul>
