@@ -19,27 +19,6 @@ const STYLE = {
     ],
 };
 
-const STYLE_DEBUG = {
-    position: "absolute",
-    bottom: 12,
-    left: 12,
-    color: colors.foreground,
-    fontFamily: "monospace",
-    fontSize: 16,
-    pointerEvents: "none",
-};
-
-const STYLE_TOOLTIP = {
-    position: "absolute",
-    background: colors.overlay,
-    color: colors.foreground,
-    fontFamily: "'IBM Plex Mono', monospace",
-    fontSize: 16,
-    lineHeight: "1.5",
-    padding: "6px 10px",
-    whiteSpace: "nowrap",
-};
-
 const gridLines = {type: "FeatureCollection", features: []};
 for (let lon = -180; lon <= 180; lon += 5) {
     gridLines.features.push({
@@ -143,25 +122,20 @@ export default function App() {
     }, []);
 
     return (
-        <div style={{position: "relative", width: "100vw", height: "100vh"}}>
-            <div ref={containerRef} style={{width: "100%", height: "100%"}}/>
+        <div className="relative w-screen h-screen">
+            <div ref={containerRef} className="w-full h-full"/>
             <Search mapRef={mapRef} setTooltip={setTooltip}/>
-            <div style={STYLE_DEBUG}>
+            <div className="absolute bottom-3 left-3 text-foreground font-mono text-base pointer-events-none">
                 z {zoom.toFixed(2)} x {cursor.x.toFixed(4)} y{" "}
                 {cursor.y.toFixed(4)}
             </div>
             {tooltip && (
                 <div
-                    style={{
-                        ...STYLE_TOOLTIP,
-                        left: tooltip.x + 12,
-                        top: tooltip.y + 12,
-                    }}
+                    className="absolute bg-overlay text-foreground font-mono text-base leading-normal py-1.5 px-2.5 whitespace-nowrap"
+                    style={{left: tooltip.x + 12, top: tooltip.y + 12}}
                 >
-                    <div style={{color: colors.muted}}>
-                        {tooltip.entityType}
-                    </div>
-                    <div style={{fontStyle: "italic"}}>{tooltip.line1}</div>
+                    <div className="text-muted">{tooltip.entityType}</div>
+                    <div className="italic">{tooltip.line1}</div>
                     <div>{tooltip.line2}</div>
                 </div>
             )}

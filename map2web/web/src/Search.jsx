@@ -1,34 +1,5 @@
 import { useEffect, useState } from "react";
-import colors from "./theme.js";
 import { MAP_ET2LAYER } from "./layers.js";
-
-const STYLE_SEARCH = {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    zIndex: 10,
-    fontFamily: "'IBM Plex Mono', monospace",
-    fontSize: 16,
-};
-const STYLE_INPUT = {
-    background: "transparent",
-    font: "inherit",
-    border: "none",
-    outline: "none",
-};
-const STYLE_LI = {
-    cursor: "pointer",
-    padding: "2px 4px",
-    color: colors.muted,
-};
-const STYLE_LI_ACTIVE = {
-    cursor: "pointer",
-    padding: "2px 4px",
-    color: colors.foreground,
-    background: colors.overlay,
-};
-
-const STYLE_UL = { margin: 0, padding: 0, listStyle: "none" };
 
 /**
  * @typedef {Object} Hit
@@ -93,12 +64,12 @@ export default function Search({ mapRef, setTooltip }) {
     };
 
     return (
-        <div style={STYLE_SEARCH}>
+        <div className="absolute top-3 left-3 z-10 font-mono text-base">
             <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="search…"
-                style={STYLE_INPUT}
+                className="bg-transparent border-0 outline-none"
                 onKeyDown={(e) => {
                     if (e.key === "ArrowDown")
                         setActiveIdx((i) =>
@@ -122,12 +93,14 @@ export default function Search({ mapRef, setTooltip }) {
                 }}
             />
             {results.length > 0 && (
-                <ul style={STYLE_UL}>
+                <ul className="m-0 p-0 list-none">
                     {results.map((hit, i) => (
                         <li
                             key={hit.id}
                             onClick={() => fly(hit)}
-                            style={i === activeIdx ? STYLE_LI_ACTIVE : STYLE_LI}
+                            className={i === activeIdx
+                                ? "cursor-pointer py-0.5 px-1 text-foreground bg-overlay"
+                                : "cursor-pointer py-0.5 px-1 text-muted"}
                             onMouseEnter={() => setActiveIdx(i)}
                             onMouseLeave={() => setActiveIdx(null)}
                         >
