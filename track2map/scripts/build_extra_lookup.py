@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.lookup import album_lookup, artist_lookup, label_lookup
+from src.entities import Artists, Albums, Labels
 
 
 def main():
@@ -65,17 +65,17 @@ def main():
     print(f"  {len(df):,} rows loaded")
     print()
 
-    artist = artist_lookup(df)
+    artist = Artists.lookup(df)
     out = output_dir / "artist_lookup.parquet"
     artist.to_parquet(out, index=False)
     print(f"artist_lookup.parquet: {len(artist):,} artists → {out}")
 
-    album = album_lookup(df)
+    album = Albums.lookup(df)
     out = output_dir / "album_lookup.parquet"
     album.to_parquet(out, index=False)
     print(f"album_lookup.parquet : {len(album):,} albums  → {out}")
 
-    label = label_lookup(df)
+    label = Labels.lookup(df)
     out = output_dir / "label_lookup.parquet"
     label.to_parquet(out, index=False)
     print(f"label_lookup.parquet : {len(label):,} labels  → {out}")

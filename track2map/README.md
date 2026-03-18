@@ -129,4 +129,3 @@ Labels are keyed by name (string), not rowid. All other entities use int64 rowid
 | Geo coords | `$T2M_GEO_DIR/{entity}_geo.parquet` | entity key, `lon`, `lat` |
 | KNN neighbors | `$T2M_KNN_DIR/{entity}_knn.parquet` | entity key, `n0`…`nK` |
 | KNN scores | `$T2M_KNN_DIR/{entity}_knn_scores.parquet` | entity key, `s0`…`sK` |
-| KNN artists | `$T2M_KNN_DIR/{entity}_knn_artists.parquet` | entity key, `a0`…`aK` (track/album only) |
