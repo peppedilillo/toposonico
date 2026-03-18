@@ -68,7 +68,7 @@ export default function App() {
         (entityType, rowid, lon, lat) => {
             mapRef.current.flyTo({
                 center: [lon, lat],
-                zoom: 11,
+                zoom: 9,
                 essential: true,
             });
             mapRef.current.once("moveend", () =>

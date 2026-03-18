@@ -115,7 +115,7 @@ export default function Search({ mapRef, selectEntity, results, setResults }) {
                 }}
             />
             {results.length > 0 && (
-                <ul className="bg-surface mt-1 py-2 list-none rounded-xl">
+                <ul className="bg-surface mt-1 py-4 list-none rounded-xl">
                     {results
                         .slice(windowStart, windowStart + DISPLAY_MAX)
                         .map((hit, i) => (

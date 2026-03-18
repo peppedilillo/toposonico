@@ -23,6 +23,8 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
+from src.entities import Artists, Albums, Labels
+
 BATCH_SIZE = 500_000
 KNN_K_DEFAULT = 20
 
@@ -53,16 +55,25 @@ CREATE TABLE tracks (
 );
 
 CREATE TABLE albums (
-    album_rowid  INTEGER PRIMARY KEY,
-    album_name   TEXT    NOT NULL,
-    track_count  INTEGER NOT NULL,
-    logcounts    REAL    NOT NULL,
-    lon          REAL    NOT NULL,
-    lat          REAL    NOT NULL,
-    artist_rowid INTEGER NOT NULL,
-    artist_name  TEXT,
-    artist_lon   REAL,
-    artist_lat   REAL
+    album_rowid          INTEGER PRIMARY KEY,
+    album_name           TEXT    NOT NULL,
+    track_count          INTEGER NOT NULL,
+    logcounts            REAL    NOT NULL,
+    lon                  REAL    NOT NULL,
+    lat                  REAL    NOT NULL,
+    artist_rowid         INTEGER NOT NULL,
+    artist_name          TEXT,
+    artist_lon           REAL,
+    artist_lat           REAL,
+    album_type           TEXT,
+    label                TEXT,
+    popularity           INTEGER,
+    total_tracks         INTEGER,
+    release_date         TEXT,
+    release_date_precision TEXT,
+    label_id             INTEGER,
+    label_lon            REAL,
+    label_lat            REAL
 );
 
 CREATE TABLE artists (
@@ -71,7 +82,9 @@ CREATE TABLE artists (
     track_count  INTEGER NOT NULL,
     logcounts    REAL    NOT NULL,
     lon          REAL    NOT NULL,
-    lat          REAL    NOT NULL
+    lat          REAL    NOT NULL,
+    popularity   INTEGER,
+    genre        TEXT
 );
 
 CREATE TABLE labels (
@@ -169,55 +182,123 @@ def _insert_knn(
     )
 
 
-def build_labels(conn, lookup_dir, geo_dir):
+def enrich_artists(df: pd.DataFrame, tracks_conn: sqlite3.Connection) -> pd.DataFrame:
+    """Join artist popularity and first genre from T2M_TRACKS_DB.
+
+    Merges on artist_rowid. Genre is NULL when no artist_genres row exists.
+    """
+    pop = pd.read_sql(
+        "SELECT rowid AS artist_rowid, popularity FROM artists", tracks_conn
+    )
+    genres = pd.read_sql(
+        "SELECT artist_rowid, MIN(genre) AS genre FROM artist_genres GROUP BY artist_rowid",
+        tracks_conn,
+    )
+    df = df.merge(pop, on="artist_rowid", how="left")
+    df = df.merge(genres, on="artist_rowid", how="left")
+    return df
+
+
+def enrich_albums(df: pd.DataFrame, tracks_conn: sqlite3.Connection) -> pd.DataFrame:
+    """Join album metadata from T2M_TRACKS_DB.
+
+    Adds: album_type, label (string), popularity, total_tracks, release_date,
+    release_date_precision. The label string is used downstream to resolve label_id/lon/lat.
+    Queries only the rowids present in df to avoid loading the full albums table.
+    """
+    rowids = df["album_rowid"].tolist()
+    chunk_size = 5_000
+    chunks = []
+    for i in range(0, len(rowids), chunk_size):
+        batch = rowids[i : i + chunk_size]
+        placeholders = ",".join("?" * len(batch))
+        chunks.append(
+            pd.read_sql(
+                f"SELECT rowid AS album_rowid, album_type, label, popularity,"
+                f" total_tracks, release_date, release_date_precision"
+                f" FROM albums WHERE rowid IN ({placeholders})",
+                tracks_conn,
+                params=batch,
+            )
+        )
+    extra = pd.concat(chunks, ignore_index=True)
+    return df.merge(extra, on="album_rowid", how="left")
+
+
+def build_labels(conn, label_lookup: pd.DataFrame, geo_dir: Path) -> pd.DataFrame:
     """Build labels table; return the label DataFrame for downstream use."""
-    lookup = pd.read_parquet(lookup_dir / "label_lookup.parquet")
     geo = pd.read_parquet(geo_dir / "label_geo.parquet")  # columns: label, lon, lat
-    # label_lookup uses 'label_rowid' — rename to label_id for the DB
-    lookup = lookup.rename(columns={"label_rowid": "label_id"})
-    df = lookup.merge(geo, on="label", how="inner")
+    df = label_lookup.rename(columns={"label_rowid": "label_id"})
+    df = df.merge(geo, on="label", how="inner")
     df = df[["label_id", "label", "track_count", "logcounts", "lon", "lat"]]
     df.to_sql("labels", conn, if_exists="append", index=False)
     print(f"  [labels]  {len(df):,} rows")
     return df
 
 
-def build_artists(conn, lookup_dir, geo_dir):
+def build_artists(
+    conn,
+    artist_lookup: pd.DataFrame,
+    geo_dir: Path,
+    tracks_conn: sqlite3.Connection | None,
+) -> pd.DataFrame:
     """Build artists table; return artist_geo for albums/tracks enrichment."""
-    lookup = pd.read_parquet(lookup_dir / "artist_lookup.parquet")
     artist_geo = pd.read_parquet(geo_dir / "artist_geo.parquet")
-    df = lookup.merge(artist_geo, on="artist_rowid", how="inner")
-    df = df[["artist_rowid", "artist_name", "track_count", "logcounts", "lon", "lat"]]
+    df = artist_lookup.merge(artist_geo, on="artist_rowid", how="inner")
+    if tracks_conn is not None:
+        df = enrich_artists(df, tracks_conn)
+    else:
+        df["popularity"] = None
+        df["genre"] = None
+    df = df[
+        ["artist_rowid", "artist_name", "track_count", "logcounts", "lon", "lat",
+         "popularity", "genre"]
+    ]
     df.to_sql("artists", conn, if_exists="append", index=False)
     print(f"  [artists] {len(df):,} rows")
     return artist_geo  # raw geo parquet (artist_rowid, lon, lat)
 
 
-def build_albums(conn, lookup_dir, geo_dir, artist_geo):
+def build_albums(
+    conn,
+    album_lookup: pd.DataFrame,
+    geo_dir: Path,
+    artist_geo: pd.DataFrame,
+    label_df: pd.DataFrame,
+    tracks_conn: sqlite3.Connection | None,
+) -> pd.DataFrame:
     """Build albums table; return album_geo for tracks enrichment."""
-    lookup = pd.read_parquet(lookup_dir / "album_lookup.parquet")
     album_geo = pd.read_parquet(geo_dir / "album_geo.parquet")
-    df = lookup.merge(album_geo, on="album_rowid", how="inner").merge(
+
+    df = album_lookup.merge(album_geo, on="album_rowid", how="inner")
+    df = df.merge(
         artist_geo.rename(columns={"lon": "artist_lon", "lat": "artist_lat"}),
         on="artist_rowid",
         how="left",
     )
+
+    if tracks_conn is not None:
+        df = enrich_albums(df, tracks_conn)
+    else:
+        for col in ["album_type", "label", "popularity", "total_tracks",
+                    "release_date", "release_date_precision"]:
+            df[col] = None
+
+    label_info = label_df[["label_id", "label", "lon", "lat"]].rename(
+        columns={"lon": "label_lon", "lat": "label_lat"}
+    )
+    df = df.merge(label_info, on="label", how="left")
     df = df[
         [
-            "album_rowid",
-            "album_name",
-            "track_count",
-            "logcounts",
-            "lon",
-            "lat",
-            "artist_rowid",
-            "artist_name",
-            "artist_lon",
-            "artist_lat",
+            "album_rowid", "album_name", "track_count", "logcounts", "lon", "lat",
+            "artist_rowid", "artist_name", "artist_lon", "artist_lat",
+            "album_type", "label", "popularity", "total_tracks",
+            "release_date", "release_date_precision",
+            "label_id", "label_lon", "label_lat",
         ]
     ]
     df.to_sql("albums", conn, if_exists="append", index=False)
-    print(f"  [albums]  {len(df):,} rows")
+    print(f"  [albums]  {len(df):,} rows written")
     return album_geo  # raw geo parquet (album_rowid, lon, lat)
 
 
@@ -415,7 +496,7 @@ def main():
     parser.add_argument(
         "--lookup-dir",
         default=os.environ.get("T2M_LOOKUP_DIR"),
-        help="Dir with *_lookup.parquets. $T2M_LOOKUP_DIR",
+        help="Dir with track_lookup.parquet. $T2M_LOOKUP_DIR",
     )
     parser.add_argument(
         "--geo-dir",
@@ -426,6 +507,11 @@ def main():
         "--knn-dir",
         default=os.environ.get("T2M_KNN_DIR"),
         help="Dir with *_knn.parquets. $T2M_KNN_DIR",
+    )
+    parser.add_argument(
+        "--tracks-db",
+        default=os.environ.get("T2M_TRACKS_DB"),
+        help="Path to spotify_clean.sqlite3 for artist/album enrichment. $T2M_TRACKS_DB (optional)",
     )
     parser.add_argument(
         "--knn-k",
@@ -462,6 +548,7 @@ def main():
     print(f"Lookup dir : {lookup_dir}")
     print(f"Geo dir    : {geo_dir}")
     print(f"KNN dir    : {knn_dir}")
+    print(f"Tracks DB  : {args.tracks_db or '(none — enrichment skipped)'}")
     print(f"knn_k      : {args.knn_k}")
     print()
 
@@ -469,11 +556,30 @@ def main():
     conn = sqlite3.connect(db_path)
     conn.executescript(DDL)
 
+    tracks_conn = sqlite3.connect(args.tracks_db) if args.tracks_db else None
+
+    print("Computing entity lookups from track_lookup.parquet...")
+    lookup_cols = [
+        "track_rowid", "artist_rowid", "artist_name",
+        "album_rowid", "album_name", "label", "logcounts",
+    ]
+    track_lookup = pd.read_parquet(lookup_dir / "track_lookup.parquet", columns=lookup_cols)
+    label_lookup = Labels.lookup(track_lookup)
+    artist_lookup = Artists.lookup(track_lookup)
+    album_lookup = Albums.lookup(track_lookup)
+    print(
+        f"  labels={len(label_lookup):,}  artists={len(artist_lookup):,}  albums={len(album_lookup):,}"
+    )
+    print()
+
     print("Building entity tables...")
-    label_df = build_labels(conn, lookup_dir, geo_dir)
-    artist_geo = build_artists(conn, lookup_dir, geo_dir)
-    album_geo = build_albums(conn, lookup_dir, geo_dir, artist_geo)
+    label_df = build_labels(conn, label_lookup, geo_dir)
+    artist_geo = build_artists(conn, artist_lookup, geo_dir, tracks_conn)
+    album_geo = build_albums(conn, album_lookup, geo_dir, artist_geo, label_df, tracks_conn)
     conn.commit()
+
+    if tracks_conn is not None:
+        tracks_conn.close()
 
     build_tracks(
         conn, lookup_dir, geo_dir, artist_geo, album_geo, label_df, args.batch_size

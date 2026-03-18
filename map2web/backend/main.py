@@ -97,7 +97,7 @@ async def recroll(q: int, entity: str):
 
 
 @app.get("/api/recs")
-async def recs(q: int, entity: str, limit: int = Query(5, ge=1, le=50)):
+async def recs(q: int, entity: str, limit: int = Query(5, ge=1)):
     if entity not in _KNN_TABLE:
         raise HTTPException(status_code=400, detail=f"Unknown entity: {entity!r}")
     knn_table, knn_pk, entity_table, entity_pk, neighbor_col = _KNN_TABLE[entity]

@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { Badge } from "./Badge.jsx";
+import colors from "./theme.js";
 
-export function Link({ onClick, children }) {
+export function Link({ onClick, children, color }) {
+    const [hovered, setHovered] = useState(false);
     return (
         <button
             onClick={onClick}
-            className="cursor-pointer text-left underline underline-offset-2 hover:opacity-70 transition-opacity"
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={hovered && color ? { color } : undefined}
+            className="cursor-pointer text-left max-w-full truncate transition-colors"
         >
             {children}
         </button>
@@ -33,10 +38,10 @@ const LINE2 = {
 
 function RecItem({ rec, entityType, navigate }) {
     return (
-        <li>
+        <li className="hover:bg-overlay -mx-5 px-5 pt-2">
             <button
                 onClick={() => navigate(entityType, getRowid(entityType, rec), rec.lon, rec.lat)}
-                className="text-left w-full hover:opacity-70 transition-opacity py-0.5"
+                className="text-left w-full cursor-pointer"
             >
                 <div className="text-sm font-medium truncate">{LINE1[entityType](rec)}</div>
                 <div className="text-xs text-muted truncate">{LINE2[entityType](rec)}</div>
@@ -53,7 +58,7 @@ function RecsList({ recs, entityType, navigate }) {
     if (!recs.length)
         return <div className="text-muted text-xs py-2">No recommendations.</div>;
     return (
-        <ol className="mt-1 space-y-1">
+        <ol className="mt-1">
             {recs.map((rec, i) => (
                 <RecItem key={i} rec={rec} entityType={entityType} navigate={navigate} />
             ))}
@@ -64,27 +69,27 @@ function RecsList({ recs, entityType, navigate }) {
 function TrackPanel({ s, navigate }) {
     return (
         <>
-            <div className="text-lg font-semibold leading-snug">{s.track_name}</div>
-            <div className="italic font-medium leading-tight text-sm mt-0.5">
+            <div className="text-lg font-semibold leading-snug truncate">{s.track_name}</div>
+            <div className="italic font-medium leading-tight text-sm mt-0.5 truncate">
                 {s.artist_lon != null ? (
-                    <Link onClick={() => navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)}>
+                    <Link onClick={() => navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)} color={colors.artist}>
                         {s.artist_name}
                     </Link>
                 ) : s.artist_name}
             </div>
             {s.album_name && (
-                <div className="text-sm mt-1">
+                <div className="text-sm mt-1 truncate">
                     {s.album_lon != null ? (
-                        <Link onClick={() => navigate("album", s.album_rowid, s.album_lon, s.album_lat)}>
+                        <Link onClick={() => navigate("album", s.album_rowid, s.album_lon, s.album_lat)} color={colors.album}>
                             {s.album_name}
                         </Link>
                     ) : s.album_name}
                 </div>
             )}
             {s.label && (
-                <div className="text-xs text-muted mt-0.5">
+                <div className="text-xs text-muted mt-0.5 truncate">
                     {s.label_lon != null ? (
-                        <Link onClick={() => navigate("label", s.label_id, s.label_lon, s.label_lat)}>
+                        <Link onClick={() => navigate("label", s.label_id, s.label_lon, s.label_lat)} color={colors.label}>
                             {s.label}
                         </Link>
                     ) : s.label}
@@ -103,19 +108,31 @@ function TrackPanel({ s, navigate }) {
 function AlbumPanel({ s, navigate }) {
     return (
         <>
-            <div className="text-lg font-semibold leading-snug">{s.album_name}</div>
+            <div className="text-lg font-semibold leading-snug truncate">{s.album_name}</div>
             {s.artist_name && (
-                <div className="italic font-medium leading-tight text-sm mt-0.5">
+                <div className="italic font-medium leading-tight text-sm mt-0.5 truncate">
                     {s.artist_lon != null ? (
-                        <Link onClick={() => navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)}>
+                        <Link onClick={() => navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)} color={colors.artist}>
                             {s.artist_name}
                         </Link>
                     ) : s.artist_name}
                 </div>
             )}
-            {s.track_count != null && (
-                <div className="text-xs text-muted mt-2">{s.track_count} tracks</div>
+            {s.label && (
+                <div className="text-xs text-muted mt-0.5 truncate">
+                    {s.label_lon != null ? (
+                        <Link onClick={() => navigate("label", s.label_id, s.label_lon, s.label_lat)} color={colors.label}>
+                            {s.label}
+                        </Link>
+                    ) : s.label}
+                </div>
             )}
+            <div className="flex items-center gap-2 mt-2 text-xs text-muted">
+                {s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
+                {s.popularity != null && (
+                    <span className="bg-muted/10 px-1.5 py-0.5 rounded">pop {s.popularity}</span>
+                )}
+            </div>
         </>
     );
 }
@@ -123,9 +140,10 @@ function AlbumPanel({ s, navigate }) {
 function ArtistPanel({ s }) {
     return (
         <>
-            <div className="text-lg font-semibold leading-snug">{s.artist_name}</div>
+            <div className="text-lg font-semibold leading-snug truncate">{s.artist_name}</div>
+            {s.genre && <div className="text-xs text-muted truncate">{s.genre}</div>}
             {s.track_count != null && (
-                <div className="text-xs text-muted mt-2">{s.track_count} tracks</div>
+                <div className="text-xs text-muted mt-2 truncate">{s.track_count} tracks</div>
             )}
         </>
     );
@@ -134,9 +152,9 @@ function ArtistPanel({ s }) {
 function LabelPanel({ s }) {
     return (
         <>
-            <div className="text-lg font-semibold leading-snug">{s.label}</div>
+            <div className="text-lg font-semibold leading-snug truncate">{s.label}</div>
             {s.track_count != null && (
-                <div className="text-xs text-muted mt-2">{s.track_count} tracks</div>
+                <div className="text-xs text-muted mt-2 truncate">{s.track_count} tracks</div>
             )}
         </>
     );
