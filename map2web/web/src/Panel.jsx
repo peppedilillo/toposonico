@@ -17,6 +17,17 @@ export function Link({ onClick, children, color }) {
     );
 }
 
+function LoadingBody() {
+    return (
+        <div className="space-y-2 animate-pulse mt-1">
+            <div className="h-5 bg-muted/20 rounded w-3/4" />
+            <div className="h-4 bg-muted/20 rounded w-1/2" />
+            <div className="h-3 bg-muted/20 rounded w-2/3" />
+            <div className="h-3 bg-muted/20 rounded w-1/3" />
+        </div>
+    );
+}
+
 const ROWID_KEY = {
     track: "track_rowid", album: "album_rowid",
     artist: "artist_rowid", label: "label_id",
@@ -176,7 +187,7 @@ export default function Panel({ selection, navigate, onClose }) {
 
     let body;
     if (selection.loading) {
-        body = <div className="text-muted text-sm animate-pulse">Loading…</div>;
+        body = <LoadingBody />;
     } else if (selection.error) {
         body = <div className="text-muted text-sm">Failed to load.</div>;
     } else if (entityType === "track") {
@@ -209,7 +220,8 @@ export default function Panel({ selection, navigate, onClose }) {
         if (recs !== null) return;
         const rowid = getRowid(entityType, selection);
         setRecs({ loading: true });
-        fetch(`/api/recs?q=${rowid}&entity=${entityType}`)
+        const diverse = entityType === "track" || entityType === "album";
+        fetch(`/api/recs?q=${rowid}&entity=${entityType}&diverse=${diverse}`)
             .then(r => r.json())
             .then(data => setRecs(data))
             .catch(() => setRecs({ error: true }));
@@ -252,6 +264,9 @@ export default function Panel({ selection, navigate, onClose }) {
                             {rolling ? "…" : "Find more"}
                         </button>
                     )}
+                    {selection.loading && (
+                        <div className="h-12 w-20 bg-muted/20 rounded-xl animate-pulse" />
+                    )}
                 </div>
             </div>
             {hasData && (
@@ -260,7 +275,7 @@ export default function Panel({ selection, navigate, onClose }) {
                         onClick={handleToggleRecs}
                         className="text-muted text-xs flex items-center gap-1 hover:text-white transition-colors"
                     >
-                        Recommendations {recsOpen ? "▲" : "▼"}
+                        Similiar {recsOpen ? "▲" : "▼"}
                     </button>
                     {recsOpen && (
                         <RecsList recs={recs} entityType={entityType} navigate={navigate} />

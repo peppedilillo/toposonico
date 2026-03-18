@@ -96,22 +96,44 @@ async def recroll(q: int, entity: str):
     return dict(zip([d[0] for d in cur.description], row))
 
 
+def _diverse_recs(rows, cols, limit):
+    dicts = [dict(zip(cols, row)) for row in rows]
+    seen_artists, added, result = set(), set(), []
+    for i, d in enumerate(dicts):
+        if len(result) >= limit:
+            break
+        artist = d.get("artist_rowid")
+        if artist not in seen_artists:
+            seen_artists.add(artist)
+            result.append(d)
+            added.add(i)
+    for i, d in enumerate(dicts):
+        if len(result) >= limit:
+            break
+        if i not in added:
+            result.append(d)
+    return result
+
+
 @app.get("/api/recs")
-async def recs(q: int, entity: str, limit: int = Query(5, ge=1)):
+async def recs(q: int, entity: str, limit: int = Query(5, ge=1), diverse: bool = Query(False)):
     if entity not in _KNN_TABLE:
         raise HTTPException(status_code=400, detail=f"Unknown entity: {entity!r}")
     knn_table, knn_pk, entity_table, entity_pk, neighbor_col = _KNN_TABLE[entity]
+    use_diverse = diverse and entity in ("track", "album")
     sql = f"""
         SELECT k.{neighbor_col}, k.score, e.*
         FROM {knn_table} k
         JOIN {entity_table} e ON e.{entity_pk} = k.{neighbor_col}
         WHERE k.{knn_pk} = ?
         ORDER BY k.rank
-        LIMIT ?
+        {"" if use_diverse else "LIMIT ?"}
     """
-    cur  = _db.execute(sql, (q, limit))
+    cur  = _db.execute(sql, (q,) if use_diverse else (q, limit))
     rows = cur.fetchall()
     cols = [d[0] for d in cur.description]
+    if use_diverse:
+        return _diverse_recs(rows, cols, limit)
     return [dict(zip(cols, row)) for row in rows]
 
 

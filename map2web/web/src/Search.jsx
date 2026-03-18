@@ -39,10 +39,11 @@ function HitContent({ hit }) {
 
 const DISPLAY_MAX = 3;
 
-export default function Search({ mapRef, selectEntity, results, setResults }) {
+export default function Search({ navigate, results, setResults }) {
     const [query, setQuery] = useState("");
     const [activeIdx, setActiveIdx] = useState(null);
     const [windowStart, setWindowStart] = useState(0);
+    const [open, setOpen] = useState(false);
 
     const resetNav = () => {
         setActiveIdx(null);
@@ -60,6 +61,7 @@ export default function Search({ mapRef, selectEntity, results, setResults }) {
                 .then((r) => r.json())
                 .then((hits) => {
                     setResults(hits);
+                    setOpen(true);
                     resetNav();
                 })
                 .catch(() => setResults([]));
@@ -68,15 +70,6 @@ export default function Search({ mapRef, selectEntity, results, setResults }) {
         return () => clearTimeout(timer);
     }, [query]);
 
-    /** @param {Hit} hit */
-    const fly = (hit) => {
-        const map = mapRef.current;
-        map.flyTo({ center: [hit.lon, hit.lat], zoom: 11, essential: true });
-        map.once("moveend", () => selectEntity(hit.entity_type, hit.rowid));
-        setQuery("");
-        setResults([]);
-    };
-
     return (
         <div
             className="absolute top-3 z-100 font-sans text-base left-1/2 -translate-x-1/2
@@ -84,11 +77,14 @@ export default function Search({ mapRef, selectEntity, results, setResults }) {
             onPointerDown={(e) => e.stopPropagation()}
             onPointerMove={(e) => e.stopPropagation()}
         >
+            <div className="flex items-center bg-surface rounded-xl">
             <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setOpen(true)}
+                onBlur={() => setTimeout(() => setOpen(false), 150)}
                 placeholder="search…"
-                className="w-full bg-surface text-white placeholder:text-muted p-2 pl-5 rounded-xl"
+                className="flex-1 bg-transparent text-white placeholder:text-muted p-2 pl-5 outline-none"
                 onKeyDown={(e) => {
                     if (e.key === "ArrowDown") {
                         const next =
@@ -105,8 +101,10 @@ export default function Search({ mapRef, selectEntity, results, setResults }) {
                                 : Math.max(activeIdx - 1, 0);
                         setActiveIdx(prev);
                         if (prev < windowStart) setWindowStart(prev);
-                    } else if (e.key === "Enter" && activeIdx !== null)
-                        fly(results[activeIdx]);
+                    } else if (e.key === "Enter" && activeIdx !== null) {
+                        navigate(results[activeIdx].entity_type, results[activeIdx].rowid, results[activeIdx].lon, results[activeIdx].lat);
+                        setOpen(false);
+                    }
                     else if (e.key === "Escape") {
                         setQuery("");
                         setResults([]);
@@ -114,14 +112,23 @@ export default function Search({ mapRef, selectEntity, results, setResults }) {
                     }
                 }}
             />
-            {results.length > 0 && (
+            {query && (
+                <button
+                    onClick={() => { setQuery(""); setResults([]); resetNav(); }}
+                    className="pr-4 text-muted hover:text-white transition-colors text-lg"
+                    aria-label="Clear search"
+                    tabIndex={-1}
+                >×</button>
+            )}
+            </div>
+            {results.length > 0 && open && (
                 <ul className="bg-surface mt-1 py-4 list-none rounded-xl">
                     {results
                         .slice(windowStart, windowStart + DISPLAY_MAX)
                         .map((hit, i) => (
                             <li
                                 key={hit.id}
-                                onClick={() => fly(hit)}
+                                onClick={() => { navigate(hit.entity_type, hit.rowid, hit.lon, hit.lat); setOpen(false); }}
                                 className={
                                     windowStart + i === activeIdx
                                         ? "cursor-pointer px-5 py-2 bg-overlay"

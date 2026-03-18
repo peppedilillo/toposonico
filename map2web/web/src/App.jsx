@@ -66,14 +66,12 @@ export default function App() {
 
     const navigate = useCallback(
         (entityType, rowid, lon, lat) => {
+            selectEntity(entityType, rowid);
             mapRef.current.flyTo({
                 center: [lon, lat],
                 zoom: 9,
                 essential: true,
             });
-            mapRef.current.once("moveend", () =>
-                selectEntity(entityType, rowid),
-            );
         },
         [selectEntity],
     );
@@ -151,7 +149,6 @@ export default function App() {
                 const hit = map.queryRenderedFeatures(e.point, { layers: LAYERS.map(l => l.id) });
                 if (!hit.length) {
                     setSelection(null);
-                    setResults([]);
                 }
             });
         });
@@ -167,8 +164,7 @@ export default function App() {
         <div className="relative w-screen h-screen text-white font-normal">
             <div ref={containerRef} className="w-full h-full" />
             <Search
-                mapRef={mapRef}
-                selectEntity={selectEntity}
+                navigate={navigate}
                 results={results}
                 setResults={setResults}
             />
