@@ -29,7 +29,6 @@ import torch
 
 from src.utils import extract_run_name
 
-
 CHUNK_SIZE_DEFAULT = 500_000
 
 
@@ -38,11 +37,7 @@ def main():
         description="Export track embeddings from model checkpoint to parquet",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "model",
-        type=Path,
-        help="Path to .pt model checkpoint file"
-    )
+    parser.add_argument("model", type=Path, help="Path to .pt model checkpoint file")
     parser.add_argument(
         "--outdir",
         default=os.environ.get("T2M_EMBEDDING_DIR"),
@@ -81,7 +76,9 @@ def main():
     rowids = np.asarray(ckpt["vocab"]["track_rowid"], dtype=np.int64)
     embed_dim = ckpt["hparams"]["embed_dim"]
     del ckpt
-    print(f"  Loaded in {time.time() - t0:.1f}s  —  vocab {len(rowids):,}, dim {embed_dim}")
+    print(
+        f"  Loaded in {time.time() - t0:.1f}s  —  vocab {len(rowids):,}, dim {embed_dim}"
+    )
 
     schema = pa.schema(
         [pa.field("track_rowid", pa.int64())]
@@ -105,7 +102,10 @@ def main():
             total_written += hi - lo
             elapsed = time.time() - t1
             rate = total_written / elapsed if elapsed > 0 else 0.0
-            print(f"  {total_written:>10,} / {vocab_size:,}  ({rate:,.0f} rows/s)", end="\r")
+            print(
+                f"  {total_written:>10,} / {vocab_size:,}  ({rate:,.0f} rows/s)",
+                end="\r",
+            )
 
     elapsed = time.time() - t0
     size_mb = out_path.stat().st_size / 1_048_576

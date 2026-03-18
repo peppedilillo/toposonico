@@ -4,6 +4,7 @@ import pytest
 
 from src.entities import Albums, Artists, Labels
 
+
 def _emb(*track_rowids):
     n = len(track_rowids)
     return pd.DataFrame(
@@ -31,6 +32,7 @@ def _lookup_label(*pairs):
 
 
 # --- artist_embeddings ---
+
 
 def test_artist_columns():
     emb = _emb(1, 2)
@@ -72,6 +74,7 @@ def test_artist_no_overlap():
 
 # --- album_embeddings ---
 
+
 def test_album_columns():
     emb = _emb(1, 2)
     lookup = _lookup_album((1, 100), (2, 100))
@@ -104,6 +107,7 @@ def test_album_dtype():
 
 
 # --- label_embeddings ---
+
 
 def test_label_columns():
     emb = _emb(1, 2)

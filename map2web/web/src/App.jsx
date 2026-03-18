@@ -1,11 +1,11 @@
-import {useCallback, useEffect, useRef, useState} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import colors from "./theme.js";
 import Search from "./Search.jsx";
 import Panel from "./Panel.jsx";
-import {LAYERS} from "./layers.js";
+import { LAYERS } from "./layers.js";
 
 const STYLE = {
     version: 8,
@@ -15,12 +15,12 @@ const STYLE = {
         {
             id: "background",
             type: "background",
-            paint: {"background-color": colors.background},
+            paint: { "background-color": colors.background },
         },
     ],
 };
 
-const gridLines = {type: "FeatureCollection", features: []};
+const gridLines = { type: "FeatureCollection", features: [] };
 for (let lon = -180; lon <= 180; lon += 5) {
     gridLines.features.push({
         type: "Feature",
@@ -54,20 +54,29 @@ export default function App() {
     const [selection, setSelection] = useState(null);
     const [results, setResults] = useState([]);
     const [zoom, setZoom] = useState(STARTZOOM);
-    const [cursor, setCursor] = useState({x: 0, y: 0});
+    const [cursor, setCursor] = useState({ x: 0, y: 0 });
 
     const selectEntity = useCallback((entityType, rowid) => {
         setSelection({ loading: true, entityType });
         fetch(`/api/info?q=${rowid}&entity=${entityType}`)
-            .then(r => r.json())
-            .then(data => setSelection({ entityType, ...data }))
+            .then((r) => r.json())
+            .then((data) => setSelection({ entityType, ...data }))
             .catch(() => setSelection({ entityType, error: true }));
     }, []);
 
-    const navigate = useCallback((entityType, rowid, lon, lat) => {
-        mapRef.current.flyTo({ center: [lon, lat], zoom: 11, essential: true });
-        mapRef.current.once("moveend", () => selectEntity(entityType, rowid));
-    }, [selectEntity]);
+    const navigate = useCallback(
+        (entityType, rowid, lon, lat) => {
+            mapRef.current.flyTo({
+                center: [lon, lat],
+                zoom: 11,
+                essential: true,
+            });
+            mapRef.current.once("moveend", () =>
+                selectEntity(entityType, rowid),
+            );
+        },
+        [selectEntity],
+    );
 
     useEffect(() => {
         const map = new maplibregl.Map({
@@ -85,7 +94,7 @@ export default function App() {
         mapRef.current = map;
 
         map.on("load", () => {
-            map.addSource("grid", {type: "geojson", data: gridLines});
+            map.addSource("grid", { type: "geojson", data: gridLines });
             map.addSource("tiles", {
                 type: "vector",
                 tiles: [`${window.location.origin}/tiles/{z}/{x}/{y}.pbf`],
@@ -95,10 +104,19 @@ export default function App() {
                 id: "grid",
                 type: "line",
                 source: "grid",
-                paint: {"line-color": colors.border, "line-width": 1},
+                paint: { "line-color": colors.border, "line-width": 1 },
             });
             LAYERS.forEach(
-                ({id, sourceLayer, char, size, color, opacity, entityType, rowidProp}) => {
+                ({
+                    id,
+                    sourceLayer,
+                    char,
+                    size,
+                    color,
+                    opacity,
+                    entityType,
+                    rowidProp,
+                }) => {
                     map.addLayer({
                         id,
                         type: "symbol",
@@ -115,8 +133,12 @@ export default function App() {
                             "text-opacity": opacity,
                         },
                     });
-                    map.on("mousemove", id, () => { map.getCanvas().style.cursor = "pointer"; });
-                    map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+                    map.on("mousemove", id, () => {
+                        map.getCanvas().style.cursor = "pointer";
+                    });
+                    map.on("mouseleave", id, () => {
+                        map.getCanvas().style.cursor = "";
+                    });
                     map.on("click", id, (e) => {
                         const p = e.features[0].properties;
                         selectEntity(entityType, p[rowidProp]);
@@ -124,23 +146,37 @@ export default function App() {
                 },
             );
             map.on("click", (e) => {
-                const hit = map.queryRenderedFeatures(e.point, { layers: LAYERS.map(l => l.id) });
-                if (!hit.length) { setSelection(null); setResults([]); }
+                const hit = map.queryRenderedFeatures(e.point, {
+                    layers: LAYERS.map((l) => l.id),
+                });
+                if (!hit.length) {
+                    setSelection(null);
+                    setResults([]);
+                }
             });
         });
 
         map.on("zoom", () => setZoom(map.getZoom()));
         map.on("mousemove", (e) =>
-            setCursor({x: e.lngLat.lng, y: e.lngLat.lat}),
+            setCursor({ x: e.lngLat.lng, y: e.lngLat.lat }),
         );
         return () => map.remove();
     }, []);
 
     return (
         <div className="relative w-screen h-screen text-white font-normal">
-            <div ref={containerRef} className="w-full h-full"/>
-            <Search mapRef={mapRef} selectEntity={selectEntity} results={results} setResults={setResults}/>
-            <Panel selection={selection} navigate={navigate} onClose={() => setSelection(null)}/>
+            <div ref={containerRef} className="w-full h-full" />
+            <Search
+                mapRef={mapRef}
+                selectEntity={selectEntity}
+                results={results}
+                setResults={setResults}
+            />
+            <Panel
+                selection={selection}
+                navigate={navigate}
+                onClose={() => setSelection(null)}
+            />
             <div className="absolute top-3 right-3 text-muted text-xs font-sans pointer-events-none">
                 z {zoom.toFixed(2)} x {cursor.x.toFixed(4)} y{" "}
                 {cursor.y.toFixed(4)}

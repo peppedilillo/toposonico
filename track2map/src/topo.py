@@ -1,4 +1,5 @@
 """Topology utilities: aggregations and derived representations over track embeddings."""
+
 from typing import Sequence
 
 import pandas as pd
@@ -44,9 +45,13 @@ def umap2geo(
     for df, key_col in umap_frames:
         x_norm = (df.umap_x - x_min) / (x_max - x_min)
         y_norm = (df.umap_y - y_min) / (y_max - y_min)
-        results.append(pd.DataFrame({
-            key_col: df[key_col],
-            "lon": (x_norm * 2 * max_lon - max_lon).round(6).astype(np.float32),
-            "lat": (y_norm * 2 * max_lat - max_lat).round(6).astype(np.float32),
-        }))
+        results.append(
+            pd.DataFrame(
+                {
+                    key_col: df[key_col],
+                    "lon": (x_norm * 2 * max_lon - max_lon).round(6).astype(np.float32),
+                    "lat": (y_norm * 2 * max_lat - max_lat).round(6).astype(np.float32),
+                }
+            )
+        )
     return results

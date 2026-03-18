@@ -28,7 +28,6 @@ import os
 import pandas as pd
 import sqlite3
 
-
 QUERY = """
     SELECT track_rowid, COUNT(*) AS playlist_count
     FROM (
@@ -41,6 +40,7 @@ QUERY = """
     GROUP BY track_rowid
     ORDER BY track_rowid
 """
+
 
 def get_connection(database_path: Path) -> sqlite3.Connection:
     uri = f"file:{database_path}?mode=ro"
@@ -60,7 +60,7 @@ def main():
     parser.add_argument(
         "--output",
         default=os.environ.get("T2M_TRACK_COUNT"),
-        help="Output parquet path. Set to `T2M_TRACK_COUNT` by default."
+        help="Output parquet path. Set to `T2M_TRACK_COUNT` by default.",
     )
     args = parser.parse_args()
 

@@ -11,10 +11,11 @@ class Artists:
         Returns columns: artist_rowid (int64), artist_name, track_count (int32),
         logcounts (float32) — mean of per-track logcounts across the artist's tracks.
         """
-        df = df[df.groupby("artist_rowid")["artist_rowid"].transform("count") > mintracks]
-        out = (
-            df.groupby(["artist_rowid", "artist_name"], as_index=False)
-            .agg(track_count=("track_rowid", "count"), logcounts=("logcounts", "mean"))
+        df = df[
+            df.groupby("artist_rowid")["artist_rowid"].transform("count") > mintracks
+        ]
+        out = df.groupby(["artist_rowid", "artist_name"], as_index=False).agg(
+            track_count=("track_rowid", "count"), logcounts=("logcounts", "mean")
         )
         out["artist_rowid"] = out["artist_rowid"].astype("int64")
         out["track_count"] = out["track_count"].astype("int32")
@@ -23,9 +24,9 @@ class Artists:
 
     @staticmethod
     def embeddings(
-            emb_df: pd.DataFrame,
-            lookup_df: pd.DataFrame,
-            min_tracks: int = 10,
+        emb_df: pd.DataFrame,
+        lookup_df: pd.DataFrame,
+        min_tracks: int = 10,
     ) -> pd.DataFrame:
         """Mean-pool track embeddings to artist level.
 
@@ -36,7 +37,9 @@ class Artists:
         df = emb_df.merge(
             lookup_df[["track_rowid", "artist_rowid"]], on="track_rowid", how="inner"
         )
-        assert df["artist_rowid"].notna().all(), "Unexpected null artist_rowid after merge"
+        assert (
+            df["artist_rowid"].notna().all()
+        ), "Unexpected null artist_rowid after merge"
         df["artist_rowid"] = df["artist_rowid"].astype("int64")
         agg = df.groupby("artist_rowid", sort=False).agg(
             **{c: (c, "mean") for c in emb_cols},
@@ -62,9 +65,8 @@ class Albums:
         logcounts across the album's tracks.
         """
         df = df[df.groupby("album_rowid")["album_rowid"].transform("count") > mintracks]
-        out = (
-            df.groupby(["album_rowid", "album_name"], as_index=False)
-            .agg(track_count=("track_rowid", "count"), logcounts=("logcounts", "mean"))
+        out = df.groupby(["album_rowid", "album_name"], as_index=False).agg(
+            track_count=("track_rowid", "count"), logcounts=("logcounts", "mean")
         )
         primary_artist = (
             df.groupby("album_rowid")[["artist_rowid", "artist_name"]]
@@ -79,9 +81,9 @@ class Albums:
 
     @staticmethod
     def embeddings(
-            emb_df: pd.DataFrame,
-            lookup_df: pd.DataFrame,
-            min_tracks: int = 5,
+        emb_df: pd.DataFrame,
+        lookup_df: pd.DataFrame,
+        min_tracks: int = 5,
     ) -> pd.DataFrame:
         """Mean-pool track embeddings to album level.
 
@@ -92,7 +94,9 @@ class Albums:
         df = emb_df.merge(
             lookup_df[["track_rowid", "album_rowid"]], on="track_rowid", how="inner"
         )
-        assert df["album_rowid"].notna().all(), "Unexpected null album_rowid after merge"
+        assert (
+            df["album_rowid"].notna().all()
+        ), "Unexpected null album_rowid after merge"
         df["album_rowid"] = df["album_rowid"].astype("int64")
         agg = df.groupby("album_rowid", sort=False).agg(
             **{c: (c, "mean") for c in emb_cols},
@@ -118,9 +122,8 @@ class Labels:
         """
         df = df[df["label"].notna() & (df["label"] != "")]
         df = df[df.groupby("label")["label"].transform("count") > mintracks]
-        out = (
-            df.groupby("label", as_index=False)
-            .agg(track_count=("track_rowid", "count"), logcounts=("logcounts", "mean"))
+        out = df.groupby("label", as_index=False).agg(
+            track_count=("track_rowid", "count"), logcounts=("logcounts", "mean")
         )
         out["track_count"] = out["track_count"].astype("int32")
         out["logcounts"] = out["logcounts"].astype("float32")
@@ -129,9 +132,9 @@ class Labels:
 
     @staticmethod
     def embeddings(
-            emb_df: pd.DataFrame,
-            lookup_df: pd.DataFrame,
-            min_tracks: int = 100,
+        emb_df: pd.DataFrame,
+        lookup_df: pd.DataFrame,
+        min_tracks: int = 100,
     ) -> pd.DataFrame:
         """Mean-pool track embeddings to label level.
 

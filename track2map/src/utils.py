@@ -7,12 +7,12 @@ from pathlib import Path
 
 
 def print_vram_budget(
-        vocab_size: int,
-        batch_size: int,
-        embedding_dims: int,
-        neg_samples: int,
-        neg_samples_block: int,
-        allocator_overhead: float = 1.30,
+    vocab_size: int,
+    batch_size: int,
+    embedding_dims: int,
+    neg_samples: int,
+    neg_samples_block: int,
+    allocator_overhead: float = 1.30,
 ):
     """Prints VRAM usage summary.
 
@@ -31,7 +31,7 @@ def print_vram_budget(
     weights_ = vocab_size * BYTES_IN_32BIT
     negs = batch_size * neg_samples * neg_samples_block * BYTES_IN_64BIT  # torch.long
     act_fwd = (
-            (2 + neg_samples) * batch_size * embedding_dims * BYTES_IN_32BIT
+        (2 + neg_samples) * batch_size * embedding_dims * BYTES_IN_32BIT
     )  # the ` 2 + ..` is for the centers and context
     act_bwd = act_fwd
 
@@ -47,9 +47,7 @@ def print_vram_budget(
         f"Optimizer state     : {optim * GB:>6.2f} GB  (SparseAdam exp_avg + exp_avg_sq, dense after warmup)"
     )
     print(f"Weights             : {weights_ * MB:>6.1f} MB  (negative sample weights)")
-    print(
-        f"Neg. sample block   : {negs * MB:>6.1f} MB  (negative sampling reservoir)"
-    )
+    print(f"Neg. sample block   : {negs * MB:>6.1f} MB  (negative sampling reservoir)")
     print(
         f"Activations fwd     : {act_fwd * MB:>6.1f} MB  ({2 + neg_samples} tensors × {batch_size:,} × {embedding_dims})"
     )
@@ -122,7 +120,7 @@ def print_vocab_stats(vocab: pd.DataFrame):
     print(f"Track count max  : {vocab['playlist_count'].max()}")
 
 
-_RUN_NAME_RE = re.compile(r'^model_([a-z]+_[a-z]+)_t\w+_ep\d+_v\w+\.pt$')
+_RUN_NAME_RE = re.compile(r"^model_([a-z]+_[a-z]+)_t\w+_ep\d+_v\w+\.pt$")
 
 
 def extract_run_name(filename: str | Path) -> str:
@@ -137,10 +135,20 @@ def extract_run_name(filename: str | Path) -> str:
     return m.group(1)
 
 
-def make_model_filename(run_name: str, vocab_size: int, epoch: int, val_loss: float) -> str:
+def make_model_filename(
+    run_name: str, vocab_size: int, epoch: int, val_loss: float
+) -> str:
     """Parse standard model filename."""
+
     def format_number(n):
-        return next((f"{n / d:.0f}"+ s for d, s in [(1e9, 'B'), (1e6, 'M'), (1e3, 'K')] if abs(n) >= d), str(n))
+        return next(
+            (
+                f"{n / d:.0f}" + s
+                for d, s in [(1e9, "B"), (1e6, "M"), (1e3, "K")]
+                if abs(n) >= d
+            ),
+            str(n),
+        )
 
     v = f"{val_loss:.4f}".replace(".", "d")
     return f"model_{run_name}_t{format_number(vocab_size)}_ep{epoch}_v{v}.pt"

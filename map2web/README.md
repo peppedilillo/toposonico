@@ -108,3 +108,7 @@ cd web && npm run dev -- --host
 ```
 
 Open `http://localhost:5173`.
+
+## Extras
+
+Run prettier for linter with `npx prettier web/src --write`

@@ -45,9 +45,7 @@ def main():
     args = parser.parse_args()
 
     if args.min_count < 1:
-        raise ValueError(
-            "Argument --min_count must be >= 1."
-        )
+        raise ValueError("Argument --min_count must be >= 1.")
 
     if args.counts is None:
         raise ValueError(

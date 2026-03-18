@@ -45,15 +45,14 @@ import pyarrow.parquet as pq
 
 from src.entities import Artists, Albums, Labels
 
-
-K_TRACKS  = 100
-K_ALBUMS  = 50
+K_TRACKS = 100
+K_ALBUMS = 50
 K_ARTISTS = 20
-K_LABELS  = 10
+K_LABELS = 10
 
-IVF_THRESHOLD    = 500_000   # use IVFFlat above this, FlatIP below
-IVF_NLIST_FACTOR = 4         # nlist = IVF_NLIST_FACTOR * sqrt(N), clamped to [256, 32768]
-WRITE_CHUNK      = 500_000   # rows per parquet write batch (avoids OOM on large DataFrames)
+IVF_THRESHOLD = 500_000  # use IVFFlat above this, FlatIP below
+IVF_NLIST_FACTOR = 4  # nlist = IVF_NLIST_FACTOR * sqrt(N), clamped to [256, 32768]
+WRITE_CHUNK = 500_000  # rows per parquet write batch (avoids OOM on large DataFrames)
 
 
 def _write_chunked(path, columns, schema, N):
@@ -67,10 +66,10 @@ def _write_chunked(path, columns, schema, N):
 
 
 ENTITIES = {
-    "track":  {"key": "track_rowid",  "k": K_TRACKS},
-    "album":  {"key": "album_rowid",  "k": K_ALBUMS},
+    "track": {"key": "track_rowid", "k": K_TRACKS},
+    "album": {"key": "album_rowid", "k": K_ALBUMS},
     "artist": {"key": "artist_rowid", "k": K_ARTISTS},
-    "label":  {"key": "label",        "k": K_LABELS},
+    "label": {"key": "label", "k": K_LABELS},
 }
 
 
@@ -92,13 +91,15 @@ def _knn_search(
     mat /= norms
 
     if N > IVF_THRESHOLD:
-        nlist = int(np.clip(IVF_NLIST_FACTOR * N ** 0.5, 256, 32_768))
+        nlist = int(np.clip(IVF_NLIST_FACTOR * N**0.5, 256, 32_768))
         quantizer = faiss.IndexFlatIP(D)
         index = faiss.IndexIVFFlat(quantizer, D, nlist, faiss.METRIC_INNER_PRODUCT)
         train_n = min(N, 256 * nlist)
         if train_n < N:
             train_mat = mat[np.random.choice(N, train_n, replace=False)]
-            print(f"  training IVF index (nlist={nlist}, subsample={train_n:,}/{N:,})...")
+            print(
+                f"  training IVF index (nlist={nlist}, subsample={train_n:,}/{N:,})..."
+            )
         else:
             train_mat = mat
             print(f"  training IVF index (nlist={nlist})...")
@@ -166,7 +167,7 @@ def _process_entity(
 
     neighbor_idx, neighbor_dist = _knn_search(matrix, k, batch_size, nprobe)
     del matrix
-    neighbor_keys = keys[neighbor_idx]   # (N, k+1)
+    neighbor_keys = keys[neighbor_idx]  # (N, k+1)
 
     key_type = pa.utf8() if isinstance(keys[0], str) else pa.int64()
 
@@ -182,9 +183,9 @@ def _process_entity(
     score_cols = {key_col: keys}
     for i in range(k + 1):
         score_cols[f"s{i}"] = neighbor_dist[:, i]
-    score_schema = pa.schema([
-        (c, pa.float32() if c.startswith("s") else key_type) for c in score_cols
-    ])
+    score_schema = pa.schema(
+        [(c, pa.float32() if c.startswith("s") else key_type) for c in score_cols]
+    )
     score_path = output_dir / f"{name}_knn_scores.parquet"
     _write_chunked(score_path, score_cols, score_schema, N)
 
@@ -217,10 +218,10 @@ def main():
         default=os.environ.get("T2M_KNN_DIR", "outs/knn"),
         help="Directory for output parquets. $T2M_KNN_DIR (default: outs/knn)",
     )
-    parser.add_argument("--k-tracks",  type=int, default=K_TRACKS)
-    parser.add_argument("--k-albums",  type=int, default=K_ALBUMS)
+    parser.add_argument("--k-tracks", type=int, default=K_TRACKS)
+    parser.add_argument("--k-albums", type=int, default=K_ALBUMS)
     parser.add_argument("--k-artists", type=int, default=K_ARTISTS)
-    parser.add_argument("--k-labels",  type=int, default=K_LABELS)
+    parser.add_argument("--k-labels", type=int, default=K_LABELS)
     parser.add_argument(
         "--batch-size",
         type=int,
@@ -248,9 +249,9 @@ def main():
     if args.track_lookup is None:
         raise ValueError("--track-lookup / $T2M_TRACK_LOOKUP not set")
 
-    embedding_path   = Path(args.embedding)
+    embedding_path = Path(args.embedding)
     track_lookup_path = Path(args.track_lookup)
-    output_dir       = Path(args.output_dir)
+    output_dir = Path(args.output_dir)
 
     if not embedding_path.exists():
         raise FileNotFoundError(f"Embedding not found: {embedding_path}")
@@ -261,10 +262,10 @@ def main():
 
     # apply CLI k overrides
     cfg = {k: dict(v) for k, v in ENTITIES.items()}
-    cfg["track"]["k"]  = args.k_tracks
-    cfg["album"]["k"]  = args.k_albums
+    cfg["track"]["k"] = args.k_tracks
+    cfg["album"]["k"] = args.k_albums
     cfg["artist"]["k"] = args.k_artists
-    cfg["label"]["k"]  = args.k_labels
+    cfg["label"]["k"] = args.k_labels
 
     print(f"Embedding  : {embedding_path}")
     print(f"Lookup     : {track_lookup_path}")
@@ -279,7 +280,7 @@ def main():
     print("Loading embeddings...")
     t0 = time.time()
     embs_df = pd.read_parquet(embedding_path)
-    ndim = embs_df.filter(regex=r'^e\d+$').shape[1]
+    ndim = embs_df.filter(regex=r"^e\d+$").shape[1]
     print(f"  {len(embs_df):,} tracks, {ndim}d  ({time.time()-t0:.1f}s)")
 
     track_lookup_df = None
@@ -294,7 +295,15 @@ def main():
 
     t_total = time.time()
     for name in args.entities:
-        _process_entity(name, cfg[name], embs_df, track_lookup_df, output_dir, args.batch_size, args.nprobe)
+        _process_entity(
+            name,
+            cfg[name],
+            embs_df,
+            track_lookup_df,
+            output_dir,
+            args.batch_size,
+            args.nprobe,
+        )
 
     print(f"\nDone in {time.time() - t_total:.1f}s")
 

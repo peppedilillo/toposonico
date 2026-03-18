@@ -84,7 +84,7 @@ def main():
     parser.add_argument(
         "--output",
         default=os.environ.get("T2M_TRACK_LOOKUP"),
-        help="Output parquet path. Set to `T2M_TRACK_LOOKUP` by default."
+        help="Output parquet path. Set to `T2M_TRACK_LOOKUP` by default.",
     )
     parser.add_argument(
         "--vocab",
@@ -100,7 +100,6 @@ def main():
         help=f"Rows per chunk for streaming write (default: {CHUNK_SIZE_DEFAULT:,})",
     )
     args = parser.parse_args()
-
 
     if args.database is None:
         raise ValueError(
@@ -120,9 +119,7 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if args.vocab is None:
-        raise FileNotFoundError(
-            f"Vocab parquet not found: {args.vocab}\n"
-        )
+        raise FileNotFoundError(f"Vocab parquet not found: {args.vocab}\n")
     vocab_path = Path(args.vocab)
     if not vocab_path.exists():
         raise FileNotFoundError(f"Track vocab not found: {vocab_path}")
@@ -162,7 +159,9 @@ def main():
             chunk = pd.DataFrame.from_records(rows, columns=col_names)
             chunk["track_rowid"] = chunk["track_rowid"].astype("int64")
 
-            mask = chunk["track_rowid"].isin(vocab_ids)  # pyright: ignore[reportArgumentType]
+            mask = chunk["track_rowid"].isin(
+                vocab_ids
+            )  # pyright: ignore[reportArgumentType]
             total_skipped += int((~mask).sum())
             chunk = chunk.loc[mask]
 
@@ -170,9 +169,9 @@ def main():
                 chunk["track_popularity"] = (
                     chunk["track_popularity"].fillna(0).astype("uint8")
                 )
-                chunk["logcounts"] = (
-                    np.log10(chunk["track_rowid"].map(vocab_counts)).astype("float32")
-                )
+                chunk["logcounts"] = np.log10(
+                    chunk["track_rowid"].map(vocab_counts)
+                ).astype("float32")
                 writer.write_table(
                     pa.Table.from_pandas(chunk, schema=SCHEMA, preserve_index=False)
                 )

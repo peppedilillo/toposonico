@@ -103,7 +103,9 @@ def main():
         umap_frames.append((df, key_col))
         entity_names.append(entity)
 
-    geo_frames = umap2geo(umap_frames, max_lon=args.extent, max_lat=args.extent, padding=args.padding)
+    geo_frames = umap2geo(
+        umap_frames, max_lon=args.extent, max_lat=args.extent, padding=args.padding
+    )
 
     for entity, geo in zip(entity_names, geo_frames):
         out_path = output_dir / f"{entity}_geo.parquet"
