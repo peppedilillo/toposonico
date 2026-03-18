@@ -145,10 +145,10 @@ export default function App() {
                     });
                 },
             );
+            // The only goal of the next lines is to give the user a way to hide
+            // searchbar dropdown and panel when he clicks on an empty space on the map.
             map.on("click", (e) => {
-                const hit = map.queryRenderedFeatures(e.point, {
-                    layers: LAYERS.map((l) => l.id),
-                });
+                const hit = map.queryRenderedFeatures(e.point, { layers: LAYERS.map(l => l.id) });
                 if (!hit.length) {
                     setSelection(null);
                     setResults([]);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import {Badge} from "./Badge.jsx";
 
 /**
  * @typedef {Object} Hit
@@ -31,11 +32,7 @@ function HitContent({ hit }) {
                     {line2}
                 </div>
             )}
-            <div className="text-muted text-xs mt-0.5">
-                <span className="uppercase tracking-wider text-[9px] bg-muted/10 px-1.5 py-0.5 rounded">
-                    {type}
-                </span>
-            </div>
+            <Badge entityType={type} />
         </>
     );
 }

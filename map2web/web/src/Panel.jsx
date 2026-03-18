@@ -1,31 +1,11 @@
-import colors from "./theme.js";
+import {Badge} from "./Badge.jsx";
 
-const ET_COLOR = {
-    track: colors.track,
-    artist: colors.artist,
-    album: colors.album,
-    label: colors.label,
-};
 
-function Badge({ entityType }) {
-    return (
-        <span
-            className="uppercase tracking-wider text-[10px] px-1.5 py-0.5 rounded font-semibold"
-            style={{
-                color: ET_COLOR[entityType] ?? colors.muted,
-                background: "rgba(255,255,255,0.07)",
-            }}
-        >
-            {entityType}
-        </span>
-    );
-}
-
-function Link({ onClick, children }) {
+export function Link({onClick, children}) {
     return (
         <button
             onClick={onClick}
-            className="text-left underline underline-offset-2 hover:opacity-70 transition-opacity"
+            className="cursor-pointer text-left underline underline-offset-2 hover:opacity-70 transition-opacity"
         >
             {children}
         </button>
