@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { MAP_ET2LAYER } from "./layers.js";
 
 /**
  * @typedef {Object} Hit
@@ -33,7 +32,7 @@ function HitContent({ hit }) {
 
 const DISPLAY_MAX = 3;
 
-export default function Search({ mapRef, setSelection, results, setResults }) {
+export default function Search({ mapRef, selectEntity, results, setResults }) {
     const [query, setQuery] = useState("");
     const [activeIdx, setActiveIdx] = useState(null);
     const [windowStart, setWindowStart] = useState(0);
@@ -59,9 +58,8 @@ export default function Search({ mapRef, setSelection, results, setResults }) {
     /** @param {Hit} hit */
     const fly = (hit) => {
         const map = mapRef.current;
-        const layer = MAP_ET2LAYER[hit.entity_type];
         map.flyTo({ center: [hit.lon, hit.lat], zoom: 11, essential: true });
-        map.once("moveend", () => setSelection(layer.info(hit)));
+        map.once("moveend", () => selectEntity(hit.entity_type, hit.rowid));
         setQuery("");
         setResults([]);
     };

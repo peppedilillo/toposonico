@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -51,10 +51,23 @@ const STARTZOOM = 4;
 export default function App() {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
-    const [selection, setSelection] = useState(null); // {entityType, line1, line2}
+    const [selection, setSelection] = useState(null);
     const [results, setResults] = useState([]);
     const [zoom, setZoom] = useState(STARTZOOM);
     const [cursor, setCursor] = useState({x: 0, y: 0});
+
+    const selectEntity = useCallback((entityType, rowid) => {
+        setSelection({ loading: true, entityType });
+        fetch(`/api/info?q=${rowid}&entity=${entityType}`)
+            .then(r => r.json())
+            .then(data => setSelection({ entityType, ...data }))
+            .catch(() => setSelection({ entityType, error: true }));
+    }, []);
+
+    const navigate = useCallback((entityType, rowid, lon, lat) => {
+        mapRef.current.flyTo({ center: [lon, lat], zoom: 11, essential: true });
+        mapRef.current.once("moveend", () => selectEntity(entityType, rowid));
+    }, [selectEntity]);
 
     useEffect(() => {
         const map = new maplibregl.Map({
@@ -85,7 +98,7 @@ export default function App() {
                 paint: {"line-color": colors.border, "line-width": 1},
             });
             LAYERS.forEach(
-                ({id, sourceLayer, char, size, color, opacity, info}) => {
+                ({id, sourceLayer, char, size, color, opacity, entityType, rowidProp}) => {
                     map.addLayer({
                         id,
                         type: "symbol",
@@ -104,7 +117,10 @@ export default function App() {
                     });
                     map.on("mousemove", id, () => { map.getCanvas().style.cursor = "pointer"; });
                     map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
-                    map.on("click", id, (e) => setSelection(info(e.features[0].properties)));
+                    map.on("click", id, (e) => {
+                        const p = e.features[0].properties;
+                        selectEntity(entityType, p[rowidProp]);
+                    });
                 },
             );
             map.on("click", (e) => {
@@ -123,8 +139,8 @@ export default function App() {
     return (
         <div className="relative w-screen h-screen text-white font-normal">
             <div ref={containerRef} className="w-full h-full"/>
-            <Search mapRef={mapRef} setSelection={setSelection} results={results} setResults={setResults}/>
-            <Panel selection={selection} onClose={() => setSelection(null)}/>
+            <Search mapRef={mapRef} selectEntity={selectEntity} results={results} setResults={setResults}/>
+            <Panel selection={selection} navigate={navigate} onClose={() => setSelection(null)}/>
             <div className="absolute top-3 right-3 text-muted text-xs font-sans pointer-events-none">
                 z {zoom.toFixed(2)} x {cursor.x.toFixed(4)} y{" "}
                 {cursor.y.toFixed(4)}

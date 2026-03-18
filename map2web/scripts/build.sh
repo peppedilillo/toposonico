@@ -27,10 +27,7 @@ if [[ -z "${M2W_ROOT:-}" ]]; then
 fi
 
 required_vars=(
-    M2W_TRACK_GEO   M2W_TRACK_LOOKUP
-    M2W_ALBUM_GEO   M2W_ALBUM_LOOKUP
-    M2W_ARTIST_GEO  M2W_ARTIST_LOOKUP
-    M2W_LABEL_GEO   M2W_LABEL_LOOKUP
+    T2M_DB
     M2W_GEOJSON_DIR
 )
 missing=()
@@ -94,6 +91,8 @@ if [[ $RUN_TIPPECANOE -eq 1 ]]; then
         -z11 -Z2 -pS -rg -g 1 -d 8 \
         --drop-densest-as-needed \
         --order-descending-by=logcounts \
+        --exclude=logcounts \
+        --exclude=track_count \
         --read-parallel --force \
         --named-layer=tracks:"$M2W_GEOJSON_DIR/track.ndjson" \
         --named-layer=albums:"$M2W_GEOJSON_DIR/album.ndjson" \

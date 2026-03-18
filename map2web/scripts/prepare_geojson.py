@@ -1,11 +1,9 @@
-"""Join a geo-parquet + lookup and write ndjson for tippecanoe.
+"""Query the track2map SQLite DB and write lean ndjson for tippecanoe.
 
-Each entity type (track, album, artist, label) has its own join key and property
-set. The geo-parquet is produced by normalize_coords.py; the lookup parquet comes
-from track2map/outs/.
-
-Input paths are resolved from CLI flags or M2W_* env vars (set via config.env).
-Output path defaults to $M2W_GEOJSON_DIR/{entity}.ndjson.
+Each entity type (track, album, artist, label) is written to its own ndjson file.
+Features carry only the entity rowid and LOD signals (logcounts, track_count); names
+and metadata are served at query time by the backend. The tippecanoe build step uses
+--exclude to strip logcounts and track_count from tile features, leaving only the rowid.
 
 Usage:
     source config.env && python scripts/prepare_geojson.py <entity> [options]
@@ -14,17 +12,13 @@ Usage:
 
 Examples:
     source config.env && python scripts/prepare_geojson.py track
-    source config.env && python scripts/prepare_geojson.py album
-
-    python scripts/prepare_geojson.py track \\
-        --geo /path/to/track_geo.parquet \\
-        --lookup /path/to/track_lookup.parquet \\
-        --output /path/to/track.ndjson
+    source config.env && python scripts/prepare_geojson.py label --output /tmp/label.ndjson
 """
 
 import argparse
 import json
 import os
+import sqlite3
 import sys
 import time
 from pathlib import Path
@@ -37,44 +31,36 @@ LOG_EVERY_DEFAULT = 500_000
 ENTITY_CONFIGS = {
     "track": {
         "key": "track_rowid",
-        "lookup_cols": ["track_rowid", "track_name", "artist_name", "logcounts"],
-        "name_cols": ["track_name", "artist_name"],
+        "sql": "SELECT track_rowid, lon, lat, logcounts FROM tracks",
     },
     "album": {
         "key": "album_rowid",
-        "lookup_cols": ["album_rowid", "album_name", "artist_name", "track_count", "logcounts"],
-        "name_cols": ["album_name"],
+        "sql": "SELECT album_rowid, lon, lat, logcounts, track_count FROM albums",
     },
     "artist": {
         "key": "artist_rowid",
-        "lookup_cols": ["artist_rowid", "artist_name", "track_count", "logcounts"],
-        "name_cols": ["artist_name"],
+        "sql": "SELECT artist_rowid, lon, lat, logcounts, track_count FROM artists",
     },
     "label": {
-        "key": "label",
-        "lookup_cols": ["label", "label_rowid", "track_count", "logcounts"],
-        "name_cols": ["label"],
+        "key": "label_rowid",
+        "sql": "SELECT label_id AS label_rowid, lon, lat, logcounts, track_count FROM labels",
     },
 }
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Write ndjson for tippecanoe from a geo-parquet + lookup",
+        description="Write ndjson for tippecanoe from the track2map SQLite DB",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("entity", choices=list(ENTITY_CONFIGS), help="Entity type")
     parser.add_argument(
-        "--geo", type=Path, default=None,
-        help="Path to geo-parquet. Defaults to M2W_{ENTITY}_GEO env var.",
-    )
-    parser.add_argument(
-        "--lookup", type=Path, default=None,
-        help="Path to lookup parquet. Defaults to M2W_{ENTITY}_LOOKUP env var.",
+        "--db", type=Path, default=None,
+        help="Path to track2map.db. Defaults to $T2M_DB.",
     )
     parser.add_argument(
         "--output", type=Path, default=None,
-        help="Output ndjson path. Defaults to M2W_GEOJSON_DIR/{entity}.ndjson.",
+        help="Output ndjson path. Defaults to $M2W_GEOJSON_DIR/{entity}.ndjson.",
     )
     parser.add_argument(
         "--log-every",
@@ -85,134 +71,56 @@ def main():
     )
     args = parser.parse_args()
 
-    entity_upper = args.entity.upper()
-
-    if args.geo is None:
-        val = os.environ.get(f"M2W_{entity_upper}_GEO")
+    if args.db is None:
+        val = os.environ.get("T2M_DB")
         if val is None:
-            raise ValueError(
-                f"No `M2W_{entity_upper}_GEO` environment variable set. "
-                f"Either run with --geo or define the environment variable."
-            )
-        args.geo = Path(val)
+            print("Error: T2M_DB is not set. Pass --db or source config.env.")
+            sys.exit(1)
+        args.db = Path(val)
 
-    if args.lookup is None:
-        val = os.environ.get(f"M2W_{entity_upper}_LOOKUP")
-        if val is None:
-            raise ValueError(
-                f"No `M2W_{entity_upper}_LOOKUP` environment variable set. "
-                f"Either run with --lookup or define the environment variable."
-            )
-        args.lookup = Path(val)
+    if not args.db.exists():
+        print(f"Error: DB not found: {args.db}")
+        sys.exit(1)
 
     if args.output is None:
         geojson_dir = os.environ.get("M2W_GEOJSON_DIR")
         if geojson_dir is None:
-            raise ValueError(
-                "No `M2W_GEOJSON_DIR` environment variable set. "
-                "Either run with --output or define the environment variable."
-            )
-        args.output = Path(geojson_dir) / f"{args.entity}.ndjson"
-
-    for path, label in [(args.geo, "geo"), (args.lookup, "lookup")]:
-        if not path.exists():
-            print(f"Error: {label} parquet not found: {path}")
+            print("Error: M2W_GEOJSON_DIR is not set. Pass --output or source config.env.")
             sys.exit(1)
+        args.output = Path(geojson_dir) / f"{args.entity}.ndjson"
 
     cfg = ENTITY_CONFIGS[args.entity]
     key = cfg["key"]
 
-    print(f"Entity  : {args.entity}")
-    print(f"Geo     : {args.geo}")
-    print(f"Lookup  : {args.lookup}")
-    print(f"Output  : {args.output}")
+    print(f"Entity : {args.entity}")
+    print(f"DB     : {args.db}")
+    print(f"Output : {args.output}")
     print()
 
-    t0 = time.time()
+    t0   = time.time()
+    conn = sqlite3.connect(f"file:{args.db}?mode=ro", uri=True)
 
-    print("Loading geo …")
-    geo = pd.read_parquet(args.geo, columns=[key, "lon", "lat"])
-    print(f"  {len(geo):,} rows")
+    print("Querying DB …")
+    df = pd.read_sql_query(cfg["sql"], conn)
+    conn.close()
+    print(f"  {len(df):,} rows")
 
-    print("Loading lookup …")
-    lookup = pd.read_parquet(args.lookup, columns=cfg["lookup_cols"])
-    print(f"  {len(lookup):,} rows")
-
-    print("Joining …")
-    df = geo.merge(lookup, on=key, how="inner")
-    print(f"  {len(df):,} rows after join")
-
-    before = len(df)
-    df = df.dropna(subset=cfg["name_cols"])
-    df = df[~df[cfg["name_cols"]].apply(lambda col: col.str.strip() == "").any(axis=1)]
-    dropped = before - len(df)
-    print(f"  {dropped:,} dropped (null/empty name)  →  {len(df):,} remaining")
-
-    lons = df["lon"].values
-    lats = df["lat"].values
-    keys = df[key].values
-
-    artists: np.ndarray = np.empty(0)
-    counts: np.ndarray = np.empty(0)
-    if args.entity == "track":
-        names = df["track_name"].astype(str).values
-        artists = df["artist_name"].astype(str).values
-        pops = df["logcounts"].fillna(0).astype(np.float32).values
-    elif args.entity == "album":
-        names = df["album_name"].astype(str).values
-        artists = df["artist_name"].astype(str).values
-        counts = df["track_count"].fillna(0).astype(np.int32).values
-        pops = df["logcounts"].fillna(0).astype(np.float32).values
-    elif args.entity == "artist":
-        names = df["artist_name"].astype(str).values
-        counts = df["track_count"].fillna(0).astype(np.int32).values
-        pops = df["logcounts"].fillna(0).astype(np.float32).values
-    else:  # label
-        names = df["label"].astype(str).values
-        rowids = df["label_rowid"].values
-        counts = df["track_count"].fillna(0).astype(np.int32).values
-        pops = df["logcounts"].fillna(0).astype(np.float32).values
+    lons   = df["lon"].values
+    lats   = df["lat"].values
+    keys   = df[key].values
+    pops   = df["logcounts"].fillna(0).astype(np.float32).values
+    counts = df["track_count"].values if "track_count" in df.columns else None
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Writing ndjson …")
-    n = len(df)
+    print("Writing ndjson …")
+    n  = len(df)
     t1 = time.time()
 
     with open(args.output, "w", encoding="utf-8") as out:
         for i in range(n):
-            if args.entity == "track":
-                props = {
-                    "track_rowid": int(keys[i]),
-                    "track_name": names[i],
-                    "artist_name": artists[i],
-                    "logcounts": round(float(pops[i]), 2),
-                }
-            elif args.entity == "album":
-                props = {
-                    "album_rowid": int(keys[i]),
-                    "album_name": names[i],
-                    "artist_name": artists[i],
-                    # for extra entitites we keep the track counts.
-                    # this is because logcounts is here a mean and not doing so
-                    # would result in losing the "size" of entity
-                    "track_count": int(counts[i]),
-                    "logcounts": round(float(pops[i]), 2),
-                }
-            elif args.entity == "artist":
-                props = {
-                    "artist_rowid": int(keys[i]),
-                    "artist_name": names[i],
-                    "track_count": int(counts[i]),
-                    "logcounts": round(float(pops[i]), 2),
-                }
-            else:  # label
-                props = {
-                    "label_rowid": int(rowids[i]),
-                    "label": names[i],
-                    "track_count": int(counts[i]),
-                    "logcounts": round(float(pops[i]), 2),
-                }
-
+            props = {key: int(keys[i]), "logcounts": round(float(pops[i]), 2)}
+            if counts is not None:
+                props["track_count"] = int(counts[i])
             feature = {
                 "type": "Feature",
                 "geometry": {"type": "Point", "coordinates": [float(lons[i]), float(lats[i])]},
@@ -223,11 +131,10 @@ def main():
 
             if i > 0 and i % args.log_every == 0:
                 elapsed = time.time() - t1
-                rate = i / elapsed
-                print(f"  {i:>9,} / {n:,}  ({rate:,.0f} features/s)", end="\r")
+                print(f"  {i:>9,} / {n:,}  ({i / elapsed:,.0f} features/s)", end="\r")
 
     elapsed = time.time() - t0
-    rate = n / (time.time() - t1)
+    rate    = n / max(time.time() - t1, 1e-6)
     print(f"  {n:>9,} / {n:,}  ({rate:,.0f} features/s)     ")
     print()
     print(f"Done in {elapsed:.1f}s  —  {n:,} features written to {args.output}")

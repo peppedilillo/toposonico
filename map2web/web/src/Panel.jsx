@@ -1,5 +1,118 @@
-export default function Panel({ selection, onClose }) {
+import colors from "./theme.js";
+
+const ET_COLOR = {
+    track:  colors.track,
+    artist: colors.artist,
+    album:  colors.album,
+    label:  colors.label,
+};
+
+function Badge({ entityType }) {
+    return (
+        <span
+            className="uppercase tracking-wider text-[10px] px-1.5 py-0.5 rounded font-semibold"
+            style={{ color: ET_COLOR[entityType] ?? colors.muted, background: "rgba(255,255,255,0.07)" }}
+        >
+            {entityType}
+        </span>
+    );
+}
+
+function Link({ onClick, children }) {
+    return (
+        <button
+            onClick={onClick}
+            className="text-left underline underline-offset-2 hover:opacity-70 transition-opacity"
+        >
+            {children}
+        </button>
+    );
+}
+
+function TrackPanel({ s, navigate }) {
+    return <>
+        <div className="text-lg font-semibold leading-snug">{s.track_name}</div>
+        <div className="italic font-medium leading-tight text-sm mt-0.5">
+            {s.artist_lon != null
+                ? <Link onClick={() => navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)}>{s.artist_name}</Link>
+                : s.artist_name}
+        </div>
+        {s.album_name && (
+            <div className="text-sm mt-1">
+                {s.album_lon != null
+                    ? <Link onClick={() => navigate("album", s.album_rowid, s.album_lon, s.album_lat)}>{s.album_name}</Link>
+                    : s.album_name}
+            </div>
+        )}
+        {s.label && (
+            <div className="text-xs text-muted mt-0.5">
+                {s.label_lon != null
+                    ? <Link onClick={() => navigate("label", s.label_id, s.label_lon, s.label_lat)}>{s.label}</Link>
+                    : s.label}
+            </div>
+        )}
+        <div className="flex items-center gap-2 mt-2 text-xs text-muted">
+            {s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
+            {s.track_popularity != null && (
+                <span className="bg-muted/10 px-1.5 py-0.5 rounded">pop {s.track_popularity}</span>
+            )}
+        </div>
+    </>;
+}
+
+function AlbumPanel({ s, navigate }) {
+    return <>
+        <div className="text-lg font-semibold leading-snug">{s.album_name}</div>
+        {s.artist_name && (
+            <div className="italic font-medium leading-tight text-sm mt-0.5">
+                {s.artist_lon != null
+                    ? <Link onClick={() => navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)}>{s.artist_name}</Link>
+                    : s.artist_name}
+            </div>
+        )}
+        {s.track_count != null && (
+            <div className="text-xs text-muted mt-2">{s.track_count} tracks</div>
+        )}
+    </>;
+}
+
+function ArtistPanel({ s }) {
+    return <>
+        <div className="text-lg font-semibold leading-snug">{s.artist_name}</div>
+        {s.track_count != null && (
+            <div className="text-xs text-muted mt-2">{s.track_count} tracks</div>
+        )}
+    </>;
+}
+
+function LabelPanel({ s }) {
+    return <>
+        <div className="text-lg font-semibold leading-snug">{s.label}</div>
+        {s.track_count != null && (
+            <div className="text-xs text-muted mt-2">{s.track_count} tracks</div>
+        )}
+    </>;
+}
+
+export default function Panel({ selection, navigate, onClose }) {
     if (!selection) return null;
+
+    const { entityType } = selection;
+
+    let body;
+    if (selection.loading) {
+        body = <div className="text-muted text-sm animate-pulse">Loading…</div>;
+    } else if (selection.error) {
+        body = <div className="text-muted text-sm">Failed to load.</div>;
+    } else if (entityType === "track") {
+        body = <TrackPanel s={selection} navigate={navigate} />;
+    } else if (entityType === "album") {
+        body = <AlbumPanel s={selection} navigate={navigate} />;
+    } else if (entityType === "artist") {
+        body = <ArtistPanel s={selection} />;
+    } else if (entityType === "label") {
+        body = <LabelPanel s={selection} />;
+    }
 
     return (
         <div
@@ -10,19 +123,21 @@ export default function Panel({ selection, onClose }) {
                        bg-surface font-sans text-base p-5
                        rounded-t-2xl sm:rounded-xl shadow-xl
                        touch-none sm:touch-auto"
-            style={{
-                paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))'
-            }}
+            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
             onPointerDown={e => e.stopPropagation()}
             onPointerMove={e => e.stopPropagation()}
         >
-            <div className="text-lg font-semibold">{selection.line1}</div>
-            {selection.line2 && <div className="italic font-medium leading-tight pr-5">{selection.line2}</div>}
-            <div className="text-muted text-sm mt-2">
-                <span className="uppercase tracking-wider text-[10px] bg-muted/10 px-1.5 py-0.5 rounded">
-                    {selection.entityType}
-                </span>
+            <div className="flex items-start justify-between gap-2 mb-2">
+                <Badge entityType={entityType} />
+                <button
+                    onClick={onClose}
+                    className="text-muted hover:text-white transition-colors text-lg leading-none"
+                    aria-label="Close"
+                >
+                    ×
+                </button>
             </div>
+            {body}
         </div>
     );
 }
