@@ -43,8 +43,10 @@ source config.env
 | `T2M_LOOKUP_DIR` | Output dir for artist/album/label lookup parquets |
 | `T2M_MODEL_DIR` | Output dir for model checkpoints |
 | `T2M_EMBEDDING_DIR` | Output dir for exported embedding parquets |
+| `T2M_EMBEDDING` | Path to specific embedding parquet (used by `build_knn.py`) |
 | `T2M_UMAP_DIR` | Output dir for UMAP projection parquets |
 | `T2M_GEO_DIR` | Output dir for geo-normalized coordinate parquets |
+| `T2M_KNN_DIR` | Output dir for KNN parquets |
 
 ## Pipeline
 
@@ -96,6 +98,21 @@ python scripts/build_geomap.py \
 Always pass all 4 entity types together — running a subset shifts the bounding box and
 breaks spatial alignment across entity types.
 
+### Phase 5 — KNN precomputation (CPU, FAISS)
+
+```sh
+python scripts/build_knn.py
+```
+
+Computes cosine KNN for all entity types (track, album, artist, label) using FAISS on CPU.
+Uses IVFFlat for large entities (>500K) and brute-force FlatIP for smaller ones.
+
+Override per-entity K: `--k-tracks 100 --k-albums 50 --k-artists 20 --k-labels 10`
+
+Run a subset: `--entities artist label`
+
+Labels are keyed by name (string), not rowid. All other entities use int64 rowids.
+
 ## Outputs reference
 
 | Artifact | Path | Key columns |
@@ -110,3 +127,6 @@ breaks spatial alignment across entity types.
 | Embeddings | `$T2M_EMBEDDING_DIR/embedding_track_<run>.parquet` | `track_rowid`, `e0`…`e127` |
 | UMAP projection | `$T2M_UMAP_DIR/umap_{entity}_2d_<run>_nn<N>_md<M>_<metric>.parquet` | entity key, `umap_x`, `umap_y` |
 | Geo coords | `$T2M_GEO_DIR/{entity}_geo.parquet` | entity key, `lon`, `lat` |
+| KNN neighbors | `$T2M_KNN_DIR/{entity}_knn.parquet` | entity key, `n0`…`nK` |
+| KNN scores | `$T2M_KNN_DIR/{entity}_knn_scores.parquet` | entity key, `s0`…`sK` |
+| KNN artists | `$T2M_KNN_DIR/{entity}_knn_artists.parquet` | entity key, `a0`…`aK` (track/album only) |

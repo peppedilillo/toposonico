@@ -7,7 +7,7 @@ import pandas as pd
 def artist_embeddings(
     emb_df: pd.DataFrame,
     lookup_df: pd.DataFrame,
-    min_tracks: int = 1,
+    min_tracks: int = 10,
 ) -> pd.DataFrame:
     """Mean-pool track embeddings to artist level.
 
@@ -35,7 +35,7 @@ def artist_embeddings(
 def album_embeddings(
     emb_df: pd.DataFrame,
     lookup_df: pd.DataFrame,
-    min_tracks: int = 1,
+    min_tracks: int = 5,
 ) -> pd.DataFrame:
     """Mean-pool track embeddings to album level.
 
@@ -63,7 +63,7 @@ def album_embeddings(
 def label_embeddings(
     emb_df: pd.DataFrame,
     lookup_df: pd.DataFrame,
-    min_tracks: int = 1,
+    min_tracks: int = 100,
 ) -> pd.DataFrame:
     """Mean-pool track embeddings to label level.
 
