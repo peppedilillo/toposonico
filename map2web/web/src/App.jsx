@@ -48,6 +48,8 @@ for (let lat = -90; lat <= 90; lat += 5) {
 
 const STARTZOOM = 4;
 
+const ENTITY_ZOOM = { track: 9, album: 8, artist: 7, label: 5 };
+
 /** Reads map state from the URL hash. Missing keys fall back to defaults. */
 function parseHash() {
     const p = new URLSearchParams(window.location.hash.slice(1));
@@ -89,13 +91,9 @@ export default function App() {
     }, []);
 
     const navigate = useCallback(
-        (entityType, rowid, lon, lat) => {
+        (entityType, rowid, lon, lat, zoom = ENTITY_ZOOM[entityType]) => {
             selectEntity(entityType, rowid);
-            mapRef.current.flyTo({
-                center: [lon, lat],
-                zoom: 9,
-                essential: true,
-            });
+            mapRef.current.flyTo({ center: [lon, lat], zoom, essential: true });
         },
         [selectEntity],
     );
@@ -113,6 +111,7 @@ export default function App() {
                 [60, 60],
             ],
             attributionControl: false,
+            scrollZoom: { around: "center" },
         });
         mapRef.current = map;
 

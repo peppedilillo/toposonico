@@ -6,7 +6,7 @@ export function Link({ onClick, children, color }) {
     const [hovered, setHovered] = useState(false);
     return (
         <button
-            onClick={onClick}
+            onClick={(e) => { e.stopPropagation(); onClick(); }}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             style={hovered && color ? { color } : undefined}
@@ -52,7 +52,10 @@ function RecItem({ rec, entityType, navigate }) {
     return (
         <li className="hover:bg-overlay -mx-5 px-5 pt-2">
             <button
-                onClick={() => navigate(entityType, getRowid(entityType, rec), rec.lon, rec.lat)}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(entityType, getRowid(entityType, rec), rec.lon, rec.lat);
+                }}
                 className="text-left w-full cursor-pointer"
             >
                 <div className="text-sm font-medium truncate">{LINE1[entityType](rec)}</div>
@@ -236,10 +239,9 @@ export default function Panel({ selection, navigate, onClose }) {
                        overflow-y-auto overscroll-contain
                        bg-surface font-sans text-base p-5
                        rounded-t-2xl sm:rounded-xl shadow-xl
-                       touch-none sm:touch-auto"
+                       touch-none sm:touch-auto cursor-pointer"
             style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
-            onPointerDown={e => e.stopPropagation()}
-            onPointerMove={e => e.stopPropagation()}
+            onClick={hasData ? handleToggleRecs : undefined}
         >
             <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
@@ -250,13 +252,13 @@ export default function Panel({ selection, navigate, onClose }) {
                 </div>
                 <div className="flex flex-col items-end gap-2 flex-shrink-0">
                     <button
-                        onClick={onClose}
+                        onClick={(e) => { e.stopPropagation(); onClose(); }}
                         className="text-muted hover:text-white transition-colors text-lg leading-none"
                         aria-label="Close"
                     >×</button>
                     {hasData && (
                         <button
-                            onClick={handleRecroll}
+                            onClick={(e) => { e.stopPropagation(); handleRecroll(); }}
                             disabled={rolling}
                             style={{ backgroundColor: rolling ? undefined : "#3bda28", color: "#000" }}
                             className="font-bold text-base px-4 py-3 rounded-xl
@@ -272,12 +274,9 @@ export default function Panel({ selection, navigate, onClose }) {
             </div>
             {hasData && (
                 <div className="mt-3 border-t border-muted/20 pt-2">
-                    <button
-                        onClick={handleToggleRecs}
-                        className="text-muted text-xs flex items-center gap-1 hover:text-white transition-colors"
-                    >
-                        Similiar {recsOpen ? "▲" : "▼"}
-                    </button>
+                    <div className="text-muted text-xs flex items-center gap-1">
+                        Similar {recsOpen ? "▲" : "▼"}
+                    </div>
                     {recsOpen && (
                         <RecsList recs={recs} entityType={entityType} navigate={navigate} />
                     )}
