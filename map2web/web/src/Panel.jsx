@@ -28,6 +28,7 @@ function LoadingBody() {
     );
 }
 
+// labels use string `label_id` as PK; all other entities use integer `<entity>_rowid`
 const ROWID_KEY = {
     track: "track_rowid", album: "album_rowid",
     artist: "artist_rowid", label: "label_id",

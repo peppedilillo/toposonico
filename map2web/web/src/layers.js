@@ -1,5 +1,16 @@
 import colors from "./theme.js";
 
+/**
+ * @typedef {Object} LayerDef
+ * @property {string} id            MapLibre layer id
+ * @property {string} sourceLayer   vector tile source-layer name
+ * @property {string} entityType    'track' | 'album' | 'artist' | 'label'
+ * @property {string} rowidProp     tile feature property that holds the entity rowid
+ * @property {string} char          symbol character rendered on the map
+ * @property {number} size          text-size in pixels
+ * @property {string} color         CSS color string
+ * @property {number} opacity       text-opacity [0, 1]
+ */
 const LAYERS = [
     {
         id: "tracks",
@@ -12,16 +23,6 @@ const LAYERS = [
         opacity: 0.7,
     },
     {
-        id: "artists",
-        sourceLayer: "artists",
-        entityType: "artist",
-        rowidProp: "artist_rowid",
-        char: "*",
-        size: 12,
-        color: colors.artist,
-        opacity: 0.7,
-    },
-    {
         id: "albums",
         sourceLayer: "albums",
         entityType: "album",
@@ -29,6 +30,16 @@ const LAYERS = [
         char: "o",
         size: 12,
         color: colors.album,
+        opacity: 0.7,
+    },
+    {
+        id: "artists",
+        sourceLayer: "artists",
+        entityType: "artist",
+        rowidProp: "artist_rowid",
+        char: "*",
+        size: 12,
+        color: colors.artist,
         opacity: 0.7,
     },
     {
@@ -43,11 +54,6 @@ const LAYERS = [
     },
 ];
 
-const MAP_ET2LAYER = {
-    track: LAYERS[0],
-    artist: LAYERS[1],
-    album: LAYERS[2],
-    label: LAYERS[3],
-};
+const MAP_ET2LAYER = Object.fromEntries(LAYERS.map((l) => [l.entityType, l]));
 
 export { LAYERS, MAP_ET2LAYER };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {Badge} from "./Badge.jsx";
 
 /**
@@ -37,18 +37,17 @@ function HitContent({ hit }) {
     );
 }
 
-const DISPLAY_MAX = 3;
-
 export default function Search({ navigate, results, setResults }) {
     const [query, setQuery] = useState("");
     const [activeIdx, setActiveIdx] = useState(null);
-    const [windowStart, setWindowStart] = useState(0);
     const [open, setOpen] = useState(false);
+    const activeItemRef = useRef(null);
 
-    const resetNav = () => {
-        setActiveIdx(null);
-        setWindowStart(0);
-    };
+    const resetNav = () => setActiveIdx(null);
+
+    useEffect(() => {
+        activeItemRef.current?.scrollIntoView({ block: "nearest" });
+    }, [activeIdx]);
 
     useEffect(() => {
         if (!query.trim()) {
@@ -82,25 +81,14 @@ export default function Search({ navigate, results, setResults }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onFocus={() => setOpen(true)}
-                onBlur={() => setTimeout(() => setOpen(false), 150)}
+                onBlur={() => setTimeout(() => setOpen(false), 150)}  // lets result clicks fire before closing
                 placeholder="search…"
                 className="flex-1 bg-transparent text-white placeholder:text-muted p-2 pl-5 outline-none"
                 onKeyDown={(e) => {
                     if (e.key === "ArrowDown") {
-                        const next =
-                            activeIdx === null
-                                ? 0
-                                : Math.min(activeIdx + 1, results.length - 1);
-                        setActiveIdx(next);
-                        if (next >= windowStart + DISPLAY_MAX)
-                            setWindowStart(next - (DISPLAY_MAX - 1));
+                        setActiveIdx(activeIdx === null ? 0 : Math.min(activeIdx + 1, results.length - 1));
                     } else if (e.key === "ArrowUp") {
-                        const prev =
-                            activeIdx === null
-                                ? results.length - 1
-                                : Math.max(activeIdx - 1, 0);
-                        setActiveIdx(prev);
-                        if (prev < windowStart) setWindowStart(prev);
+                        setActiveIdx(activeIdx === null ? results.length - 1 : Math.max(activeIdx - 1, 0));
                     } else if (e.key === "Enter" && activeIdx !== null) {
                         navigate(results[activeIdx].entity_type, results[activeIdx].rowid, results[activeIdx].lon, results[activeIdx].lat);
                         setOpen(false);
@@ -122,26 +110,19 @@ export default function Search({ navigate, results, setResults }) {
             )}
             </div>
             {results.length > 0 && open && (
-                <ul className="bg-surface mt-1 py-4 list-none rounded-xl">
-                    {results
-                        .slice(windowStart, windowStart + DISPLAY_MAX)
-                        .map((hit, i) => (
-                            <li
-                                key={hit.id}
-                                onClick={() => { navigate(hit.entity_type, hit.rowid, hit.lon, hit.lat); setOpen(false); }}
-                                className={
-                                    windowStart + i === activeIdx
-                                        ? "cursor-pointer px-5 py-2 bg-overlay"
-                                        : "cursor-pointer px-5 py-2"
-                                }
-                                onMouseEnter={() =>
-                                    setActiveIdx(windowStart + i)
-                                }
-                                onMouseLeave={() => setActiveIdx(null)}
-                            >
-                                <HitContent hit={hit} />
-                            </li>
-                        ))}
+                <ul className="bg-surface mt-1 py-4 list-none rounded-xl max-h-[40dvh] overflow-y-auto overscroll-contain">
+                    {results.map((hit, i) => (
+                        <li
+                            key={hit.id}
+                            ref={i === activeIdx ? activeItemRef : null}
+                            onClick={() => { navigate(hit.entity_type, hit.rowid, hit.lon, hit.lat); setOpen(false); }}
+                            className={i === activeIdx ? "cursor-pointer px-5 py-2 bg-overlay" : "cursor-pointer px-5 py-2"}
+                            onMouseEnter={() => setActiveIdx(i)}
+                            onMouseLeave={() => setActiveIdx(null)}
+                        >
+                            <HitContent hit={hit} />
+                        </li>
+                    ))}
                 </ul>
             )}
         </div>

@@ -48,6 +48,29 @@ for (let lat = -90; lat <= 90; lat += 5) {
 
 const STARTZOOM = 4;
 
+/** Reads map state from the URL hash. Missing keys fall back to defaults. */
+function parseHash() {
+    const p = new URLSearchParams(window.location.hash.slice(1));
+    return {
+        z:      parseFloat(p.get("z"))   || STARTZOOM,
+        lon:    parseFloat(p.get("lon")) || 0,
+        lat:    parseFloat(p.get("lat")) || 0,
+        entity: p.get("entity"),
+        rowid:  p.get("rowid"),
+    };
+}
+
+/**
+ * Merges `updates` into the current URL hash using replaceState (no history entry).
+ * Pass `null` for a value to remove that key.
+ */
+function updateHash(updates) {
+    const p = new URLSearchParams(window.location.hash.slice(1));
+    for (const [k, v] of Object.entries(updates))
+        v == null ? p.delete(k) : p.set(k, String(v));
+    history.replaceState(null, "", "#" + p.toString());
+}
+
 export default function App() {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
@@ -57,6 +80,7 @@ export default function App() {
     const [cursor, setCursor] = useState({ x: 0, y: 0 });
 
     const selectEntity = useCallback((entityType, rowid) => {
+        updateHash({ entity: entityType, rowid });
         setSelection({ loading: true, entityType });
         fetch(`/api/info?q=${rowid}&entity=${entityType}`)
             .then((r) => r.json())
@@ -77,11 +101,12 @@ export default function App() {
     );
 
     useEffect(() => {
+        const { z, lon, lat } = parseHash();
         const map = new maplibregl.Map({
             container: containerRef.current,
             style: STYLE,
-            center: [0, 0],
-            zoom: STARTZOOM,
+            center: [lon, lat],
+            zoom: z,
             minZoom: 3,
             maxBounds: [
                 [-60, -60],
@@ -149,10 +174,18 @@ export default function App() {
                 const hit = map.queryRenderedFeatures(e.point, { layers: LAYERS.map(l => l.id) });
                 if (!hit.length) {
                     setSelection(null);
+                    updateHash({ entity: null, rowid: null });
                 }
             });
+
+            const { entity, rowid } = parseHash();
+            if (entity && rowid) selectEntity(entity, rowid);
         });
 
+        map.on("moveend", () => {
+            const c = map.getCenter();
+            updateHash({ z: map.getZoom().toFixed(2), lon: c.lng.toFixed(4), lat: c.lat.toFixed(4) });
+        });
         map.on("zoom", () => setZoom(map.getZoom()));
         map.on("mousemove", (e) =>
             setCursor({ x: e.lngLat.lng, y: e.lngLat.lat }),
@@ -171,7 +204,7 @@ export default function App() {
             <Panel
                 selection={selection}
                 navigate={navigate}
-                onClose={() => setSelection(null)}
+                onClose={() => { setSelection(null); updateHash({ entity: null, rowid: null }); }}
             />
             <div className="absolute top-3 right-3 text-muted text-xs font-sans pointer-events-none">
                 z {zoom.toFixed(2)} x {cursor.x.toFixed(4)} y{" "}
