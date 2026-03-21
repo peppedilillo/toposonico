@@ -56,7 +56,6 @@ source config.env
 python scripts/build_track_counts.py
 python scripts/build_training_vocab.py --min-count 5
 python scripts/build_track_lookup.py
-python scripts/build_extra_lookup.py
 python scripts/build_playlist_chunks.py $T2M_ROOT/outs/chunks
 ```
 
