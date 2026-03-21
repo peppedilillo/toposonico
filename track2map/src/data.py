@@ -163,7 +163,7 @@ def make_cached_reader() -> Callable:
 def init_chunk_processor(
     vocab: pd.DataFrame,
     w: int,
-    thr_quantile: float = 0.99,
+    sub_threshold: float = 1e-5,
     reader: Callable | None = None,
 ) -> Callable:
     """Initialise a stateless chunk-processing closure.
@@ -171,7 +171,7 @@ def init_chunk_processor(
     Args:
         vocab: DataFrame with columns track_rowid, track_id, playlist_count.
         w: Context-window half-width for skip-gram pair generation.
-        thr_quantile: Subsampling threshold expressed as a frequency quantile.
+        sub_threshold: Subsampling threshold.
         reader: Callable ``(path) -> DataFrame`` used to load raw chunk data.
             Defaults to a plain ``pd.read_parquet`` call.
     """
@@ -188,7 +188,6 @@ def init_chunk_processor(
     counts = vocab["playlist_count"].values.astype(np.float64)
     freq = counts / counts.sum()
 
-    sub_threshold = float(np.quantile(freq, thr_quantile))
     keep_probs = np.minimum(1.0, np.sqrt(sub_threshold / freq)).astype(
         np.float32
     )  # indexed by track_id
