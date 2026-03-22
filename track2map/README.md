@@ -43,7 +43,8 @@ source config.env
 | `T2M_LOOKUP_DIR` | Output dir for artist/album/label lookup parquets |
 | `T2M_MODEL_DIR` | Output dir for model checkpoints |
 | `T2M_EMBEDDING_DIR` | Output dir for exported embedding parquets |
-| `T2M_EMBEDDING` | Path to specific embedding parquet (used by `build_knn.py`) |
+| `T2M_EMBEDDING` | Path to specific embedding parquet (used by `build_knn.py`, `dedup_embeddings.py`) |
+| `T2M_EMBEDDING_DEDUP` | Output path for deduplicated embedding parquet (used by `dedup_embeddings.py`) |
 | `T2M_UMAP_DIR` | Output dir for UMAP projection parquets |
 | `T2M_GEO_DIR` | Output dir for geo-normalized coordinate parquets |
 | `T2M_KNN_DIR` | Output dir for KNN parquets |
@@ -73,6 +74,22 @@ python scripts/export_embeddings.py $T2M_MODEL_DIR/<checkpoint>.pt
 ```
 
 `export_embeddings.py` derives the run name from the checkpoint filename.
+
+### Phase 2b — Embedding deduplication
+
+```sh
+python scripts/dedup_embeddings.py
+# reads  $T2M_EMBEDDING
+# writes $T2M_EMBEDDING_DEDUP
+```
+
+Deduplicates by ISRC: multiple Spotify track IDs often point to the same recording (single
+re-releases, compilations, re-uploads). For each group sharing an ISRC, only the entry with
+the highest `logcounts` (playlist appearances) is kept — it has the most reliable embedding.
+Tracks with no ISRC are left untouched. Reduces vocab by ~23% on a typical run (~11M → ~8.6M).
+
+Set `T2M_EMBEDDING` to the raw export and `T2M_EMBEDDING_DEDUP` to the desired output path,
+then point downstream steps (`umap.ipynb`, `build_knn.py`) at `T2M_EMBEDDING_DEDUP`.
 
 ### Phase 3 — UMAP projection (GPU, cuML)
 
@@ -123,7 +140,8 @@ Labels are keyed by name (string), not rowid. All other entities use int64 rowid
 | Artist lookup | `$T2M_LOOKUP_DIR/artist_lookup.parquet` | `artist_rowid`, `artist_name`, `track_count`, `mean_popularity` |
 | Album lookup | `$T2M_LOOKUP_DIR/album_lookup.parquet` | `album_rowid`, `album_name`, `track_count`, `mean_popularity` |
 | Label lookup | `$T2M_LOOKUP_DIR/label_lookup.parquet` | `label`, `track_count`, `mean_popularity` |
-| Embeddings | `$T2M_EMBEDDING_DIR/embedding_track_<run>.parquet` | `track_rowid`, `e0`…`e127` |
+| Embeddings (raw) | `$T2M_EMBEDDING_DIR/embedding_track_<run>.parquet` | `track_rowid`, `e0`…`e127` |
+| Embeddings (dedup) | `$T2M_EMBEDDING_DEDUP` | `track_rowid`, `e0`…`e127` (ISRC-deduplicated) |
 | UMAP projection | `$T2M_UMAP_DIR/umap_{entity}_2d_<run>_nn<N>_md<M>_<metric>.parquet` | entity key, `umap_x`, `umap_y` |
 | Geo coords | `$T2M_GEO_DIR/{entity}_geo.parquet` | entity key, `lon`, `lat` |
 | KNN neighbors | `$T2M_KNN_DIR/{entity}_knn.parquet` | entity key, `n0`…`nK` |
