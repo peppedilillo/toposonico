@@ -8,13 +8,13 @@ untouched. Writes a new parquet with the same schema as the input.
 Runs after export_embeddings.py and before umap.ipynb / build_knn.py.
 
 Usage:
-    python scripts/dedup_embeddings.py [--embedding PATH] [--track-lookup PATH] [--output PATH]
+    python scripts/dedup_embeddings.py EMBEDDING [--track-lookup PATH] [--output PATH]
 
 Example:
     python scripts/dedup_embeddings.py \\
-        --embedding outs/embedding_track_silent_whale.parquet \\
+        outs/embedding_track_silent_whale_unfiltered.parquet \\
         --track-lookup outs/track_lookup.parquet \\
-        --output outs/embedding_track_silent_whale_dedup.parquet
+        --output outs/embedding_track_silent_whale.parquet
 """
 
 import argparse
@@ -36,9 +36,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--embedding",
-        default=os.environ.get("T2M_EMBEDDING"),
-        help="Path to input embedding parquet (track_rowid + e0…eD). $T2M_EMBEDDING",
+        "embedding",
+        help="Path to the unfiltered embedding parquet (track_rowid + e0…eD).",
     )
     parser.add_argument(
         "--track-lookup",
@@ -47,22 +46,18 @@ def main():
     )
     parser.add_argument(
         "--output",
-        default=os.environ.get("T2M_EMBEDDING_DEDUP"),
-        help="Output parquet path. $T2M_EMBEDDING_DEDUP",
+        default=os.environ.get("T2M_EMBEDDING"),
+        help="Output parquet path. $T2M_EMBEDDING",
     )
     args = parser.parse_args()
 
-    if args.embedding is None:
-        raise ValueError(
-            "No embedding path set. Use --embedding or set $T2M_EMBEDDING."
-        )
     if args.track_lookup is None:
         raise ValueError(
             "No track-lookup path set. Use --track-lookup or set $T2M_TRACK_LOOKUP."
         )
     if args.output is None:
         raise ValueError(
-            "No output path set. Use --output or set $T2M_EMBEDDING_DEDUP."
+            "No output path set. Use --output or set $T2M_EMBEDDING."
         )
 
     embedding_path = Path(args.embedding)
@@ -92,7 +87,6 @@ def main():
     # read only track_rowid column to get vocab and embed_dim without loading embeddings
     rowids_table = pf.read(columns=["track_rowid"])
     all_rowids = rowids_table.column("track_rowid").to_pylist()
-    embed_dim = pf.schema_arrow.names.count  # computed below
     embed_dim = len([n for n in pf.schema_arrow.names if n.startswith("e")])
     n_total = len(all_rowids)
     del rowids_table

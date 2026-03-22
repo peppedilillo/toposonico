@@ -41,7 +41,7 @@ def main():
     parser.add_argument(
         "--outdir",
         default=os.environ.get("T2M_EMBEDDING_DIR"),
-        help="Output directory path",
+        help="Output directory path. $T2M_EMBEDDING_DIR",
     )
     parser.add_argument(
         "--chunk-size",
@@ -62,7 +62,7 @@ def main():
         )
     outdir_path = Path(args.outdir)
     outdir_path.mkdir(parents=True, exist_ok=True)
-    out_path = outdir_path / f"embedding_track_{extract_run_name(model_path)}.parquet"
+    out_path = outdir_path / f"embedding_track_{extract_run_name(model_path)}_unfiltered.parquet"
 
     print(f"Checkpoint : {model_path}")
     print(f"Output     : {out_path}")
