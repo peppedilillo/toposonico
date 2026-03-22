@@ -47,6 +47,7 @@ source config.env
 | `T2M_UMAP_DIR` | Output dir for UMAP projection parquets |
 | `T2M_GEO_DIR` | Output dir for geo-normalized coordinate parquets |
 | `T2M_KNN_DIR` | Output dir for KNN parquets |
+| `T2M_DB` | Output path for the SQLite database (`build_db.py`) |
 
 ## Pipeline
 
@@ -69,26 +70,18 @@ python scripts/build_playlist_chunks.py $T2M_ROOT/outs/chunks
 ```sh
 # open notebooks/train.ipynb
 # checkpoint saved to $T2M_MODEL_DIR/model_<run>_t<size>_ep<N>_v<loss>.pt
-python scripts/export_embeddings.py $T2M_MODEL_DIR/<checkpoint>.pt
-```
-
-`export_embeddings.py` derives the run name from the checkpoint filename and appends
-`_unfiltered` to the output filename.
-
-### Phase 2b — Embedding deduplication
-
-```sh
-python scripts/dedup_embeddings.py $T2M_EMBEDDING_DIR/embedding_track_<run>_unfiltered.parquet
+python scripts/export_embeddings.py $T2M_MODEL_DIR/<checkpoint>.pt --output $T2M_EMBEDDING
 # --track-lookup defaults to $T2M_TRACK_LOOKUP
-# --output       defaults to $T2M_EMBEDDING
 ```
 
-Deduplicates by ISRC: multiple Spotify track IDs often point to the same recording (single
-re-releases, compilations, re-uploads). For each group sharing an ISRC, only the entry with
-the highest `logcounts` (playlist appearances) is kept — it has the most reliable embedding.
+Exports `embeddings_in.weight` from the checkpoint and deduplicates by ISRC: multiple
+Spotify track IDs often point to the same recording (re-releases, compilations, re-uploads).
+For each group sharing an ISRC, only the entry with the highest `logcounts` is kept.
 Tracks with no ISRC are left untouched. Reduces vocab by ~23% on a typical run (~11M → ~8.6M).
 
-`$T2M_EMBEDDING` (the output) is the canonical embedding used by all downstream steps.
+`$T2M_EMBEDDING` is the canonical embedding used by all downstream steps.
+
+Pass `--no-filter` to skip deduplication and write all embeddings as-is.
 
 ### Phase 3 — UMAP projection (GPU, cuML)
 
@@ -128,6 +121,26 @@ Run a subset: `--entities artist label`
 
 Labels are keyed by name (string), not rowid. All other entities use int64 rowids.
 
+### Phase 6 — Database build
+
+```sh
+python scripts/build_db.py
+```
+
+Assembles a single SQLite DB (`$T2M_DB`) from all parquet outputs:
+
+- **Entity tables** (`tracks`, `albums`, `artists`, `labels`) — denormalized with geo
+  coordinates for fast cross-entity navigation (e.g. `tracks` carries `artist_lon/lat`,
+  `album_lon/lat`, `label_lon/lat`). Indexed on rowid.
+- **KNN tables** (`track_knn`, `album_knn`, `artist_knn`, `label_knn`) — flat format
+  `(entity_rowid, rank, neighbor_rowid, score)`, self-matches excluded, capped at
+  `--knn-k` neighbours per entity (default: 20).
+
+Optional: pass `--tracks-db $T2M_TRACKS_DB` to enrich artists with popularity/genre and
+albums with album_type, total_tracks, release_date from the source Spotify metadata DB.
+
+The output DB is the sole input to the `map2web` backend.
+
 ## Outputs reference
 
 | Artifact | Path | Key columns |
@@ -139,9 +152,9 @@ Labels are keyed by name (string), not rowid. All other entities use int64 rowid
 | Artist lookup | `$T2M_LOOKUP_DIR/artist_lookup.parquet` | `artist_rowid`, `artist_name`, `track_count`, `mean_popularity` |
 | Album lookup | `$T2M_LOOKUP_DIR/album_lookup.parquet` | `album_rowid`, `album_name`, `track_count`, `mean_popularity` |
 | Label lookup | `$T2M_LOOKUP_DIR/label_lookup.parquet` | `label`, `track_count`, `mean_popularity` |
-| Embeddings (raw) | `$T2M_EMBEDDING_DIR/embedding_track_<run>_unfiltered.parquet` | `track_rowid`, `e0`…`e127` |
-| Embeddings (dedup) | `$T2M_EMBEDDING` | `track_rowid`, `e0`…`e127` (ISRC-deduplicated) |
+| Embeddings | `$T2M_EMBEDDING` | `track_rowid`, `e0`…`e127` (ISRC-deduplicated) |
 | UMAP projection | `$T2M_UMAP_DIR/umap_{entity}_2d_<run>_nn<N>_md<M>_<metric>.parquet` | entity key, `umap_x`, `umap_y` |
 | Geo coords | `$T2M_GEO_DIR/{entity}_geo.parquet` | entity key, `lon`, `lat` |
 | KNN neighbors | `$T2M_KNN_DIR/{entity}_knn.parquet` | entity key, `n0`…`nK` |
 | KNN scores | `$T2M_KNN_DIR/{entity}_knn_scores.parquet` | entity key, `s0`…`sK` |
+| SQLite DB | `$T2M_DB` | all entity + KNN tables |
