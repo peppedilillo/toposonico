@@ -490,8 +490,8 @@ def main():
     )
     parser.add_argument(
         "--db",
-        default=os.environ.get("T2M_DB", "outs/track2map.db"),
-        help="Output SQLite path. $T2M_DB (default: outs/track2map.db)",
+        default=os.environ.get("T2M_DB"),
+        help="Output SQLite path. $T2M_DB",
     )
     parser.add_argument(
         "--lookup-dir",
@@ -528,6 +528,7 @@ def main():
     args = parser.parse_args()
 
     for name, val in [
+        ("--db", args.db),
         ("--lookup-dir", args.lookup_dir),
         ("--geo-dir", args.geo_dir),
         ("--knn-dir", args.knn_dir),

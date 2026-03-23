@@ -44,7 +44,6 @@ source config.env
 | `T2M_MODEL_DIR` | Output dir for model checkpoints |
 | `T2M_EMBEDDING_DIR` | Output dir for exported embedding parquets |
 | `T2M_EMBEDDING` | Path to deduplicated embedding parquet — canonical input for all downstream steps |
-| `T2M_UMAP_DIR` | Output dir for UMAP projection parquets |
 | `T2M_GEO_DIR` | Output dir for geo-normalized coordinate parquets |
 | `T2M_KNN_DIR` | Output dir for KNN parquets |
 | `T2M_DB` | Output path for the SQLite database (`build_db.py`) |
@@ -87,7 +86,7 @@ Pass `--no-filter` to skip deduplication and write all embeddings as-is.
 
 ```sh
 # open notebooks/umap.ipynb
-# outputs written to $T2M_UMAP_DIR/umap_{track,album,artist,label}_2d_<run>_nn<N>_md<M>_<metric>.parquet
+# outputs written to outs/umap/umap_{track,album,artist,label}_2d_nn<N>_md<M>_<metric>.parquet
 ```
 
 The notebook `fit_transform`s on tracks then `transform`s other entities — run all 4 entity
@@ -97,10 +96,10 @@ types in the same session to keep the coordinate space consistent.
 
 ```sh
 python scripts/build_geomap.py \
-    --track-umap  $T2M_UMAP_DIR/umap_track_2d_<run>_nn<N>_md<M>_<metric>.parquet \
-    --album-umap  $T2M_UMAP_DIR/umap_album_2d_<run>_nn<N>_md<M>_<metric>.parquet \
-    --artist-umap $T2M_UMAP_DIR/umap_artist_2d_<run>_nn<N>_md<M>_<metric>.parquet \
-    --label-umap  $T2M_UMAP_DIR/umap_label_2d_<run>_nn<N>_md<M>_<metric>.parquet
+    --track-umap  outs/umap/umap_track_2d_nn<N>_md<M>_<metric>.parquet \
+    --album-umap  outs/umap/umap_album_2d_nn<N>_md<M>_<metric>.parquet \
+    --artist-umap outs/umap/umap_artist_2d_nn<N>_md<M>_<metric>.parquet \
+    --label-umap  outs/umap/umap_label_2d_nn<N>_md<M>_<metric>.parquet
 ```
 
 Always pass all 4 entity types together — running a subset shifts the bounding box and
@@ -143,18 +142,18 @@ The output DB is the sole input to the `map2web` backend.
 
 ## Outputs reference
 
-| Artifact | Path | Key columns |
-|---|---|---|
-| Track counts | `$T2M_TRACK_COUNT` | `track_rowid`, `playlist_count` |
-| Training vocab | `$T2M_TRAINING_VOCAB` | `track_rowid`, `track_id`, `playlist_count` |
-| Playlist chunks | `$T2M_ROOT/outs/chunks/chunk_NNNNNN.parquet` | `playlist_rowid`, `track_rowid`, `position`, `added_at` |
-| Track lookup | `$T2M_TRACK_LOOKUP` | `track_rowid`, `track_name`, `artist_name`, `track_popularity`, `artist_rowid`, `album_rowid`, `label`, `release_date` |
-| Artist lookup | `$T2M_LOOKUP_DIR/artist_lookup.parquet` | `artist_rowid`, `artist_name`, `track_count`, `mean_popularity` |
-| Album lookup | `$T2M_LOOKUP_DIR/album_lookup.parquet` | `album_rowid`, `album_name`, `track_count`, `mean_popularity` |
-| Label lookup | `$T2M_LOOKUP_DIR/label_lookup.parquet` | `label`, `track_count`, `mean_popularity` |
-| Embeddings | `$T2M_EMBEDDING` | `track_rowid`, `e0`…`e127` (ISRC-deduplicated) |
-| UMAP projection | `$T2M_UMAP_DIR/umap_{entity}_2d_<run>_nn<N>_md<M>_<metric>.parquet` | entity key, `umap_x`, `umap_y` |
-| Geo coords | `$T2M_GEO_DIR/{entity}_geo.parquet` | entity key, `lon`, `lat` |
-| KNN neighbors | `$T2M_KNN_DIR/{entity}_knn.parquet` | entity key, `n0`…`nK` |
-| KNN scores | `$T2M_KNN_DIR/{entity}_knn_scores.parquet` | entity key, `s0`…`sK` |
-| SQLite DB | `$T2M_DB` | all entity + KNN tables |
+| Artifact | Path                                           | Key columns |
+|---|------------------------------------------------|---|
+| Track counts | `$T2M_TRACK_COUNT`                             | `track_rowid`, `playlist_count` |
+| Training vocab | `$T2M_TRAINING_VOCAB`                          | `track_rowid`, `track_id`, `playlist_count` |
+| Playlist chunks | `$T2M_ROOT/outs/chunks/chunk_NNNNNN.parquet`   | `playlist_rowid`, `track_rowid`, `position`, `added_at` |
+| Track lookup | `$T2M_TRACK_LOOKUP`                            | `track_rowid`, `track_name`, `artist_name`, `track_popularity`, `artist_rowid`, `album_rowid`, `label`, `release_date` |
+| Artist lookup | `$T2M_LOOKUP_DIR/artist_lookup.parquet`        | `artist_rowid`, `artist_name`, `track_count`, `mean_popularity` |
+| Album lookup | `$T2M_LOOKUP_DIR/album_lookup.parquet`         | `album_rowid`, `album_name`, `track_count`, `mean_popularity` |
+| Label lookup | `$T2M_LOOKUP_DIR/label_lookup.parquet`         | `label`, `track_count`, `mean_popularity` |
+| Embeddings | `$T2M_EMBEDDING`                               | `track_rowid`, `e0`…`e127` (ISRC-deduplicated) |
+| UMAP projection | `umap_{entity}_2d_nn<N>_md<M>_<metric>.parquet` | entity key, `umap_x`, `umap_y` |
+| Geo coords | `$T2M_GEO_DIR/{entity}_geo.parquet`            | entity key, `lon`, `lat` |
+| KNN neighbors | `$T2M_KNN_DIR/{entity}_knn.parquet`            | entity key, `n0`…`nK` |
+| KNN scores | `$T2M_KNN_DIR/{entity}_knn_scores.parquet`     | entity key, `s0`…`sK` |
+| SQLite DB | `$T2M_DB`                                      | all entity + KNN tables |

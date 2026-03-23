@@ -215,8 +215,8 @@ def main():
     )
     parser.add_argument(
         "--output-dir",
-        default=os.environ.get("T2M_KNN_DIR", "outs/knn"),
-        help="Directory for output parquets. $T2M_KNN_DIR (default: outs/knn)",
+        default=os.environ.get("T2M_KNN_DIR"),
+        help="Directory for output parquets. $T2M_KNN_DIR",
     )
     parser.add_argument("--k-tracks", type=int, default=K_TRACKS)
     parser.add_argument("--k-albums", type=int, default=K_ALBUMS)
@@ -248,6 +248,8 @@ def main():
         raise ValueError("--embedding / $T2M_EMBEDDING not set")
     if args.track_lookup is None:
         raise ValueError("--track-lookup / $T2M_TRACK_LOOKUP not set")
+    if args.output_dir is None:
+        raise ValueError("--output-dir / $T2M_KNN_DIR not set")
 
     embedding_path = Path(args.embedding)
     track_lookup_path = Path(args.track_lookup)
