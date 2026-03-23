@@ -41,6 +41,11 @@ source config.env
 | `T2M_TRAINING_VOCAB` | Output: filtered vocab with `track_id` mapping |
 | `T2M_TRACK_LOOKUP` | Output: track metadata joined to vocab |
 | `T2M_LOOKUP_DIR` | Output dir for artist/album/label lookup parquets |
+| `T2M_UMAP_DIR` | Dir containing UMAP parquets |
+| `T2M_TRACK_UMAP` | UMAP parquet for tracks — canonical input to `build_geomap.py` |
+| `T2M_ALBUM_UMAP` | UMAP parquet for albums |
+| `T2M_ARTIST_UMAP` | UMAP parquet for artists |
+| `T2M_LABEL_UMAP` | UMAP parquet for labels |
 | `T2M_MODEL_DIR` | Output dir for model checkpoints |
 | `T2M_EMBEDDING_DIR` | Output dir for exported embedding parquets |
 | `T2M_EMBEDDING` | Path to deduplicated embedding parquet — canonical input for all downstream steps |
@@ -92,18 +97,19 @@ Pass `--no-filter` to skip deduplication and write all embeddings as-is.
 The notebook `fit_transform`s on tracks then `transform`s other entities — run all 4 entity
 types in the same session to keep the coordinate space consistent.
 
+> **Warning:** all four entity UMAPs must come from the same UMAP fit — tracks are
+> `fit_transform`ed first, and albums/artists/labels are `transform`ed through that same
+> fitted model. Mixing parquets from different fits produces incompatible coordinates and
+> silently corrupts the geo map.
+
 ### Phase 4 — Geo normalization
 
 ```sh
-python scripts/build_geomap.py \
-    --track-umap  outs/umap/umap_track_2d_nn<N>_md<M>_<metric>.parquet \
-    --album-umap  outs/umap/umap_album_2d_nn<N>_md<M>_<metric>.parquet \
-    --artist-umap outs/umap/umap_artist_2d_nn<N>_md<M>_<metric>.parquet \
-    --label-umap  outs/umap/umap_label_2d_nn<N>_md<M>_<metric>.parquet
+source config.env && uv run python scripts/build_geomap.py
 ```
 
-Always pass all 4 entity types together — running a subset shifts the bounding box and
-breaks spatial alignment across entity types.
+UMAP paths are read from `$T2M_{ENTITY}_UMAP`. Always run with all 4 entity types together —
+a subset shifts the bounding box and breaks spatial alignment across entity types.
 
 ### Phase 5 — KNN precomputation (CPU, FAISS)
 
@@ -152,7 +158,7 @@ The output DB is the sole input to the `map2web` backend.
 | Album lookup | `$T2M_LOOKUP_DIR/album_lookup.parquet`         | `album_rowid`, `album_name`, `track_count`, `mean_popularity` |
 | Label lookup | `$T2M_LOOKUP_DIR/label_lookup.parquet`         | `label`, `track_count`, `mean_popularity` |
 | Embeddings | `$T2M_EMBEDDING`                               | `track_rowid`, `e0`…`e127` (ISRC-deduplicated) |
-| UMAP projection | `umap_{entity}_2d_nn<N>_md<M>_<metric>.parquet` | entity key, `umap_x`, `umap_y` |
+| UMAP projection | `$T2M_{ENTITY}_UMAP` (one per entity, set in config.env) | entity key, `umap_x`, `umap_y` |
 | Geo coords | `$T2M_GEO_DIR/{entity}_geo.parquet`            | entity key, `lon`, `lat` |
 | KNN neighbors | `$T2M_KNN_DIR/{entity}_knn.parquet`            | entity key, `n0`…`nK` |
 | KNN scores | `$T2M_KNN_DIR/{entity}_knn_scores.parquet`     | entity key, `s0`…`sK` |

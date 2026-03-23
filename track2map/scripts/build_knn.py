@@ -45,6 +45,18 @@ import pyarrow.parquet as pq
 
 from src.entities import Artists, Albums, Labels
 
+
+def _rss_mb() -> int:
+    with open("/proc/self/status") as f:
+        for line in f:
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1]) // 1024
+    return 0
+
+
+def _mem(label: str) -> None:
+    print(f"  [mem] {label:<32} {_rss_mb():>8,} MB RSS")
+
 K_TRACKS = 100
 K_ALBUMS = 50
 K_ARTISTS = 20
@@ -52,17 +64,6 @@ K_LABELS = 10
 
 IVF_THRESHOLD = 500_000  # use IVFFlat above this, FlatIP below
 IVF_NLIST_FACTOR = 4  # nlist = IVF_NLIST_FACTOR * sqrt(N), clamped to [256, 32768]
-WRITE_CHUNK = 500_000  # rows per parquet write batch (avoids OOM on large DataFrames)
-
-
-def _write_chunked(path, columns, schema, N):
-    """Write columns dict to parquet in WRITE_CHUNK-sized batches."""
-    cols = list(columns.keys())
-    with pq.ParquetWriter(path, schema) as writer:
-        for start in range(0, N, WRITE_CHUNK):
-            end = min(start + WRITE_CHUNK, N)
-            chunk = {c: columns[c][start:end] for c in cols}
-            writer.write_table(pa.table(chunk, schema=schema))
 
 
 ENTITIES = {
@@ -73,22 +74,18 @@ ENTITIES = {
 }
 
 
-def _knn_search(
-    matrix: np.ndarray, k: int, batch_size: int, nprobe: int
-) -> tuple[np.ndarray, np.ndarray]:
-    """Cosine KNN via FAISS (CPU).
+def _knn_search(matrix: np.ndarray, k: int, batch_size: int, nprobe: int):
+    """Cosine KNN via FAISS (CPU). Yields (I, D_batch) per search batch.
 
-    Returns (neighbor_idx, neighbor_dist) — both (N, k+1). neighbor_idx contains
-    int64 row-indices; neighbor_dist contains float32 cosine similarities (vectors
-    are L2-normalized, index uses METRIC_INNER_PRODUCT).
-
-    Results may include self-match — caller should filter by rowid if needed.
+    I: int64 (batch, k+1) row-indices into matrix; D_batch: float32 (batch, k+1)
+    cosine similarities. Results may include self-match — caller filters by rowid.
     """
     N, D = matrix.shape
     mat = matrix  # to_numpy() already returns a copy; normalise in-place
     norms = np.linalg.norm(mat, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     mat /= norms
+    _mem("after normalize")
 
     if N > IVF_THRESHOLD:
         nlist = int(np.clip(IVF_NLIST_FACTOR * N**0.5, 256, 32_768))
@@ -104,29 +101,30 @@ def _knn_search(
             train_mat = mat
             print(f"  training IVF index (nlist={nlist})...")
         index.train(train_mat)
+        _mem("after IVF train")
         index.nprobe = nprobe
     else:
         index = faiss.IndexFlatIP(D)
 
     index.add(mat)
+    _mem("after index.add")
 
-    neighbor_idx = np.empty((N, k + 1), dtype=np.int64)
-    neighbor_dist = np.empty((N, k + 1), dtype=np.float32)
     t0 = time.time()
     done = 0
     for start in range(0, N, batch_size):
         chunk = mat[start : start + batch_size]
         D_batch, I = index.search(chunk, k + 1)
         B = len(chunk)
-        neighbor_idx[start : start + B] = I
-        neighbor_dist[start : start + B] = D_batch
         done += B
+        if done == B:
+            _mem("after first search batch")
         elapsed = time.time() - t0
         rate = done / elapsed if elapsed > 0 else 0.0
         print(f"  {done:>10,} / {N:,}  ({rate:,.0f} rows/s)", end="\r")
+        yield I, D_batch
 
     print()
-    return neighbor_idx, neighbor_dist
+    _mem("after full search")
 
 
 def _process_entity(
@@ -164,36 +162,40 @@ def _process_entity(
 
     N = len(matrix)
     print(f"  {N:,} entities, k={k}")
-
-    neighbor_idx, neighbor_dist = _knn_search(matrix, k, batch_size, nprobe)
-    del matrix
-    neighbor_keys = keys[neighbor_idx]  # (N, k+1)
+    _mem("matrix built")
 
     key_type = pa.utf8() if isinstance(keys[0], str) else pa.int64()
-
-    # neighbor keys
-    knn_cols = {key_col: keys}
-    for i in range(k + 1):
-        knn_cols[f"n{i}"] = neighbor_keys[:, i]
-    knn_schema = pa.schema([(c, key_type) for c in knn_cols])
+    knn_schema = pa.schema([(key_col, key_type)] + [(f"n{i}", key_type) for i in range(k + 1)])
+    score_schema = pa.schema([(key_col, key_type)] + [(f"s{i}", pa.float32()) for i in range(k + 1)])
     knn_path = output_dir / f"{name}_knn.parquet"
-    _write_chunked(knn_path, knn_cols, knn_schema, N)
-
-    # cosine similarity scores
-    score_cols = {key_col: keys}
-    for i in range(k + 1):
-        score_cols[f"s{i}"] = neighbor_dist[:, i]
-    score_schema = pa.schema(
-        [(c, pa.float32() if c.startswith("s") else key_type) for c in score_cols]
-    )
     score_path = output_dir / f"{name}_knn_scores.parquet"
-    _write_chunked(score_path, score_cols, score_schema, N)
 
-    written = [knn_path, score_path]
-    del neighbor_dist, neighbor_keys
+    start = 0
+    with pq.ParquetWriter(knn_path, knn_schema) as knn_w, \
+         pq.ParquetWriter(score_path, score_schema) as score_w:
+        for I, D_batch in _knn_search(matrix, k, batch_size, nprobe):
+            B = len(I)
+            batch_keys = keys[start : start + B]
+            neighbor_batch_keys = keys[I]  # (B, k+1)
+
+            knn_row = {key_col: batch_keys}
+            for i in range(k + 1):
+                knn_row[f"n{i}"] = neighbor_batch_keys[:, i]
+            knn_w.write_table(pa.table(knn_row, schema=knn_schema))
+
+            score_row = {key_col: batch_keys}
+            for i in range(k + 1):
+                score_row[f"s{i}"] = D_batch[:, i]
+            score_w.write_table(pa.table(score_row, schema=score_schema))
+
+            start += B
+    _mem("after write")
+    del matrix
+    _mem("after del matrix")
+
     elapsed = time.time() - t0
     rate = N / elapsed if elapsed > 0 else 0.0
-    for p in written:
+    for p in [knn_path, score_path]:
         print(f"  → {p}")
     print(f"  {name:<8} {N:>10,} rows  ({elapsed:.1f}s, {rate:,.0f} rows/s)")
 

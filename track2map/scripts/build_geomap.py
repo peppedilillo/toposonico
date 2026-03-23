@@ -7,18 +7,23 @@ writes per-entity geo-parquets containing only the key column + lon + lat.
 Running with a subset of entities shifts the bbox — always run with all 4 together
 to keep coordinate alignment stable across entity types.
 
+All four parquets must come from the same UMAP fit — mixing parquets from different
+fits produces incompatible coordinates.
+
 Usage:
-    python scripts/build_geomap.py \\
-        [--track-umap PATH] [--album-umap PATH] \\
-        [--artist-umap PATH] [--label-umap PATH] \\
-        [--output-dir DIR] [--extent DEG] [--padding FRAC]
+    uv run python scripts/build_geomap.py [options]
 
 Examples:
-    python scripts/build_geomap.py \\
-        --track-umap  outs/umap/umap_track_2d_pure_bolt_nn150_md0d01_cosine.parquet \\
-        --album-umap  outs/umap/umap_album_2d_pure_bolt_nn150_md0d01_cosine.parquet \\
-        --artist-umap outs/umap/umap_artist_2d_pure_bolt_nn150_md0d01_cosine.parquet \\
-        --label-umap  outs/umap/umap_label_2d_pure_bolt_nn150_md0d01_cosine.parquet
+    # all four entities via env vars (recommended)
+    source config.env && uv run python scripts/build_geomap.py
+
+    # explicit paths (env-var-free)
+    uv run python scripts/build_geomap.py \\
+        --track-umap  outs/umap/umap_track_2d_nn150_md0d01_cosine.parquet \\
+        --album-umap  outs/umap/umap_album_2d_nn150_md0d01_cosine.parquet \\
+        --artist-umap outs/umap/umap_artist_2d_nn150_md0d01_cosine.parquet \\
+        --label-umap  outs/umap/umap_label_2d_nn150_md0d01_cosine.parquet \\
+        --output-dir  outs/geo/
 """
 
 import argparse
@@ -31,10 +36,10 @@ import pandas as pd
 from src.topo import umap2geo
 
 ENTITIES = {
-    "track": ("track_umap", "track_rowid"),
-    "album": ("album_umap", "album_rowid"),
-    "artist": ("artist_umap", "artist_rowid"),
-    "label": ("label_umap", "label"),
+    "track":  ("track_umap",  "track_rowid",  "T2M_TRACK_UMAP"),
+    "album":  ("album_umap",  "album_rowid",  "T2M_ALBUM_UMAP"),
+    "artist": ("artist_umap", "artist_rowid", "T2M_ARTIST_UMAP"),
+    "label":  ("label_umap",  "label",        "T2M_LABEL_UMAP"),
 }
 
 EXTENT_DEFAULT = 45.0
@@ -46,10 +51,22 @@ def main():
         description="Joint-normalize UMAP coords to lon/lat for all entity types",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--track-umap", type=Path, metavar="PATH")
-    parser.add_argument("--album-umap", type=Path, metavar="PATH")
-    parser.add_argument("--artist-umap", type=Path, metavar="PATH")
-    parser.add_argument("--label-umap", type=Path, metavar="PATH")
+    parser.add_argument(
+        "--track-umap", default=os.environ.get("T2M_TRACK_UMAP"), metavar="PATH",
+        help="UMAP parquet for tracks. $T2M_TRACK_UMAP",
+    )
+    parser.add_argument(
+        "--album-umap", default=os.environ.get("T2M_ALBUM_UMAP"), metavar="PATH",
+        help="UMAP parquet for albums. $T2M_ALBUM_UMAP",
+    )
+    parser.add_argument(
+        "--artist-umap", default=os.environ.get("T2M_ARTIST_UMAP"), metavar="PATH",
+        help="UMAP parquet for artists. $T2M_ARTIST_UMAP",
+    )
+    parser.add_argument(
+        "--label-umap", default=os.environ.get("T2M_LABEL_UMAP"), metavar="PATH",
+        help="UMAP parquet for labels. $T2M_LABEL_UMAP",
+    )
     parser.add_argument(
         "--output-dir",
         default=os.environ.get("T2M_GEO_DIR"),
@@ -80,14 +97,19 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # subset of entities whose UMAP path was provided; allows running on fewer than 4
     active = {
-        entity: getattr(args, attr)
-        for entity, (attr, _) in ENTITIES.items()
+        entity: Path(getattr(args, attr))
+        for entity, (attr, *_) in ENTITIES.items()
         if getattr(args, attr) is not None
     }
 
     if not active:
-        print("Error: at least one --*-umap argument is required", file=sys.stderr)
+        print(
+            "Error: no UMAP paths provided. Pass --track-umap / --album-umap / "
+            "--artist-umap / --label-umap or set $T2M_TRACK_UMAP etc. in config.env",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     for entity, path in active.items():
