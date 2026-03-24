@@ -110,7 +110,7 @@ export default function Search({ navigate, results, setResults }) {
             )}
             </div>
             {results.length > 0 && open && (
-                <ul className="bg-surface mt-1 py-4 list-none rounded-xl max-h-[40dvh] overflow-y-auto overscroll-contain">
+                <ul className="bg-surface mt-1 py-4 list-none rounded-xl max-h-[30dvh] overflow-y-auto overscroll-contain">
                     {results.map((hit, i) => (
                         <li
                             key={hit.id}

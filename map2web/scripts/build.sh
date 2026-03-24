@@ -86,10 +86,13 @@ if [[ $RUN_TIPPECANOE -eq 1 ]]; then
     echo "=== Step 2: tippecanoe ==="
     echo "Output: $TILES_DIR"
     echo ""
+    rm -rf "$TILES_DIR"
+    echo "  cleaned $TILES_DIR"
 
     tippecanoe -e "$TILES_DIR" \
-        -z11 -Z2 -pS -rg -g 1 -d 8 \
+        -z12 -Z3 -pS -rg -g 1 -d 8 \
         --drop-densest-as-needed \
+        --extend-zooms-if-still-dropping \
         --order-descending-by=logcounts \
         --exclude=logcounts \
         --exclude=track_count \

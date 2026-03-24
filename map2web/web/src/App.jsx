@@ -48,7 +48,7 @@ for (let lat = -90; lat <= 90; lat += 5) {
 
 const STARTZOOM = 4;
 
-const ENTITY_ZOOM = { track: 9, album: 8, artist: 7, label: 5 };
+const ENTITY_ZOOM = { track: 9, album: 8, artist: 7, label: 6 };
 
 /** Reads map state from the URL hash. Missing keys fall back to defaults. */
 function parseHash() {

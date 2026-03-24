@@ -116,7 +116,7 @@ def _diverse_recs(rows, cols, limit):
 
 
 @app.get("/api/recs")
-async def recs(q: int, entity: str, limit: int = Query(5, ge=1), diverse: bool = Query(False)):
+async def recs(q: int, entity: str, limit: int = Query(4, ge=1), diverse: bool = Query(False)):
     if entity not in _KNN_TABLE:
         raise HTTPException(status_code=400, detail=f"Unknown entity: {entity!r}")
     knn_table, knn_pk, entity_table, entity_pk, neighbor_col = _KNN_TABLE[entity]
