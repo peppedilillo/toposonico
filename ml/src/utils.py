@@ -151,7 +151,7 @@ def make_model_filename(
         )
 
     v = f"{val_loss:.4f}".replace(".", "d")
-    return f"model_{run_name}_t{format_number(vocab_size)}_ep{epoch}_v{v}.pt"
+    return f"{run_name}_model_t{format_number(vocab_size)}_ep{epoch}_v{v}.pt"
 
 
 def human_hash(sep="_"):
