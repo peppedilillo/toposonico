@@ -120,7 +120,7 @@ def print_vocab_stats(vocab: pd.DataFrame):
     print(f"Track count max  : {vocab['playlist_count'].max()}")
 
 
-_RUN_NAME_RE = re.compile(r"^model_([a-z]+_[a-z]+)_t\w+_ep\d+_v\w+\.pt$")
+_RUN_NAME_RE = re.compile(r"^([a-z]+_[a-z]+)_model_t\w+_ep\d+_v\w+\.pt$")
 
 
 def extract_run_name(filename: str | Path) -> str:

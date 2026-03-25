@@ -14,13 +14,13 @@ Downstream usage:
     matrix = df.filter(like="e").values   # (V, D) float32
 
 Usage:
-    python scripts/export_embeddings.py checkpoint --output PATH [--track-lookup PATH]
-    python scripts/export_embeddings.py checkpoint --output PATH --no-filter
+    python scripts/build_embeddings.py checkpoint --output PATH [--track-lookup PATH]
+    python scripts/build_embeddings.py checkpoint --output PATH --no-filter
 
 Examples:
-    python scripts/export_embeddings.py models/vivid_dragon/model.pt
+    python scripts/build_embeddings.py models/vivid_dragon/model.pt
 
-    python scripts/export_embeddings.py models/vivid_dragon/model.pt --no-filter \\
+    python scripts/build_embeddings.py models/vivid_dragon/model.pt --no-filter \\
         --output outs/vivid_dragon_embeddings_tracks_unfiltered.parquet
 """
 

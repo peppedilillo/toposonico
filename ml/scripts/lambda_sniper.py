@@ -6,15 +6,15 @@ availability) before entering the polling loop, so you can immediately see
 whether your targets are listed and what they cost.
 
 Usage:
-    python scripts/snipe_lambda.py [--instances TYPE [TYPE ...]]
+    python scripts/lambda_sniper.py [--instances TYPE [TYPE ...]]
                                    [--regions PREFIX [PREFIX ...]]
                                    [--poll-interval SECS] [--api-key KEY]
                                    [--dry-run]
 
 Examples:
-    python scripts/snipe_lambda.py
-    python scripts/snipe_lambda.py --instances gpu_1x_a100_sxm4 --regions us
-    python scripts/snipe_lambda.py --dry-run
+    python scripts/lambda_sniper.py
+    python scripts/lambda_sniper.py --instances gpu_1x_a100_sxm4 --regions us
+    python scripts/lambda_sniper.py --dry-run
 """
 
 import argparse
