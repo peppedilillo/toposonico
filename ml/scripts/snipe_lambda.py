@@ -68,7 +68,7 @@ def region_matches(name, prefixes):
     return any(name.startswith(p) for p in prefixes)
 
 
-def print_catalog(data, targets, regions):
+def print_catalog(data, targets, regions) -> int:
     target_set = set(targets)
     prefix_str = ", ".join(f"{p}*" for p in regions)
 
@@ -96,7 +96,12 @@ def print_catalog(data, targets, regions):
 
     if not any(r[0] == "*" and r[4] for r in rows):
         print(f"  None of the target instances have capacity in {prefix_str} regions right now.")
+    else:
+        print()
     print()
+
+    # 2 (blank line + header) + 1 (separator) + len(rows) + 1 (blank) + 1 (warning/blank) + 1 (trailing blank)
+    return len(rows) + 6
 
 
 def launch(api_key, itype, region, key_name):
@@ -118,7 +123,7 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
         print(f"[{ts()}] Failed to fetch catalog: {e}")
         return
 
-    print_catalog(data, instances, regions)
+    catalog_lines = print_catalog(data, instances, regions)
 
     if dry_run:
         print(f"[{ts()}] DRY RUN — exiting without polling.")
@@ -131,7 +136,7 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
         return
 
     print(f"[{ts()}] Sniping {', '.join(instances)} in {prefix_str} — polling every {poll_interval}s")
-    print()
+    print(flush=True)  # placeholder status line — overwritten on first iteration
 
     checks = 0
     start = time.time()
@@ -140,6 +145,9 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
         try:
             data = fetch_catalog(api_key)
             checks += 1
+
+            print(f"\033[{catalog_lines + 1}A\033[J", end="", flush=True)
+            catalog_lines = print_catalog(data, instances, regions)
 
             for itype in instances:
                 if itype not in data:
@@ -163,7 +171,7 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
                     print(f"[{ts()}] Launch failed: {resp.text}")
                 return
 
-            print(f"[{ts()}] #{checks:04d}  {elapsed(start)} elapsed — no capacity", end="\r")
+            print(f"[{ts()}] #{checks:04d}  {elapsed(start)} elapsed — no capacity", end="\r", flush=True)
             time.sleep(poll_interval)
 
         except Exception as e:

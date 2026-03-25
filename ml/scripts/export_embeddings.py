@@ -18,12 +18,10 @@ Usage:
     python scripts/export_embeddings.py checkpoint --output PATH --no-filter
 
 Examples:
-    python scripts/export_embeddings.py models/vivid_dragon/model.pt \\
-        --output outs/track_embeddings.parquet
+    python scripts/export_embeddings.py models/vivid_dragon/model.pt
 
-    python scripts/export_embeddings.py models/vivid_dragon/model.pt \\
-        --output outs/embedding_track_vivid_dragon_unfiltered.parquet \\
-        --no-filter
+    python scripts/export_embeddings.py models/vivid_dragon/model.pt --no-filter \\
+        --output outs/vivid_dragon_embeddings_tracks_unfiltered.parquet
 """
 
 import argparse
@@ -37,6 +35,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import torch
 
+from src.utils import extract_run_name
+
 CHUNK_SIZE_DEFAULT = 500_000
 
 
@@ -49,7 +49,7 @@ def main():
     parser.add_argument(
         "--output",
         default=os.environ.get("T2M_EMBEDDING"),
-        help="Output parquet path. $T2M_EMBEDDING",
+        help="Output parquet path $T2M_EMBEDDING, either a directory or a file name.",
     )
     parser.add_argument(
         "--track-lookup",
@@ -78,6 +78,8 @@ def main():
             "No output path set. Use --output or set $T2M_EMBEDDING."
         )
     output_path = Path(args.output)
+    if output_path.is_dir():
+        output_path = output_path / f"{extract_run_name(model_path)}_embeddings_tracks.parquet"
 
     if not args.no_filter:
         if args.track_lookup is None:
