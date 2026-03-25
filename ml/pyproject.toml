@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sr-ml"
+name = "track2map"
 version = "0.1.0"
-description = "Trains Word2Vec track embeddings from Spotify playlists."
+description = "Trains Word2Vec track embeddings and umap from Spotify playlists."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
