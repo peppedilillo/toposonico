@@ -79,7 +79,7 @@ def main():
         )
     output_path = Path(args.output)
     if output_path.is_dir():
-        output_path = output_path / f"{extract_run_name(model_path)}_embeddings_tracks.parquet"
+        output_path = output_path / f"{extract_run_name(model_path)}_embedding_track.parquet"
 
     if not args.no_filter:
         if args.track_lookup is None:
