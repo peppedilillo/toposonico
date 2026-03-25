@@ -36,8 +36,9 @@ Now the scripts should be wired to run with default inputs and output in `/outs`
 
 ```sh
 python scripts/build_training_vocab.py --min-count 2
-python scripts/build_track_lookup.py
 python scripts/build_playlist_chunks.py path/to/chunks
+python scripts/build_track_lookup.py
+python scripts/build_entity_lookups.py
 ```
 
 We will use `build_track_lookup.py` again so take note of where it lives.
@@ -52,13 +53,13 @@ There is a lot of data, choose a directory for chunks wisely
 python scripts/build_embeddings.py path/to/<checkpoint>.pt
 ```
 
-Export embedding will also perform clean-up of tracks with duplicated ISRC.
+This script will also perform clean-up of tracks with duplicated ISRC.
 You can skip deduplication passing `--no-filter`.
 
 ### Phase 3 — UMAP projection (interactive, GPU)
 
 ```sh
-# open notebooks/umap.ipynb
+# open notebooks/umap.ipynb, do your thing and store them somewhere safe
 ```
 
 Voilà! Take note of the umap location for all entities, we will use it in the next phases.
@@ -67,3 +68,4 @@ Voilà! Take note of the umap location for all entities, we will use it in the n
 > `fit_transform`ed first, and albums/artists/labels are `transform`ed through that same
 > fitted model. Mixing parquets from different fits produces incompatible coordinates and
 > silently corrupts the geo map.
+

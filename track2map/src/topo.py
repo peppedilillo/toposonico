@@ -7,9 +7,9 @@ import pandas as pd
 
 def umap2geo(
     umap_frames: Sequence[tuple[pd.DataFrame, str]],
-    max_lon: float = 45.0,
-    max_lat: float = 45.0,
-    padding: float = 0.02,
+    max_lon: float = 22.5,
+    max_lat: float = 22.5,
+    padding: float = 1.,
 ) -> list[pd.DataFrame]:
     """Map UMAP coordinates to fake lon/lat using a shared bounding box.
 
@@ -20,9 +20,9 @@ def umap2geo(
     Args:
         umap_frames: sequence of (df, key_col) pairs. Each df must have columns
             ``umap_x`` and ``umap_y`` plus the key column.
-        max_lon: half-width in degrees for the x axis (default 45).
-        max_lat: half-width in degrees for the y axis (default 45).
-        padding: fractional padding added to each side of the global bbox (default 0.02).
+        max_lon: half-width in degrees for the x axis (default 22.5).
+        max_lat: half-width in degrees for the y axis (default 22.5).
+        padding: padding added to each side of the global bbox (default 1.).
 
     Returns:
         List of DataFrames, one per input, with columns [key_col, lon, lat] (float32).
@@ -34,12 +34,10 @@ def umap2geo(
     y_min = min(df.umap_y.min() for df, _ in umap_frames)
     y_max = max(df.umap_y.max() for df, _ in umap_frames)
 
-    x_pad = (x_max - x_min) * padding
-    y_pad = (y_max - y_min) * padding
-    x_min -= x_pad
-    x_max += x_pad
-    y_min -= y_pad
-    y_max += y_pad
+    x_min -= padding
+    x_max += padding
+    y_min -= padding
+    y_max += padding
 
     results = []
     for df, key_col in umap_frames:

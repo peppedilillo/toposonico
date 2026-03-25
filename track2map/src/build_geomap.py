@@ -35,15 +35,13 @@ import pandas as pd
 
 from src.topo import umap2geo
 
+
 ENTITIES = {
     "track":  ("track_umap",  "track_rowid",  "T2M_TRACK_UMAP"),
     "album":  ("album_umap",  "album_rowid",  "T2M_ALBUM_UMAP"),
     "artist": ("artist_umap", "artist_rowid", "T2M_ARTIST_UMAP"),
     "label":  ("label_umap",  "label",        "T2M_LABEL_UMAP"),
 }
-
-EXTENT_DEFAULT = 45.0
-PADDING_DEFAULT = 0.02
 
 
 def main():
@@ -74,21 +72,32 @@ def main():
         help="Directory for output geo-parquets (default: $T2M_GEO_DIR)",
     )
     parser.add_argument(
-        "--extent",
+        "--width",
         type=float,
-        default=EXTENT_DEFAULT,
+        default=os.environ.get("T2M_GEO_WIDTH"),
         metavar="DEG",
-        help=f"Half-width in degrees of the lon/lat square (default: {EXTENT_DEFAULT})",
+        help=f"Width in degrees of the lon/lat square (default: $T2M_GEO_WIDTH).",
     )
     parser.add_argument(
         "--padding",
         type=float,
-        default=PADDING_DEFAULT,
-        metavar="FRAC",
-        help=f"Fractional padding added to each side of the bbox (default: {PADDING_DEFAULT})",
+        default=os.environ.get("T2M_GEO_PADDING"),
+        metavar="DEG",
+        help=f"Fractional padding added to each side of the bbox (default: $T2M_GEO_PADDING).",
     )
     args = parser.parse_args()
 
+    if args.width is None:
+        raise ValueError(
+            "No `T2M_GEO_WIDTH` environment variable set. "
+            "Either run with --width argument or define the environment variable."
+        )
+    hwidth = args.width / 2.
+    if args.padding is None:
+        raise ValueError(
+            "No `T2M_GEO_PADDING` environment variable set. "
+            "Either run with --padding argument or define the environment variable."
+        )
     if args.output_dir is None:
         raise ValueError(
             "No `T2M_GEO_DIR` environment variable set. "
@@ -126,7 +135,7 @@ def main():
         entity_names.append(entity)
 
     geo_frames = umap2geo(
-        umap_frames, max_lon=args.extent, max_lat=args.extent, padding=args.padding
+        umap_frames, max_lon=hwidth, max_lat=hwidth, padding=args.padding
     )
 
     for entity, geo in zip(entity_names, geo_frames):

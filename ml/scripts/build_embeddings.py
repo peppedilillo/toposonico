@@ -48,13 +48,13 @@ def main():
     parser.add_argument("model", type=Path, help="Path to .pt model checkpoint file")
     parser.add_argument(
         "--output",
-        default=os.environ.get("T2M_EMBEDDING"),
-        help="Output parquet path $T2M_EMBEDDING, either a directory or a file name.",
+        default=os.environ.get("T2M_EMBEDDING_DIR"),
+        help="Output parquet path, either a directory or a file name. Set to `T2M_EMBEDDING_DIR` by default.",
     )
     parser.add_argument(
         "--track-lookup",
         default=os.environ.get("T2M_TRACK_LOOKUP"),
-        help="Path to track_lookup.parquet (for ISRC dedup). $T2M_TRACK_LOOKUP",
+        help="Path to track_lookup.parquet (for ISRC deduplication). Set to `T2M_TRACK_LOOKUP` by default.",
     )
     parser.add_argument(
         "--chunk-size",
@@ -75,11 +75,12 @@ def main():
 
     if args.output is None:
         raise ValueError(
-            "No output path set. Use --output or set $T2M_EMBEDDING."
+            "No output path set. Use --output or set $T2M_EMBEDDING_DIR."
         )
     output_path = Path(args.output)
     if output_path.is_dir():
         output_path = output_path / f"{extract_run_name(model_path)}_embedding_track.parquet"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not args.no_filter:
         if args.track_lookup is None:
@@ -89,8 +90,6 @@ def main():
         lookup_path = Path(args.track_lookup)
         if not lookup_path.exists():
             raise FileNotFoundError(f"Track lookup not found: {lookup_path}")
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Checkpoint : {model_path}")
     print(f"Output     : {output_path}")
