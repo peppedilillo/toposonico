@@ -52,12 +52,22 @@ assert all(k > 0 for k in _KNN_K.values()), f"Empty KNN table(s): {_KNN_K}"
 
 @app.get("/api/search")
 async def search(q: str = Query(..., min_length=1), limit: int = Query(10, ge=1, le=50)):
+    """Full-text search across all entity types via Meilisearch.
+
+    Returns a list of hits, each with entity_type, rowid, lon, lat, and
+    entity-specific name fields (track_name, artist_name, etc.).
+    """
     result = _index.search(q, {"limit": limit})
     return result["hits"]
 
 
 @app.get("/api/info")
 async def info(q: int, entity: str):
+    """Fetch full metadata for a single entity from the SQLite DB.
+
+    Returns all columns from the entity's table, including denormalized
+    geo coords for related entities (e.g. artist_lon/lat on a track row).
+    """
     if entity not in _ENTITY_TABLE:
         raise HTTPException(status_code=400, detail=f"Unknown entity: {entity!r}")
     table, pk = _ENTITY_TABLE[entity]
@@ -70,6 +80,12 @@ async def info(q: int, entity: str):
 
 @app.get("/api/recroll")
 async def recroll(q: int, entity: str):
+    """Pick a random neighbour using epsilon-greedy exploration.
+
+    80% of the time picks from the top 20% of neighbours (exploitation);
+    20% of the time picks from the remaining 80% (exploration).
+    Returns full entity metadata, same shape as /api/info.
+    """
     if entity not in _KNN_TABLE:
         raise HTTPException(status_code=400, detail=f"Unknown entity: {entity!r}")
     knn_table, knn_pk, entity_table, entity_pk, neighbor_col = _KNN_TABLE[entity]
@@ -117,6 +133,11 @@ def _diverse_recs(rows, cols, limit):
 
 @app.get("/api/recs")
 async def recs(q: int, entity: str, limit: int = Query(4, ge=1), diverse: bool = Query(False)):
+    """Return top-K nearest neighbours for an entity.
+
+    With diverse=true (tracks and albums only), deduplicates by artist so the
+    list spans more of the neighbourhood. Returns full entity metadata rows.
+    """
     if entity not in _KNN_TABLE:
         raise HTTPException(status_code=400, detail=f"Unknown entity: {entity!r}")
     knn_table, knn_pk, entity_table, entity_pk, neighbor_col = _KNN_TABLE[entity]
@@ -139,6 +160,11 @@ async def recs(q: int, entity: str, limit: int = Query(4, ge=1), diverse: bool =
 
 @app.get("/api/knn")
 async def knn(q: int, entity: str, limit: int = Query(20, ge=1, le=100)):
+    """Return top-K nearest neighbours with similarity scores.
+
+    Like /api/recs but includes the cosine similarity score column and has a
+    higher default limit. Intended for raw KNN inspection rather than UI display.
+    """
     if entity not in _KNN_TABLE:
         raise HTTPException(status_code=400, detail=f"Unknown entity: {entity!r}")
     knn_table, knn_pk, entity_table, entity_pk, neighbor_col = _KNN_TABLE[entity]

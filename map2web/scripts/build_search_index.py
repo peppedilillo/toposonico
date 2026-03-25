@@ -69,6 +69,9 @@ def iter_docs(conn, entity, threshold=None):
             "logcounts":   r["logcounts"],
         }
 
+        # `id` is a prefixed string because rowids are not unique across entity types:
+        # Meilisearch requires a globally unique PK per index. `rowid` carries the
+        # integer for navigation (Search.jsx passes it to /api/info, /api/recs, etc.).
         if entity == "track":
             doc.update({
                 "id":          f"track_{r['track_rowid']}",
