@@ -16,13 +16,12 @@ Example:
 
 import argparse
 import os
+from pathlib import Path
 import sqlite3
 import time
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 
 QUERY = """
     SELECT track_rowid, COUNT(*) AS playlist_count

@@ -1,9 +1,9 @@
+from pathlib import Path
 import random
+import re
 
 import pandas as pd
 import torch
-import re
-from pathlib import Path
 
 
 def print_vram_budget(

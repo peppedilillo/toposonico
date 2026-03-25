@@ -16,10 +16,10 @@ Example:
 """
 
 import argparse
+import os
 from pathlib import Path
 import sqlite3
 import time
-import os
 
 import numpy as np
 import pandas as pd
@@ -90,7 +90,7 @@ def main():
         "--vocab",
         default=os.environ.get("T2M_TRAINING_VOCAB"),
         help="Global track vocab parquet — only tracks whose track_rowid appears "
-        "in the vocab are written; all others are skipped."
+        "in the vocab are written; all others are skipped.",
     )
     parser.add_argument(
         "--chunk-size",

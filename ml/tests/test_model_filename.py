@@ -1,6 +1,7 @@
 import pytest
 
-from src.utils import make_model_filename, extract_run_name
+from src.utils import extract_run_name
+from src.utils import make_model_filename
 
 
 def test_roundtrip():

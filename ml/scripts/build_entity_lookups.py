@@ -15,12 +15,14 @@ Example:
 
 import argparse
 import os
-import time
 from pathlib import Path
+import time
 
 import pandas as pd
 
-from src.entities import Albums, Artists, Labels
+from src.entities import Albums
+from src.entities import Artists
+from src.entities import Labels
 
 
 def main():
@@ -103,7 +105,9 @@ def main():
         result = cls.lookup(df)
         result.to_parquet(output_path, index=False)
         size_mb = output_path.stat().st_size / 1_048_576
-        print(f"{name:<8}  {len(result):>8,} rows  →  {output_path}  ({size_mb:.1f} MB, {time.time() - t1:.1f}s)")
+        print(
+            f"{name:<8}  {len(result):>8,} rows  →  {output_path}  ({size_mb:.1f} MB, {time.time() - t1:.1f}s)"
+        )
 
     print(f"\nDone in {time.time() - t0:.1f}s")
 

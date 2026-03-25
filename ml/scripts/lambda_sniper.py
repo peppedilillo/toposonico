@@ -20,10 +20,9 @@ Examples:
 import argparse
 import os
 import time
-from requests.auth import HTTPBasicAuth
 
 import requests
-
+from requests.auth import HTTPBasicAuth
 
 API_BASE = "https://cloud.lambda.ai/api/v1"
 DEFAULT_INSTANCES = ["gpu_1x_a100_sxm4", "gpu_1x_a100_pcie"]
@@ -78,24 +77,32 @@ def print_catalog(data, targets, regions) -> int:
         desc = itype.get("description", "")
         cents = itype.get("price_cents_per_hour")
         price = f"${cents / 100:.2f}/hr" if cents is not None else "n/a"
-        all_regions = [r["name"] for r in entry.get("regions_with_capacity_available", [])]
+        all_regions = [
+            r["name"] for r in entry.get("regions_with_capacity_available", [])
+        ]
         matching = [r for r in all_regions if region_matches(r, regions)]
         marker = "*" if name in target_set else " "
         rows.append((marker, name, desc, price, matching))
 
-    name_w  = max(len(r[1]) for r in rows)
-    desc_w  = max(len(r[2]) for r in rows)
+    name_w = max(len(r[1]) for r in rows)
+    desc_w = max(len(r[2]) for r in rows)
     price_w = max(len(r[3]) for r in rows)
 
-    print(f"\n  {'':1}  {'Instance':<{name_w}}  {'Description':<{desc_w}}  {'Price':>{price_w}}  Regions ({prefix_str})")
+    print(
+        f"\n  {'':1}  {'Instance':<{name_w}}  {'Description':<{desc_w}}  {'Price':>{price_w}}  Regions ({prefix_str})"
+    )
     print(f"  {'':1}  {'-'*name_w}  {'-'*desc_w}  {'-'*price_w}  -------")
     for marker, name, desc, price, matching in rows:
         regions_str = ", ".join(matching) if matching else "—"
-        print(f"  {marker}  {name:<{name_w}}  {desc:<{desc_w}}  {price:>{price_w}}  {regions_str}")
+        print(
+            f"  {marker}  {name:<{name_w}}  {desc:<{desc_w}}  {price:>{price_w}}  {regions_str}"
+        )
     print()
 
     if not any(r[0] == "*" and r[4] for r in rows):
-        print(f"  None of the target instances have capacity in {prefix_str} regions right now.")
+        print(
+            f"  None of the target instances have capacity in {prefix_str} regions right now."
+        )
     else:
         print()
     print()
@@ -107,7 +114,12 @@ def print_catalog(data, targets, regions) -> int:
 def launch(api_key, itype, region, key_name):
     return requests.post(
         f"{API_BASE}/instance-operations/launch",
-        json={"region_name": region, "instance_type_name": itype, "ssh_key_names": [key_name], "quantity": 1},
+        json={
+            "region_name": region,
+            "instance_type_name": itype,
+            "ssh_key_names": [key_name],
+            "quantity": 1,
+        },
         auth=auth(api_key),
         timeout=10,
     )
@@ -135,7 +147,9 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
         print(f"[{ts()}] {e}")
         return
 
-    print(f"[{ts()}] Sniping {', '.join(instances)} in {prefix_str} — polling every {poll_interval}s")
+    print(
+        f"[{ts()}] Sniping {', '.join(instances)} in {prefix_str} — polling every {poll_interval}s"
+    )
     print(flush=True)  # placeholder status line — overwritten on first iteration
 
     checks = 0
@@ -153,7 +167,8 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
                 if itype not in data:
                     continue
                 matching = [
-                    r["name"] for r in data[itype].get("regions_with_capacity_available", [])
+                    r["name"]
+                    for r in data[itype].get("regions_with_capacity_available", [])
                     if region_matches(r["name"], regions)
                 ]
                 if not matching:
@@ -166,12 +181,18 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
                 if resp.ok:
                     ids = resp.json().get("data", {}).get("instance_ids", [])
                     print(f"[{ts()}] Launched! Instance ID(s): {', '.join(ids)}")
-                    print(f"[{ts()}] Check status: https://cloud.lambdalabs.com/instances")
+                    print(
+                        f"[{ts()}] Check status: https://cloud.lambdalabs.com/instances"
+                    )
                 else:
                     print(f"[{ts()}] Launch failed: {resp.text}")
                 return
 
-            print(f"[{ts()}] #{checks:04d}  {elapsed(start)} elapsed — no capacity", end="\r", flush=True)
+            print(
+                f"[{ts()}] #{checks:04d}  {elapsed(start)} elapsed — no capacity",
+                end="\r",
+                flush=True,
+            )
             time.sleep(poll_interval)
 
         except Exception as e:
@@ -224,7 +245,9 @@ def main():
         )
 
     try:
-        snipe(args.api_key, args.instances, args.regions, args.poll_interval, args.dry_run)
+        snipe(
+            args.api_key, args.instances, args.regions, args.poll_interval, args.dry_run
+        )
     except KeyboardInterrupt:
         print(f"\n[{ts()}] Stopped.")
 

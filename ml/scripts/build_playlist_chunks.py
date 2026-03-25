@@ -25,10 +25,10 @@ import argparse
 from datetime import datetime
 from datetime import timezone
 import json
+import os
 from pathlib import Path
 import sqlite3
 import time
-import os
 
 import pandas as pd
 

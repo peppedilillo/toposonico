@@ -7,8 +7,7 @@ def _get_config_parameter(var: str) -> int:
     n = os.environ.get(var)
     if n is None:
         raise EnvironmentError(
-            f"No {var} environment variable set. "
-            f"Have you run `source config.env`?"
+            f"No {var} environment variable set. " f"Have you run `source config.env`?"
         )
     return int(n)
 
@@ -27,7 +26,8 @@ class Artists:
         """
 
         df = df[
-            df.groupby("artist_rowid")["artist_rowid"].transform("count") > Artists.MINTRACKS
+            df.groupby("artist_rowid")["artist_rowid"].transform("count")
+            > Artists.MINTRACKS
         ]
         out = df.groupby(["artist_rowid", "artist_name"], as_index=False).agg(
             logcounts=("logcounts", "mean")
@@ -79,7 +79,10 @@ class Albums:
         artist_name, logcounts (float32) — mean of per-track
         logcounts across the album's tracks.
         """
-        df = df[df.groupby("album_rowid")["album_rowid"].transform("count") > Albums.MINTRACKS]
+        df = df[
+            df.groupby("album_rowid")["album_rowid"].transform("count")
+            > Albums.MINTRACKS
+        ]
         out = df.groupby(["album_rowid", "album_name"], as_index=False).agg(
             logcounts=("logcounts", "mean")
         )
@@ -137,9 +140,7 @@ class Labels:
         """
         df = df[df["label"].notna() & (df["label"] != "")]
         df = df[df.groupby("label")["label"].transform("count") > Labels.MINTRACKS]
-        out = df.groupby("label", as_index=False).agg(
-            logcounts=("logcounts", "mean")
-        )
+        out = df.groupby("label", as_index=False).agg(logcounts=("logcounts", "mean"))
         out["logcounts"] = out["logcounts"].astype("float32")
         out.insert(0, "label_rowid", pd.RangeIndex(len(out), dtype="int32"))
         return out

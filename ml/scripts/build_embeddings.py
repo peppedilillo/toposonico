@@ -25,9 +25,9 @@ Examples:
 """
 
 import argparse
+import os
 from pathlib import Path
 import time
-import os
 
 import numpy as np
 import pandas as pd
@@ -74,12 +74,12 @@ def main():
         raise FileNotFoundError(f"Model not found: {model_path}")
 
     if args.output is None:
-        raise ValueError(
-            "No output path set. Use --output or set $T2M_EMBEDDING_DIR."
-        )
+        raise ValueError("No output path set. Use --output or set $T2M_EMBEDDING_DIR.")
     output_path = Path(args.output)
     if output_path.is_dir():
-        output_path = output_path / f"{extract_run_name(model_path)}_embedding_track.parquet"
+        output_path = (
+            output_path / f"{extract_run_name(model_path)}_embedding_track.parquet"
+        )
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not args.no_filter:
@@ -106,11 +106,15 @@ def main():
     rowids = np.asarray(ckpt["vocab"]["track_rowid"], dtype=np.int64)
     embed_dim = ckpt["hparams"]["embed_dim"]
     del ckpt
-    print(f"  Loaded in {time.time() - t0:.1f}s  —  vocab {len(rowids):,}, dim {embed_dim}")
+    print(
+        f"  Loaded in {time.time() - t0:.1f}s  —  vocab {len(rowids):,}, dim {embed_dim}"
+    )
 
     if not args.no_filter:
         print("Loading lookup...")
-        lookup = pd.read_parquet(lookup_path, columns=["track_rowid", "id_isrc", "logcounts"])
+        lookup = pd.read_parquet(
+            lookup_path, columns=["track_rowid", "id_isrc", "logcounts"]
+        )
         print(f"  {len(lookup):,} rows")
 
         print("Deduplicating by ISRC...")
@@ -121,14 +125,18 @@ def main():
         valid = sub[sub["id_isrc"].notna() & (sub["id_isrc"] != "")]
         no_isrc = sub[sub["id_isrc"].isna() | (sub["id_isrc"] == "")]
 
-        keep = valid.sort_values("logcounts", ascending=False).drop_duplicates("id_isrc", keep="first")
+        keep = valid.sort_values("logcounts", ascending=False).drop_duplicates(
+            "id_isrc", keep="first"
+        )
         n_dup_removed = len(valid) - len(keep)
 
         keep_rowids = set(keep["track_rowid"]) | set(no_isrc["track_rowid"])
         del sub, valid, no_isrc, keep, lookup
 
         print(f"  Duplicates removed : {n_dup_removed:,}")
-        print(f"  Before: {len(rowids):,}  →  After: {len(keep_rowids):,}  (-{len(rowids) - len(keep_rowids):,})")
+        print(
+            f"  Before: {len(rowids):,}  →  After: {len(keep_rowids):,}  (-{len(rowids) - len(keep_rowids):,})"
+        )
 
         mask = np.array([r in keep_rowids for r in rowids.tolist()], dtype=bool)
         rowids = rowids[mask]
