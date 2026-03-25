@@ -83,8 +83,8 @@ def main():
     )
     parser.add_argument(
         "--output",
-        default=os.environ.get("T2M_TRACK_LOOKUP"),
-        help="Output parquet path. Set to `T2M_TRACK_LOOKUP` by default.",
+        default=os.environ.get("T2M_LOOKUP_TRACK"),
+        help="Output parquet path. Set to `T2M_LOOKUP_TRACK` by default.",
     )
     parser.add_argument(
         "--vocab",
@@ -111,7 +111,7 @@ def main():
 
     if args.output is None:
         raise ValueError(
-            "No `T2M_TRACK_LOOKUP` environment variable set. "
+            "No `T2M_LOOKUP_TRACK` environment variable set. "
             "Either run with --output argument or define the environment variable."
         )
     output_path = Path(args.output)

@@ -30,29 +30,29 @@ def main():
     )
     parser.add_argument(
         "--track-lookup",
-        default=os.environ.get("T2M_TRACK_LOOKUP"),
-        help="Path to track_lookup.parquet. Set to `T2M_TRACK_LOOKUP` by default.",
+        default=os.environ.get("T2M_LOOKUP_TRACK"),
+        help="Path to track_lookup.parquet. Set to `T2M_LOOKUP_TRACK` by default.",
     )
     parser.add_argument(
         "--artist-output",
-        default=os.environ.get("T2M_ARTIST_LOOKUP"),
-        help="Output path for artist_lookup.parquet. Set to `T2M_ARTIST_LOOKUP` by default.",
+        default=os.environ.get("T2M_LOOKUP_ARTIST"),
+        help="Output path for artist_lookup.parquet. Set to `T2M_LOOKUP_ARTIST` by default.",
     )
     parser.add_argument(
         "--album-output",
-        default=os.environ.get("T2M_ALBUM_LOOKUP"),
-        help="Output path for album_lookup.parquet. Set to `T2M_ALBUM_LOOKUP` by default.",
+        default=os.environ.get("T2M_LOOKUP_ALBUM"),
+        help="Output path for album_lookup.parquet. Set to `T2M_LOOKUP_ALBUM` by default.",
     )
     parser.add_argument(
         "--label-output",
-        default=os.environ.get("T2M_LABEL_LOOKUP"),
-        help="Output path for label_lookup.parquet. Set to `T2M_LABEL_LOOKUP` by default.",
+        default=os.environ.get("T2M_LOOKUP_LABEL"),
+        help="Output path for label_lookup.parquet. Set to `T2M_LOOKUP_LABEL` by default.",
     )
     args = parser.parse_args()
 
     if args.track_lookup is None:
         raise ValueError(
-            "No `T2M_TRACK_LOOKUP` environment variable set. "
+            "No `T2M_LOOKUP_TRACK` environment variable set. "
             "Either run with --track-lookup or define the environment variable."
         )
     track_lookup_path = Path(args.track_lookup)
@@ -61,17 +61,17 @@ def main():
 
     if args.artist_output is None:
         raise ValueError(
-            "No `T2M_ARTIST_LOOKUP` environment variable set. "
+            "No `T2M_LOOKUP_ARTIST` environment variable set. "
             "Either run with --artist-output or define the environment variable."
         )
     if args.album_output is None:
         raise ValueError(
-            "No `T2M_ALBUM_LOOKUP` environment variable set. "
+            "No `T2M_LOOKUP_ALBUM` environment variable set. "
             "Either run with --album-output or define the environment variable."
         )
     if args.label_output is None:
         raise ValueError(
-            "No `T2M_LABEL_LOOKUP` environment variable set. "
+            "No `T2M_LOOKUP_LABEL` environment variable set. "
             "Either run with --label-output or define the environment variable."
         )
 

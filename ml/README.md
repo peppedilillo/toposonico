@@ -69,3 +69,7 @@ Voilà! Take note of the umap location for all entities, we will use it in the n
 > fitted model. Mixing parquets from different fits produces incompatible coordinates and
 > silently corrupts the geo map.
 
+----
+
+You should now have four UMAP and four lookup tables, one for each entity type. 
+These will be the inputs for the database.

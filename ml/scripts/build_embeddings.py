@@ -53,8 +53,8 @@ def main():
     )
     parser.add_argument(
         "--track-lookup",
-        default=os.environ.get("T2M_TRACK_LOOKUP"),
-        help="Path to track_lookup.parquet (for ISRC deduplication). Set to `T2M_TRACK_LOOKUP` by default.",
+        default=os.environ.get("T2M_LOOKUP_TRACK"),
+        help="Path to track_lookup.parquet (for ISRC deduplication). Set to `T2M_LOOKUP_TRACK` by default.",
     )
     parser.add_argument(
         "--chunk-size",
@@ -85,7 +85,7 @@ def main():
     if not args.no_filter:
         if args.track_lookup is None:
             raise ValueError(
-                "No track-lookup path set. Use --track-lookup or set $T2M_TRACK_LOOKUP."
+                "No track-lookup path set. Use --track-lookup or set T2M_LOOKUP_TRACK."
             )
         lookup_path = Path(args.track_lookup)
         if not lookup_path.exists():
