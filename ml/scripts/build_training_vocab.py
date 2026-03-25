@@ -44,13 +44,13 @@ def main():
     )
     parser.add_argument(
         "--database",
-        default=os.environ.get("T2M_PLAYLIST_DB"),
-        help="Path to playlist SQLite database. Set to `T2M_PLAYLIST_DB` by default.",
+        default=os.environ.get("SICK_PLAYLIST_DB"),
+        help="Path to playlist SQLite database. Set to `SICK_PLAYLIST_DB` by default.",
     )
     parser.add_argument(
         "--output",
-        default=os.environ.get("T2M_TRAINING_VOCAB"),
-        help="Output parquet path. Set to `T2M_TRAINING_VOCAB` by default.",
+        default=os.environ.get("SICK_TRAINING_VOCAB"),
+        help="Output parquet path. Set to `SICK_TRAINING_VOCAB` by default.",
     )
     parser.add_argument(
         "--min-count",
@@ -65,7 +65,7 @@ def main():
 
     if args.database is None:
         raise ValueError(
-            "No `T2M_PLAYLIST_DB` environment variable set. "
+            "No `SICK_PLAYLIST_DB` environment variable set. "
             "Either run with --database argument or define the environment variable."
         )
     db_path = Path(args.database)
@@ -74,7 +74,7 @@ def main():
 
     if args.output is None:
         raise ValueError(
-            "No `T2M_TRAINING_VOCAB` environment variable set. "
+            "No `SICK_TRAINING_VOCAB` environment variable set. "
             "Either run with --output argument or define the environment variable."
         )
     output_path = Path(args.output)

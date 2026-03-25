@@ -13,7 +13,7 @@ def _get_config_parameter(var: str) -> int:
 
 
 class Artists:
-    MINTRACKS = _get_config_parameter("T2M_ARTIST_MINTRACK")
+    MINTRACKS = _get_config_parameter("SICK_ARTIST_MINTRACK")
 
     @staticmethod
     def lookup(df: pd.DataFrame) -> pd.DataFrame:
@@ -67,7 +67,7 @@ class Artists:
 
 
 class Albums:
-    MINTRACKS = _get_config_parameter("T2M_ALBUM_MINTRACK")
+    MINTRACKS = _get_config_parameter("SICK_ALBUM_MINTRACK")
 
     @staticmethod
     def lookup(df: pd.DataFrame) -> pd.DataFrame:
@@ -127,7 +127,7 @@ class Albums:
 
 
 class Labels:
-    MINTRACKS = _get_config_parameter("T2M_LABEL_MINTRACK")
+    MINTRACKS = _get_config_parameter("SICK_LABEL_MINTRACK")
 
     @staticmethod
     def lookup(df: pd.DataFrame) -> pd.DataFrame:
