@@ -10,15 +10,12 @@ wheels/
 # ide
 .idea
 
-# data
-assets
-notebooks/experiments/data
+# binaries
+outs
+
+# private
+config.env
 
 # Virtual environments
 .venv
-
-# notebooks
-notebooks/___*
-
-# LLM
-CLAUDE.md
+uv.lock

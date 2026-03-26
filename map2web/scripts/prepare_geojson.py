@@ -35,15 +35,15 @@ ENTITY_CONFIGS = {
     },
     "album": {
         "key": "album_rowid",
-        "sql": "SELECT album_rowid, lon, lat, logcounts, track_count FROM albums",
+        "sql": "SELECT album_rowid, lon, lat, logcounts FROM albums",
     },
     "artist": {
         "key": "artist_rowid",
-        "sql": "SELECT artist_rowid, lon, lat, logcounts, track_count FROM artists",
+        "sql": "SELECT artist_rowid, lon, lat, logcounts FROM artists",
     },
     "label": {
         "key": "label_rowid",
-        "sql": "SELECT label_id AS label_rowid, lon, lat, logcounts, track_count FROM labels",
+        "sql": "SELECT label_id AS label_rowid, lon, lat, logcounts FROM labels",
     },
 }
 
@@ -109,7 +109,6 @@ def main():
     lats   = df["lat"].values
     keys   = df[key].values
     pops   = df["logcounts"].fillna(0).astype(np.float32).values
-    counts = df["track_count"].values if "track_count" in df.columns else None
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     print("Writing ndjson …")
@@ -119,8 +118,6 @@ def main():
     with open(args.output, "w", encoding="utf-8") as out:
         for i in range(n):
             props = {key: int(keys[i]), "logcounts": round(float(pops[i]), 2)}
-            if counts is not None:
-                props["track_count"] = int(counts[i])
             feature = {
                 "type": "Feature",
                 "geometry": {"type": "Point", "coordinates": [float(lons[i]), float(lats[i])]},

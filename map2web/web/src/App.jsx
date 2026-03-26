@@ -9,7 +9,6 @@ import { LAYERS } from "./layers.js";
 
 const STYLE = {
     version: 8,
-    glyphs: "/fonts/IBMPlexMono/{fontstack}/{range}.pbf",
     sources: {},
     layers: [
         {
@@ -48,7 +47,7 @@ for (let lat = -90; lat <= 90; lat += 5) {
 
 const STARTZOOM = 4;
 
-const ENTITY_ZOOM = { track: 9, album: 8, artist: 7, label: 6 };
+const ENTITY_ZOOM = { track: 10, album: 9, artist: 9, label: 8 };
 
 /** Reads map state from the URL hash. Missing keys fall back to defaults. */
 function parseHash() {
@@ -132,8 +131,7 @@ export default function App() {
                 ({
                     id,
                     sourceLayer,
-                    char,
-                    size,
+                    radius,
                     color,
                     opacity,
                     entityType,
@@ -141,18 +139,13 @@ export default function App() {
                 }) => {
                     map.addLayer({
                         id,
-                        type: "symbol",
+                        type: "circle",
                         source: "tiles",
                         "source-layer": sourceLayer,
-                        layout: {
-                            "text-field": char,
-                            "text-size": size,
-                            "text-font": ["IBM Plex Mono Regular"],
-                            "text-allow-overlap": true,
-                        },
                         paint: {
-                            "text-color": color,
-                            "text-opacity": opacity,
+                            "circle-radius": radius,
+                            "circle-color": color,
+                            "circle-opacity": opacity,
                         },
                     });
                     map.on("mousemove", id, () => {

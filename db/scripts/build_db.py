@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the SQLite database from track2map output parquets.
+"""Build the SQLite database from parquet inputs.
 
 Loads lookup, geo, and KNN parquets and writes a single SQLite DB:
   - tracks, albums, artists, labels  — with denormalized geo for cross-entity navigation
@@ -23,10 +23,8 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from src.entities import Artists, Albums, Labels
 
 BATCH_SIZE = 500_000
-KNN_K_DEFAULT = 20
 
 DDL = """
 PRAGMA journal_mode = WAL;
@@ -57,7 +55,6 @@ CREATE TABLE tracks (
 CREATE TABLE albums (
     album_rowid          INTEGER PRIMARY KEY,
     album_name           TEXT    NOT NULL,
-    track_count          INTEGER NOT NULL,
     logcounts            REAL    NOT NULL,
     lon                  REAL    NOT NULL,
     lat                  REAL    NOT NULL,
@@ -79,7 +76,6 @@ CREATE TABLE albums (
 CREATE TABLE artists (
     artist_rowid INTEGER PRIMARY KEY,
     artist_name  TEXT    NOT NULL,
-    track_count  INTEGER NOT NULL,
     logcounts    REAL    NOT NULL,
     lon          REAL    NOT NULL,
     lat          REAL    NOT NULL,
@@ -90,7 +86,6 @@ CREATE TABLE artists (
 CREATE TABLE labels (
     label_id    INTEGER PRIMARY KEY,
     label       TEXT    NOT NULL UNIQUE,
-    track_count INTEGER NOT NULL,
     logcounts   REAL    NOT NULL,
     lon         REAL    NOT NULL,
     lat         REAL    NOT NULL
@@ -137,8 +132,8 @@ CREATE INDEX idx_albums_artist ON albums(artist_rowid);
 """
 
 
-def _pivot_knn(key_vals, neighbor_mat, score_mat, knn_k):
-    """Pivot wide KNN batch to flat rows, filtering self-matches, capped at knn_k per entity.
+def _pivot_knn(key_vals, neighbor_mat, score_mat):
+    """Pivot wide KNN batch to flat rows, filtering self-matches.
 
     key_vals:     (B,)      int64 — entity rowids for this batch
     neighbor_mat: (B, K+1)  int64 — neighbor rowids (may include self-match)
@@ -168,9 +163,7 @@ def _pivot_knn(key_vals, neighbor_mat, score_mat, knn_k):
     run_start_per_el = np.repeat(run_starts, run_lengths)
     ranks_f = np.arange(len(keys_f), dtype=np.int32) - run_start_per_el.astype(np.int32)
 
-    # Cap at knn_k neighbours per entity
-    cap = ranks_f < knn_k
-    return keys_f[cap], ranks_f[cap], neighbors_f[cap], scores_f[cap]
+    return keys_f, ranks_f, neighbors_f, scores_f
 
 
 def _insert_knn(
@@ -183,7 +176,7 @@ def _insert_knn(
 
 
 def enrich_artists(df: pd.DataFrame, tracks_conn: sqlite3.Connection) -> pd.DataFrame:
-    """Join artist popularity and first genre from T2M_TRACKS_DB.
+    """Join artist popularity and first genre from SICK_TRACKS_DB.
 
     Merges on artist_rowid. Genre is NULL when no artist_genres row exists.
     """
@@ -200,7 +193,7 @@ def enrich_artists(df: pd.DataFrame, tracks_conn: sqlite3.Connection) -> pd.Data
 
 
 def enrich_albums(df: pd.DataFrame, tracks_conn: sqlite3.Connection) -> pd.DataFrame:
-    """Join album metadata from T2M_TRACKS_DB.
+    """Join album metadata from SICK_TRACKS_DB.
 
     Adds: album_type, label (string), popularity, total_tracks, release_date,
     release_date_precision. The label string is used downstream to resolve label_id/lon/lat.
@@ -227,10 +220,10 @@ def enrich_albums(df: pd.DataFrame, tracks_conn: sqlite3.Connection) -> pd.DataF
 
 def build_labels(conn, label_lookup: pd.DataFrame, geo_dir: Path) -> pd.DataFrame:
     """Build labels table; return the label DataFrame for downstream use."""
-    geo = pd.read_parquet(geo_dir / "label_geo.parquet")  # columns: label, lon, lat
+    geo = pd.read_parquet(geo_dir / "geo_label.parquet")  # columns: label, lon, lat
     df = label_lookup.rename(columns={"label_rowid": "label_id"})
     df = df.merge(geo, on="label", how="inner")
-    df = df[["label_id", "label", "track_count", "logcounts", "lon", "lat"]]
+    df = df[["label_id", "label", "logcounts", "lon", "lat"]]
     df.to_sql("labels", conn, if_exists="append", index=False)
     print(f"  [labels]  {len(df):,} rows")
     return df
@@ -243,7 +236,7 @@ def build_artists(
     tracks_conn: sqlite3.Connection | None,
 ) -> pd.DataFrame:
     """Build artists table; return artist_geo for albums/tracks enrichment."""
-    artist_geo = pd.read_parquet(geo_dir / "artist_geo.parquet")
+    artist_geo = pd.read_parquet(geo_dir / "geo_artist.parquet")
     df = artist_lookup.merge(artist_geo, on="artist_rowid", how="inner")
     if tracks_conn is not None:
         df = enrich_artists(df, tracks_conn)
@@ -251,8 +244,7 @@ def build_artists(
         df["popularity"] = None
         df["genre"] = None
     df = df[
-        ["artist_rowid", "artist_name", "track_count", "logcounts", "lon", "lat",
-         "popularity", "genre"]
+        ["artist_rowid", "artist_name", "logcounts", "lon", "lat", "popularity", "genre"]
     ]
     df.to_sql("artists", conn, if_exists="append", index=False)
     print(f"  [artists] {len(df):,} rows")
@@ -268,7 +260,7 @@ def build_albums(
     tracks_conn: sqlite3.Connection | None,
 ) -> pd.DataFrame:
     """Build albums table; return album_geo for tracks enrichment."""
-    album_geo = pd.read_parquet(geo_dir / "album_geo.parquet")
+    album_geo = pd.read_parquet(geo_dir / "geo_album.parquet")
 
     df = album_lookup.merge(album_geo, on="album_rowid", how="inner")
     df = df.merge(
@@ -290,7 +282,7 @@ def build_albums(
     df = df.merge(label_info, on="label", how="left")
     df = df[
         [
-            "album_rowid", "album_name", "track_count", "logcounts", "lon", "lat",
+            "album_rowid", "album_name", "logcounts", "lon", "lat",
             "artist_rowid", "artist_name", "artist_lon", "artist_lat",
             "album_type", "label", "popularity", "total_tracks",
             "release_date", "release_date_precision",
@@ -303,9 +295,9 @@ def build_albums(
 
 
 def build_tracks(
-    conn, lookup_dir, geo_dir, artist_geo, album_geo, label_df, batch_size
+    conn, lookup_track_path, geo_dir, artist_geo, album_geo, label_df, batch_size
 ):
-    track_geo = pd.read_parquet(geo_dir / "track_geo.parquet")
+    track_geo = pd.read_parquet(geo_dir / "geo_track.parquet")
 
     artist_geo_r = artist_geo.rename(columns={"lon": "artist_lon", "lat": "artist_lat"})
     album_geo_r = album_geo.rename(columns={"lon": "album_lon", "lat": "album_lat"})
@@ -325,7 +317,7 @@ def build_tracks(
         "album_name",
         "label",
     ]
-    pf = pq.ParquetFile(lookup_dir / "track_lookup.parquet")
+    pf = pq.ParquetFile(lookup_track_path)
     total = 0
     t0 = time.time()
 
@@ -371,15 +363,15 @@ def build_tracks(
     print(f"\n  [tracks]  {total:,} rows  ({time.time()-t0:.1f}s)")
 
 
-def build_knn_tables(conn, knn_dir, label_to_id, knn_k, batch_size):
+def build_knn_tables(conn, knn_dir, label_to_id, batch_size):
     # Track, album, artist — int64 keys throughout
     for entity, pk_col, table in [
         ("track", "track_rowid", "track_knn"),
         ("album", "album_rowid", "album_knn"),
         ("artist", "artist_rowid", "artist_knn"),
     ]:
-        knn_path = knn_dir / f"{entity}_knn.parquet"
-        score_path = knn_dir / f"{entity}_knn_scores.parquet"
+        knn_path = knn_dir / f"knn_{entity}.parquet"
+        score_path = knn_dir / f"knn_scores_{entity}.parquet"
         if not knn_path.exists():
             print(f"  [{table}] skipped (not found: {knn_path})")
             continue
@@ -403,7 +395,7 @@ def build_knn_tables(conn, knn_dir, label_to_id, knn_k, batch_size):
             score_mat = sdf[s_cols].to_numpy(dtype=np.float32)
 
             keys_f, ranks_f, neighbors_f, scores_f = _pivot_knn(
-                key_vals, neighbor_mat, score_mat, knn_k
+                key_vals, neighbor_mat, score_mat
             )
             _insert_knn(
                 conn,
@@ -424,8 +416,8 @@ def build_knn_tables(conn, knn_dir, label_to_id, knn_k, batch_size):
         print(f"\n  [{table}]  {total:,} rows  ({time.time()-t0:.1f}s)")
 
     # Labels — string keys, must map to label_id
-    label_knn_path = knn_dir / "label_knn.parquet"
-    label_score_path = knn_dir / "label_knn_scores.parquet"
+    label_knn_path = knn_dir / "knn_label.parquet"
+    label_score_path = knn_dir / "knn_scores_label.parquet"
     if not label_knn_path.exists():
         print("  [label_knn] skipped (not found)")
         return
@@ -462,7 +454,7 @@ def build_knn_tables(conn, knn_dir, label_to_id, knn_k, batch_size):
 
         valid = key_ids != -1
         keys_f, ranks_f, neighbors_f, scores_f = _pivot_knn(
-            key_ids[valid], neighbor_ids[valid], score_mat[valid], knn_k
+            key_ids[valid], neighbor_ids[valid], score_mat[valid]
         )
         _insert_knn(
             conn,
@@ -485,39 +477,48 @@ def build_knn_tables(conn, knn_dir, label_to_id, knn_k, batch_size):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Build SQLite DB from track2map parquet outputs",
+        description="Build SQLite DB from parquet inputs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--db",
-        default=os.environ.get("T2M_DB"),
-        help="Output SQLite path. $T2M_DB",
+        default=os.environ.get("SICK_DB"),
+        help="Output SQLite path. $SICK_DB",
     )
     parser.add_argument(
-        "--lookup-dir",
-        default=os.environ.get("T2M_LOOKUP_DIR"),
-        help="Dir with track_lookup.parquet. $T2M_LOOKUP_DIR",
+        "--lookup-track",
+        default=os.environ.get("SICK_LOOKUP_TRACK"),
+        help="Path to lookup_track.parquet. $SICK_LOOKUP_TRACK",
+    )
+    parser.add_argument(
+        "--lookup-artist",
+        default=os.environ.get("SICK_LOOKUP_ARTIST"),
+        help="Path to lookup_artist.parquet. $SICK_LOOKUP_ARTIST",
+    )
+    parser.add_argument(
+        "--lookup-album",
+        default=os.environ.get("SICK_LOOKUP_ALBUM"),
+        help="Path to lookup_album.parquet. $SICK_LOOKUP_ALBUM",
+    )
+    parser.add_argument(
+        "--lookup-label",
+        default=os.environ.get("SICK_LOOKUP_LABEL"),
+        help="Path to lookup_label.parquet. $SICK_LOOKUP_LABEL",
     )
     parser.add_argument(
         "--geo-dir",
-        default=os.environ.get("T2M_GEO_DIR"),
-        help="Dir with *_geo.parquets. $T2M_GEO_DIR",
+        default=os.environ.get("SICK_GEO_DIR"),
+        help="Dir with geo_*.parquets. $SICK_GEO_DIR",
     )
     parser.add_argument(
         "--knn-dir",
-        default=os.environ.get("T2M_KNN_DIR"),
-        help="Dir with *_knn.parquets. $T2M_KNN_DIR",
+        default=os.environ.get("SICK_KNN_DIR"),
+        help="Dir with knn_*.parquets. $SICK_KNN_DIR",
     )
     parser.add_argument(
         "--tracks-db",
-        default=os.environ.get("T2M_TRACKS_DB"),
-        help="Path to spotify_clean.sqlite3 for artist/album enrichment. $T2M_TRACKS_DB (optional)",
-    )
-    parser.add_argument(
-        "--knn-k",
-        type=int,
-        default=KNN_K_DEFAULT,
-        help=f"Max neighbours to store per entity (default: {KNN_K_DEFAULT})",
+        default=os.environ.get("SICK_TRACKS_DB"),
+        help="Path to spotify_clean.sqlite3 for artist/album enrichment. $SICK_TRACKS_DB (optional)",
     )
     parser.add_argument(
         "--batch-size",
@@ -527,16 +528,22 @@ def main():
     )
     args = parser.parse_args()
 
-    for name, val in [
-        ("--db", args.db),
-        ("--lookup-dir", args.lookup_dir),
-        ("--geo-dir", args.geo_dir),
-        ("--knn-dir", args.knn_dir),
-    ]:
-        if val is None:
-            raise ValueError(f"{name} not set (or corresponding env var)")
+    if args.db is None:
+        raise ValueError("--db / $SICK_DB not set")
+    if args.lookup_track is None:
+        raise ValueError("--lookup-track / $SICK_LOOKUP_TRACK not set")
+    if args.lookup_artist is None:
+        raise ValueError("--lookup-artist / $SICK_LOOKUP_ARTIST not set")
+    if args.lookup_album is None:
+        raise ValueError("--lookup-album / $SICK_LOOKUP_ALBUM not set")
+    if args.lookup_label is None:
+        raise ValueError("--lookup-label / $SICK_LOOKUP_LABEL not set")
+    if args.geo_dir is None:
+        raise ValueError("--geo-dir / $SICK_GEO_DIR not set")
+    if args.knn_dir is None:
+        raise ValueError("--knn-dir / $SICK_KNN_DIR not set")
 
-    lookup_dir = Path(args.lookup_dir)
+    lookup_track_path = Path(args.lookup_track)
     geo_dir = Path(args.geo_dir)
     knn_dir = Path(args.knn_dir)
     db_path = Path(args.db)
@@ -545,12 +552,15 @@ def main():
         db_path.unlink()
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"DB         : {db_path}")
-    print(f"Lookup dir : {lookup_dir}")
-    print(f"Geo dir    : {geo_dir}")
-    print(f"KNN dir    : {knn_dir}")
-    print(f"Tracks DB  : {args.tracks_db or '(none — enrichment skipped)'}")
-    print(f"knn_k      : {args.knn_k}")
+    print(f"DB           : {db_path}")
+    print(f"Lookup track : {lookup_track_path}")
+    print(f"Lookup artist: {args.lookup_artist}")
+    print(f"Lookup album : {args.lookup_album}")
+    print(f"Lookup label : {args.lookup_label}")
+    print(f"Geo dir      : {geo_dir}")
+    print(f"KNN dir      : {knn_dir}")
+    print(f"Tracks DB    : {args.tracks_db or '(none — enrichment skipped)'}")
+
     print()
 
     t_total = time.time()
@@ -559,15 +569,10 @@ def main():
 
     tracks_conn = sqlite3.connect(args.tracks_db) if args.tracks_db else None
 
-    print("Computing entity lookups from track_lookup.parquet...")
-    lookup_cols = [
-        "track_rowid", "artist_rowid", "artist_name",
-        "album_rowid", "album_name", "label", "logcounts",
-    ]
-    track_lookup = pd.read_parquet(lookup_dir / "track_lookup.parquet", columns=lookup_cols)
-    label_lookup = Labels.lookup(track_lookup)
-    artist_lookup = Artists.lookup(track_lookup)
-    album_lookup = Albums.lookup(track_lookup)
+    print("Loading entity lookups...")
+    label_lookup = pd.read_parquet(args.lookup_label)
+    artist_lookup = pd.read_parquet(args.lookup_artist)
+    album_lookup = pd.read_parquet(args.lookup_album)
     print(
         f"  labels={len(label_lookup):,}  artists={len(artist_lookup):,}  albums={len(album_lookup):,}"
     )
@@ -583,13 +588,13 @@ def main():
         tracks_conn.close()
 
     build_tracks(
-        conn, lookup_dir, geo_dir, artist_geo, album_geo, label_df, args.batch_size
+        conn, lookup_track_path, geo_dir, artist_geo, album_geo, label_df, args.batch_size
     )
     conn.commit()
 
     print("\nBuilding KNN tables...")
     label_to_id = dict(zip(label_df["label"], label_df["label_id"]))
-    build_knn_tables(conn, knn_dir, label_to_id, args.knn_k, args.batch_size)
+    build_knn_tables(conn, knn_dir, label_to_id, args.batch_size)
 
     print("\nCreating indexes...")
     conn.executescript(POST_DDL)

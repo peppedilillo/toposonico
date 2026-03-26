@@ -6,10 +6,9 @@ import colors from "./theme.js";
  * @property {string} sourceLayer   vector tile source-layer name
  * @property {string} entityType    'track' | 'album' | 'artist' | 'label'
  * @property {string} rowidProp     tile feature property that holds the entity rowid
- * @property {string} char          symbol character rendered on the map
- * @property {number} size          text-size in pixels
+ * @property {number} radius        circle-radius in pixels
  * @property {string} color         CSS color string
- * @property {number} opacity       text-opacity [0, 1]
+ * @property {number} opacity       circle-opacity [0, 1]
  */
 const LAYERS = [
     {
@@ -17,18 +16,16 @@ const LAYERS = [
         sourceLayer: "tracks",
         entityType: "track",
         rowidProp: "track_rowid",
-        char: "·",
-        size: 16,
+        radius: 1.5,
         color: colors.track,
-        opacity: 0.7,
+        opacity: 0.5,
     },
     {
         id: "albums",
         sourceLayer: "albums",
         entityType: "album",
         rowidProp: "album_rowid",
-        char: "o",
-        size: 12,
+        radius: 2,
         color: colors.album,
         opacity: 0.7,
     },
@@ -37,8 +34,7 @@ const LAYERS = [
         sourceLayer: "artists",
         entityType: "artist",
         rowidProp: "artist_rowid",
-        char: "*",
-        size: 12,
+        radius: 2,
         color: colors.artist,
         opacity: 0.7,
     },
@@ -47,10 +43,9 @@ const LAYERS = [
         sourceLayer: "labels",
         entityType: "label",
         rowidProp: "label_rowid",
-        char: "P",
-        size: 24,
+        radius: 3,
         color: colors.label,
-        opacity: 1.0,
+        opacity: 0.7,
     },
 ];
 
