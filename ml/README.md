@@ -70,9 +70,21 @@ Voilà! Take note of the umap location for all entities, we will use it in the n
 > fitted model. Mixing parquets from different fits produces incompatible coordinates and
 > silently corrupts the geo map.
 
+
+
+### Phase 4 - Writing manifest
+
+You should now have four UMAP, four embeddings and four lookup tables, one for each entity type.
+Get a manifest template with:
+
+```shell
+python scripts/manifest.py > manifest.toml
+```
+
+Fill it.
+
 ----
 
-What a _sick_ ride it was.
+Voilà! Wasn't a _sick_ ride? You are done, rejoice!
 
-You should now have four UMAP, four embeddings and four lookup tables, one for each entity type. 
-These will be the inputs for the database.
+Joking.. But now we can build the db.
