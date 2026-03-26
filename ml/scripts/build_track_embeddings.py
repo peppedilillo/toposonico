@@ -48,8 +48,8 @@ def main():
     parser.add_argument("model", type=Path, help="Path to .pt model checkpoint file")
     parser.add_argument(
         "--output",
-        default=os.environ.get("SICK_EMBEDDING_DIR"),
-        help="Output parquet path, either a directory or a file name. Set to `SICK_EMBEDDING_DIR` by default.",
+        default=os.environ.get("SICK_EMBEDDING_TRACK"),
+        help="Output parquet path. Set to `SICK_EMBEDDING_TRACK` by default.",
     )
     parser.add_argument(
         "--track-lookup",
@@ -74,12 +74,8 @@ def main():
         raise FileNotFoundError(f"Model not found: {model_path}")
 
     if args.output is None:
-        raise ValueError("No output path set. Use --output or set SICK_EMBEDDING_DIR.")
+        raise ValueError("No output path set. Use --output or set SICK_EMBEDDING_TRACK.")
     output_path = Path(args.output)
-    if output_path.is_dir():
-        output_path = (
-            output_path / f"{extract_run_name(model_path)}_embedding_track.parquet"
-        )
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not args.no_filter:

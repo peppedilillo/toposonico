@@ -44,13 +44,14 @@ python scripts/build_entity_lookups.py
 We will use `build_track_lookup.py` again so take note of where it lives.
 There is a lot of data, choose a directory for chunks wisely
 
-### Phase 2 — Training (interactive, GPU)
+### Phase 2 — Training and embeddings (interactive, GPU)
 
 > Use the `lambda_sniper.py` script for catching lambdalabs instances!
 
 ```sh
 # open notebooks/train.ipynb, do your thing and store the checkpoint to `path/to/<checkpoint>.pt`
-python scripts/build_embeddings.py path/to/<checkpoint>.pt
+python scripts/build_track_embeddings.py path/to/<checkpoint>.pt
+python scripts/build_entity_embeddings.py
 ```
 
 This script will also perform clean-up of tracks with duplicated ISRC.
@@ -71,5 +72,7 @@ Voilà! Take note of the umap location for all entities, we will use it in the n
 
 ----
 
-You should now have four UMAP and four lookup tables, one for each entity type. 
+What a _sick_ ride it was.
+
+You should now have four UMAP, four embeddings and four lookup tables, one for each entity type. 
 These will be the inputs for the database.
