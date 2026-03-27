@@ -1,12 +1,10 @@
 """Compute joint lon/lat coordinates for all entity types from UMAP projections.
 
-Reads UMAP parquets for any combination of tracks, albums, artists, and labels,
-computes a single global bounding box across all of them (with padding), then
-writes per-entity geo-parquets containing only the key column + lon + lat.
+Reads UMAP parquets for all entity types from the ml manifest, computes a single
+global bounding box across all of them (with padding), then writes per-entity
+geo-parquets containing only the key column + lon + lat.
 
-Running with a subset of entities shifts the bbox — always run with all 4 together
-to keep coordinate alignment stable across entity types.
-
+Always run with all 4 entities together to keep coordinate alignment stable.
 All four parquets must come from the same UMAP fit — mixing parquets from different
 fits produces incompatible coordinates.
 
@@ -14,32 +12,25 @@ Usage:
     uv run python scripts/build_geomap.py [options]
 
 Examples:
-    # all four entities via env vars (recommended)
     source config.env && uv run python scripts/build_geomap.py
-
-    # explicit paths (env-var-free)
-    uv run python scripts/build_geomap.py \\
-        --track-umap  outs/umap/umap_track_2d_nn150_md0d01_cosine.parquet \\
-        --album-umap  outs/umap/umap_album_2d_nn150_md0d01_cosine.parquet \\
-        --artist-umap outs/umap/umap_artist_2d_nn150_md0d01_cosine.parquet \\
-        --label-umap  outs/umap/umap_label_2d_nn150_md0d01_cosine.parquet \\
-        --output-dir  outs/geo/
+    uv run python scripts/build_geomap.py --manifest ml/outs/manifest.toml --output-dir outs/geo/
 """
 
 import argparse
 import os
-import sys
 from pathlib import Path
 from typing import Sequence
 
 import pandas as pd
 
+from src.utils import get_auxpaths, read_manifest
+
 
 ENTITIES = {
-    "track":  ("umap_track",  "track_rowid",  "SICK_UMAP_TRACK"),
-    "album":  ("umap_album",  "album_rowid",  "SICK_UMAP_ALBUM"),
-    "artist": ("umap_artist", "artist_rowid", "SICK_UMAP_ARTIST"),
-    "label":  ("umap_label",  "label",        "SICK_UMAP_LABEL"),
+    "track":  "track_rowid",
+    "album":  "album_rowid",
+    "artist": "artist_rowid",
+    "label":  "label",
 }
 
 
@@ -99,86 +90,46 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--umap-track", default=os.environ.get("SICK_UMAP_TRACK"), metavar="PATH",
-        help="UMAP parquet for tracks.Set to `SICK_UMAP_TRACK` by default.",
-    )
-    parser.add_argument(
-        "--umap-album", default=os.environ.get("SICK_UMAP_ALBUM"), metavar="PATH",
-        help="UMAP parquet for albums. Set to `SICK_UMAP_ALBUM` by default.",
-    )
-    parser.add_argument(
-        "--umap-artist", default=os.environ.get("SICK_UMAP_ARTIST"), metavar="PATH",
-        help="UMAP parquet for artists. Set to `SICK_UMAP_ARTIST` by default.",
-    )
-    parser.add_argument(
-        "--umap-label", default=os.environ.get("SICK_UMAP_LABEL"), metavar="PATH",
-        help="UMAP parquet for labels. Set to `SICK_UMAP_LABEL` by default.",
-    )
-    parser.add_argument(
-        "--output-dir",
-        default=os.environ.get("SICK_GEO_DIR"),
-        metavar="DIR",
-        help="Directory for output geo-parquets. Set to `SICK_GEO_DIR` by default.",
+        "--manifest",
+        default=os.environ.get("SICK_MANIFEST"),
+        metavar="PATH",
+        help="Path to ml manifest TOML. $SICK_MANIFEST",
     )
     parser.add_argument(
         "--width",
         type=float,
         default=os.environ.get("SICK_GEO_WIDTH"),
         metavar="DEG",
-        help=f"Width in degrees of the lon/lat square. Set to `SICK_GEO_WIDTH` by default.",
+        help="Width in degrees of the lon/lat square. $SICK_GEO_WIDTH",
     )
     parser.add_argument(
         "--padding",
         type=float,
         default=os.environ.get("SICK_GEO_PADDING"),
         metavar="DEG",
-        help=f"Fractional padding added to each side of the bbox. Set to `SICK_GEO_PADDING` by default.",
+        help="Fractional padding added to each side of the bbox. $SICK_GEO_PADDING",
     )
     args = parser.parse_args()
 
+    if args.manifest is None:
+        raise ValueError("--manifest / $SICK_MANIFEST not set")
     if args.width is None:
-        raise ValueError(
-            "No `SICK_GEO_WIDTH` environment variable set. "
-            "Either run with --width argument or define the environment variable."
-        )
-    hwidth = args.width / 2.
+        raise ValueError("--width / $SICK_GEO_WIDTH not set")
     if args.padding is None:
-        raise ValueError(
-            "No `SICK_GEO_PADDING` environment variable set. "
-            "Either run with --padding argument or define the environment variable."
-        )
-    if args.output_dir is None:
-        raise ValueError(
-            "No `SICK_GEO_DIR` environment variable set. "
-            "Either run with --output-dir argument or define the environment variable."
-        )
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+        raise ValueError("--padding / $SICK_GEO_PADDING not set")
 
-    # subset of entities whose UMAP path was provided; allows running on fewer than 4
-    active = {
-        entity: Path(getattr(args, attr))
-        for entity, (attr, *_) in ENTITIES.items()
-        if getattr(args, attr) is not None
-    }
+    manifest = read_manifest(args.manifest)
+    umap_paths = {entity: Path(p) for entity, p in manifest["umap"].items()}
 
-    if not active:
-        print(
-            "Error: no UMAP paths provided. Pass --umap-track / --umap-album / "
-            "--umap-artist / --umap-label or set $SICK_UMAP_TRACK etc. in config.env",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    geo_paths = get_auxpaths()["geo"]
+    next(iter(geo_paths.values())).parent.mkdir(parents=True, exist_ok=True)
 
-    for entity, path in active.items():
-        if not path.exists():
-            print(f"Error: {entity} UMAP parquet not found: {path}", file=sys.stderr)
-            sys.exit(1)
+    hwidth = args.width / 2.
 
     umap_frames = []
     entity_names = []
-    for entity, path in active.items():
-        key_col = ENTITIES[entity][1]
+    for entity, path in umap_paths.items():
+        key_col = ENTITIES[entity]
         df = pd.read_parquet(path, columns=[key_col, "umap_x", "umap_y"])
         umap_frames.append((df, key_col))
         entity_names.append(entity)
@@ -188,7 +139,7 @@ def main():
     )
 
     for entity, geo in zip(entity_names, geo_frames):
-        out_path = output_dir / f"geo_{entity}.parquet"
+        out_path = geo_paths[entity]
         geo.to_parquet(out_path, index=False)
         print(f"{entity:8s}  {len(geo):>9,} rows  →  {out_path}")
 

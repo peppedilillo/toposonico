@@ -27,9 +27,6 @@ Examples:
 
     # full run (tracks ~10-20 min on CPU with IVF)
     source config.env && uv run python scripts/build_knn.py
-
-    # higher recall (slower)
-    source config.env && uv run python scripts/build_knn.py --nprobe 128
 """
 
 import argparse
@@ -42,6 +39,8 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+
+from src.utils import get_auxpaths, read_manifest
 
 
 IVF_THRESHOLD = 500_000  # use IVFFlat above this, FlatIP below
@@ -56,11 +55,26 @@ ENTITIES = {
 }
 
 
-def _knn_search(matrix: np.ndarray, k: int, batch_size: int, nprobe: int):
-    """Cosine KNN via FAISS (CPU). Yields (I, D_batch) per search batch.
+INDEX_MIN_LEN = 256
+INDEX_MAX_LEN = 32768
 
-    I: int64 (batch, k+1) row-indices into matrix; D_batch: float32 (batch, k+1)
-    cosine similarities. Results may include self-match — filter at serve time.
+def _knn_search(matrix: np.ndarray, k: int, batch_size: int, nprobe: int):
+    """Cosine KNN over the full matrix via FAISS (CPU). Normalises in-place.
+
+    Selects index type based on N: IVFFlat for N > IVF_THRESHOLD (approximate,
+    fast), FlatIP otherwise (exact). Yields one batch at a time to avoid
+    materialising the full (N, k+1) result array in RAM.
+
+    Args:
+        matrix:     (N, D) float32 embedding matrix. Modified in-place (L2-normalised).
+        k:          number of neighbours to return (k+1 columns yielded to allow
+                    self-match removal downstream).
+        batch_size: number of query rows per FAISS search call.
+        nprobe:     IVF nprobe — cells visited per query; ignored for FlatIP.
+
+    Yields:
+        (I, D_batch): row-index matrix (batch, k+1) int64 and cosine-similarity
+        matrix (batch, k+1) float32. Results may include self-match.
     """
     N, D = matrix.shape
     mat = matrix  # normalise in-place (caller does not reuse matrix after this)
@@ -69,15 +83,13 @@ def _knn_search(matrix: np.ndarray, k: int, batch_size: int, nprobe: int):
     mat /= norms
 
     if N > IVF_THRESHOLD:
-        nlist = int(np.clip(IVF_NLIST_FACTOR * N**0.5, 256, 32_768))
+        nlist = int(np.clip(IVF_NLIST_FACTOR * N**0.5, INDEX_MIN_LEN, INDEX_MAX_LEN))
         quantizer = faiss.IndexFlatIP(D)
         index = faiss.IndexIVFFlat(quantizer, D, nlist, faiss.METRIC_INNER_PRODUCT)
         train_n = min(N, 256 * nlist)
         if train_n < N:
             train_mat = mat[np.random.choice(N, train_n, replace=False)]
-            print(
-                f"  training IVF index (nlist={nlist}, subsample={train_n:,}/{N:,})..."
-            )
+            print(f"  training IVF index (nlist={nlist}, subsample={train_n:,}/{N:,})...")
         else:
             train_mat = mat
             print(f"  training IVF index (nlist={nlist})...")
@@ -108,10 +120,31 @@ def _process_entity(
     key_col: str,
     k: int,
     emb_df: pd.DataFrame,
-    output_dir: Path,
+    knn_path: Path,
+    score_path: Path,
     batch_size: int,
     nprobe: int,
 ) -> None:
+    """Run KNN search for one entity type and write results to two parquets.
+
+    Extracts the key column and the e0…eD embedding columns from emb_df, runs
+    cosine KNN via _knn_search, and streams results to:
+      - knn_path   : key_col + n0…n{k}  (neighbor keys, same type as key_col)
+      - score_path : key_col + s0…s{k}  (float32 cosine similarities)
+
+    k+1 columns are written per row so the caller can filter self-matches without
+    losing a neighbour slot. Key type is utf8 for labels, int64 for all others.
+
+    Args:
+        name:       entity name used in log output (e.g. "track").
+        key_col:    column name for the entity key (e.g. "track_rowid", "label").
+        k:          number of neighbours per entity.
+        emb_df:     DataFrame with key_col + e0…eD columns.
+        knn_path:   output path for neighbor parquet.
+        score_path: output path for scores parquet.
+        batch_size: FAISS search batch size (halve if OOM).
+        nprobe:     IVF nprobe passed through to _knn_search.
+    """
     t0 = time.time()
 
     keys = emb_df[key_col].to_numpy()
@@ -123,8 +156,6 @@ def _process_entity(
     key_type = pa.utf8() if isinstance(keys[0], str) else pa.int64()
     knn_schema = pa.schema([(key_col, key_type)] + [(f"n{i}", key_type) for i in range(k + 1)])
     score_schema = pa.schema([(key_col, key_type)] + [(f"s{i}", pa.float32()) for i in range(k + 1)])
-    knn_path = output_dir / f"knn_{name}.parquet"
-    score_path = output_dir / f"knn_scores_{name}.parquet"
 
     start = 0
     with pq.ParquetWriter(knn_path, knn_schema) as knn_w, \
@@ -160,29 +191,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--embedding-track",
-        default=os.environ.get("SICK_EMBEDDING_TRACK"),
-        help="Path to track embedding parquet. $SICK_EMBEDDING_TRACK",
-    )
-    parser.add_argument(
-        "--embedding-album",
-        default=os.environ.get("SICK_EMBEDDING_ALBUM"),
-        help="Path to album embedding parquet. $SICK_EMBEDDING_ALBUM",
-    )
-    parser.add_argument(
-        "--embedding-artist",
-        default=os.environ.get("SICK_EMBEDDING_ARTIST"),
-        help="Path to artist embedding parquet. $SICK_EMBEDDING_ARTIST",
-    )
-    parser.add_argument(
-        "--embedding-label",
-        default=os.environ.get("SICK_EMBEDDING_LABEL"),
-        help="Path to label embedding parquet. $SICK_EMBEDDING_LABEL",
-    )
-    parser.add_argument(
-        "--output-dir",
-        default=os.environ.get("SICK_KNN_DIR"),
-        help="Directory for output parquets. $SICK_KNN_DIR",
+        "--manifest",
+        default=os.environ.get("SICK_MANIFEST"),
+        help="Path to ml manifest TOML. $SICK_MANIFEST",
     )
     parser.add_argument("--k-track",  type=int, default=os.environ.get("SICK_K_TRACK"),  help="Neighbors per track. $SICK_K_TRACK")
     parser.add_argument("--k-album",  type=int, default=os.environ.get("SICK_K_ALBUM"),  help="Neighbors per album. $SICK_K_ALBUM")
@@ -200,25 +211,16 @@ def main():
         default=64,
         help="IVF nprobe — higher = more accurate, slower (default: 64)",
     )
-    parser.add_argument(
-        "--entities",
-        nargs="+",
-        choices=list(ENTITIES),
-        default=list(ENTITIES),
-        metavar="ENTITY",
-        help=f"Entities to process (default: all). Choices: {list(ENTITIES)}",
-    )
     args = parser.parse_args()
 
-    if args.output_dir is None:
-        raise ValueError("--output-dir / $SICK_KNN_DIR not set")
+    if args.manifest is None:
+        raise ValueError("--manifest / $SICK_MANIFEST not set")
 
-    emb_args = {
-        "track":  args.embedding_track,
-        "album":  args.embedding_album,
-        "artist": args.embedding_artist,
-        "label":  args.embedding_label,
-    }
+    manifest = read_manifest(args.manifest)
+
+    aux = get_auxpaths()
+    knn_paths, score_paths = aux["knn"], aux["knn_scores"]
+
     ks = {
         "track":  args.k_track,
         "album":  args.k_album,
@@ -226,38 +228,21 @@ def main():
         "label":  args.k_label,
     }
 
-    for name in args.entities:
-        if emb_args[name] is None:
-            raise ValueError(
-                f"No `SICK_EMBEDDING_{name.upper()}` environment variable set. "
-                f"Either run with --embedding-{name} or define the environment variable."
-            )
+    for name in ENTITIES:
         if ks[name] is None:
-            raise ValueError(
-                f"--k-{name} / $SICK_K_{name.upper()} not set. "
-                "Either pass the argument or set the environment variable."
-            )
+            raise ValueError(f"--k-{name} / $SICK_K_{name.upper()} not set")
 
-    output_dir = Path(args.output_dir)
-    emb_paths = {name: Path(emb_args[name]) for name in args.entities}
+    next(iter(knn_paths.values())).parent.mkdir(parents=True, exist_ok=True)
 
-    for name, path in emb_paths.items():
-        if not path.exists():
-            raise FileNotFoundError(f"{name} embedding not found: {path}")
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    print(f"Output dir : {output_dir}")
-    print(f"Entities   : {args.entities}")
     print(f"Batch size : {args.batch_size:,}")
     print(f"nprobe     : {args.nprobe}")
     print()
 
     t_total = time.time()
-    for name in args.entities:
+    for name in ENTITIES:
         t0 = time.time()
         print(f"Loading {name} embeddings...")
-        emb_df = pd.read_parquet(emb_paths[name])
+        emb_df = pd.read_parquet(manifest["embeddings"][name])
         ndim = emb_df.filter(regex=r"^e\d+$").shape[1]
         print(f"  {len(emb_df):,} rows, {ndim}d  ({time.time()-t0:.1f}s)")
         _process_entity(
@@ -265,7 +250,8 @@ def main():
             ENTITIES[name],
             ks[name],
             emb_df,
-            output_dir,
+            knn_paths[name],
+            score_paths[name],
             args.batch_size,
             args.nprobe,
         )

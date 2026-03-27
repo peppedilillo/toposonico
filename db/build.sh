@@ -22,12 +22,7 @@ if [[ -z "${SICK_OUT_DIR:-}" ]]; then
     fi
 fi
 
-required_vars=(
-    SICK_UMAP_TRACK SICK_UMAP_ALBUM SICK_UMAP_ARTIST SICK_UMAP_LABEL
-    SICK_EMBEDDING_TRACK SICK_EMBEDDING_ALBUM SICK_EMBEDDING_ARTIST SICK_EMBEDDING_LABEL
-    SICK_LOOKUP_TRACK SICK_LOOKUP_ARTIST SICK_LOOKUP_ALBUM SICK_LOOKUP_LABEL
-    SICK_DB
-)
+required_vars=(SICK_MANIFEST SICK_DB)
 missing=()
 for var in "${required_vars[@]}"; do
     [[ -z "${!var:-}" ]] && missing+=("$var")
