@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pandas as pd
 
 
@@ -12,160 +13,381 @@ def _get_config_parameter(var: str) -> int:
     return int(n)
 
 
+def extract_model_rowids(model_dict: dict) -> np.array:
+    """Return checkpoint track rowids in the same order as the embedding table.
+
+    Args:
+        model_dict: Checkpoint dictionary loaded from ``torch.load(...)``.
+
+    Returns:
+        Numpy array of ``track_rowid`` values aligned with
+        ``embeddings_in.weight`` rows.
+    """
+    return model_dict["vocab"]["track_rowid"]
+
+
+def extract_model_embeddings(model_dict: dict) -> np.array:
+    """Return checkpoint input embeddings as a NumPy array.
+
+    The returned matrix is aligned with :func:`extract_model_rowids`, so row ``i``
+    corresponds to ``extract_model_rowids(model_dict)[i]``.
+    """
+    return model_dict["model_state_dict"]["embeddings_in.weight"].numpy()
+
+
+def extract_model_dim(model_dict: dict) -> int:
+    """Return checkpoint embedding dimensionality."""
+    return model_dict["hparams"]["embed_dim"]
+
+
+class Tracks:
+    """Track-level entity helpers scoped to checkpoint-supported tracks.
+
+    Unlike the higher-level entity classes, tracks do not apply any minimum-track
+    threshold. All methods operate on the intersection of ``t1_df`` and the
+    checkpoint vocabulary.
+    """
+
+    @staticmethod
+    def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
+        """Return exported ``track_rowid`` values present in ``t1_df`` and the checkpoint.
+
+        Args:
+            t1_df: Enriched training vocab with unique ``track_rowid`` values.
+            model_dict: Training checkpoint containing the model vocab.
+
+        Returns:
+            ``pd.Index`` of checkpoint-supported, labeled ``track_rowid`` values in
+            the same order as they appear in ``t1_df``.
+        """
+        assert t1_df["track_rowid"].is_unique, "Expected unique track_rowid in t1_df"
+        model_rowids = extract_model_rowids(model_dict)
+        valid_tracks = t1_df[
+            t1_df["track_rowid"].isin(model_rowids) & t1_df["label_rowid"].notna()
+        ]["track_rowid"]
+        return pd.Index(valid_tracks)
+
+    @staticmethod
+    def lookup(t1_df: pd.DataFrame, model_dict: dict) -> pd.DataFrame:
+        """Build the track lookup table for checkpoint-supported tracks.
+
+        Args:
+            t1_df: Enriched training vocab with ``track_rowid`` and
+                ``playlist_count`` columns.
+            model_dict: Training checkpoint containing the model vocab.
+
+        Returns:
+            DataFrame with columns ``track_rowid`` (``int64``) and ``logcounts``
+            (``float32``), where ``logcounts = log10(playlist_count)``.
+        """
+        valid_ids = Tracks.valid_ids(t1_df, model_dict)
+        mask = t1_df["track_rowid"].isin(valid_ids)
+        out = pd.DataFrame(
+            {
+                "track_rowid": t1_df.loc[mask, "track_rowid"].to_numpy(),
+                "logcounts": np.log10(t1_df.loc[mask, "playlist_count"]).astype("float32"),
+            }
+        )
+        out["track_rowid"] = out["track_rowid"].astype("int64")
+        out["logcounts"] = out["logcounts"].astype("float32")
+        return out
+
+    @staticmethod
+    def embeddings(t1_df: pd.DataFrame, model_dict: dict) -> pd.DataFrame:
+        """Return checkpoint track embeddings for tracks present in ``t1_df``.
+
+        Args:
+            t1_df: Enriched training vocab with unique ``track_rowid`` values.
+            model_dict: Training checkpoint containing ``embeddings_in.weight``.
+
+        Returns:
+            DataFrame with columns ``track_rowid`` and ``e0..e{D-1}``, one row per
+            checkpoint-supported track in ``t1_df``. Embedding columns are
+            ``float32``.
+        """
+        emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
+        emb_df = pd.DataFrame(
+            extract_model_embeddings(model_dict),
+            index=extract_model_rowids(model_dict),
+            columns=emb_cols,
+        )
+        for c in emb_cols:
+            emb_df[c] = emb_df[c].astype("float32")
+        valid_ids = Tracks.valid_ids(t1_df, model_dict)
+        emb_df.index.name = "track_rowid"
+        out = emb_df.loc[valid_ids].reset_index()
+        out["track_rowid"] = out["track_rowid"].astype("int64")
+        return out
+
+
 class Artists:
+    """Artist-level entity helpers built from checkpoint-supported tracks.
+
+    Artists are included only when at least ``SICK_ARTIST_MINTRACK`` of their
+    tracks are present in the checkpoint-supported subset of ``t1_df``.
+    """
+
     MINTRACKS = _get_config_parameter("SICK_ARTIST_MINTRACK")
 
     @staticmethod
-    def lookup(df: pd.DataFrame) -> pd.DataFrame:
-        """Aggregate track_lookup rows to one row per artist.
+    def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
+        """Return track ids belonging to artists that meet the minimum threshold.
 
-        df must contain a logcounts (float32) column (from track_lookup.parquet).
+        Args:
+            t1_df: Enriched training vocab with unique ``track_rowid`` and
+                ``artist_rowid`` columns.
+            model_dict: Training checkpoint containing the model vocab.
 
-        Returns columns: artist_rowid (int64), artist_name, logcounts (float32)
-        mean of per-track logcounts across the artist's tracks.
+        Returns:
+            ``pd.Index`` of ``track_rowid`` values whose artist has at least
+            ``Artists.MINTRACKS`` checkpoint-supported tracks.
         """
+        base_ids = Tracks.valid_ids(t1_df, model_dict)
+        subset = t1_df[t1_df["track_rowid"].isin(base_ids)]
+        counts = subset.groupby("artist_rowid")["artist_rowid"].transform("count")
+        valid_tracks = subset[counts >= Artists.MINTRACKS]["track_rowid"]
+        return pd.Index(valid_tracks)
 
-        df = df[
-            df.groupby("artist_rowid")["artist_rowid"].transform("count")
-            > Artists.MINTRACKS
-        ]
-        out = df.groupby(["artist_rowid", "artist_name"], as_index=False).agg(
-            logcounts=("logcounts", "mean")
+    @staticmethod
+    def lookup(t1_df: pd.DataFrame, model_dict: dict) -> pd.DataFrame:
+        """Build the artist lookup table from checkpoint-supported tracks.
+
+        Args:
+            t1_df: Enriched training vocab with ``track_rowid``, ``artist_rowid``,
+                and ``playlist_count`` columns.
+            model_dict: Training checkpoint containing the model vocab.
+
+        Returns:
+            DataFrame with columns ``artist_rowid`` (``int64``) and ``logcounts``
+            (``float32``). ``logcounts`` is the mean of per-track
+            ``log10(playlist_count)`` across valid artist tracks.
+        """
+        valid_ids = Artists.valid_ids(t1_df, model_dict)
+        mask = t1_df["track_rowid"].isin(valid_ids)
+        out = (
+            np.log10(t1_df.loc[mask, "playlist_count"])
+            .astype("float32")
+            .groupby(t1_df.loc[mask, "artist_rowid"], sort=False)
+            .mean()
+            .reset_index(name="logcounts")
         )
         out["artist_rowid"] = out["artist_rowid"].astype("int64")
         out["logcounts"] = out["logcounts"].astype("float32")
         return out
 
     @staticmethod
-    def embeddings(
-        emb_df: pd.DataFrame,
-        lookup_df: pd.DataFrame,
-    ) -> pd.DataFrame:
-        """Mean-pool track embeddings to artist level.
+    def embeddings(t1_df: pd.DataFrame, model_dict: dict) -> pd.DataFrame:
+        """Mean-pool checkpoint track embeddings to the artist level.
 
-        Returns a DataFrame with columns [artist_rowid, e0, …, e{D-1}], one row per
-        artist with at least Artists.MINTRACKS tracks in `lookup_df`.
+        Args:
+            t1_df: Enriched training vocab with unique ``track_rowid`` and
+                ``artist_rowid`` columns.
+            model_dict: Training checkpoint containing ``embeddings_in.weight``.
+
+        Returns:
+            DataFrame with columns ``artist_rowid`` and ``e0..e{D-1}``, one row per
+            valid artist. Embeddings are the mean of checkpoint track embeddings and
+            remain ``float32``.
         """
-        emb_cols = [c for c in emb_df.columns if c != "track_rowid"]
-        df = emb_df.merge(
-            lookup_df[["track_rowid", "artist_rowid"]], on="track_rowid", how="inner"
+        emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
+        emb_df = pd.DataFrame(
+            extract_model_embeddings(model_dict),
+            index=extract_model_rowids(model_dict),
+            columns=emb_cols
         )
-        assert (
-            df["artist_rowid"].notna().all()
-        ), "Unexpected null artist_rowid after merge"
-        df["artist_rowid"] = df["artist_rowid"].astype("int64")
-        agg = df.groupby("artist_rowid", sort=False).agg(
-            **{c: (c, "mean") for c in emb_cols},
-            track_count=("track_rowid", "count"),
-        )
-        agg = agg[agg["track_count"] >= Artists.MINTRACKS]
-        result = agg[emb_cols].reset_index()
-        result["artist_rowid"] = result["artist_rowid"].astype("int64")
         for c in emb_cols:
-            result[c] = result[c].astype("float32")
-        return result
+            emb_df[c] = emb_df[c].astype("float32")
+        valid_ids = Artists.valid_ids(t1_df, model_dict)
+        emb_df.index.name = "track_rowid"
+        emb_df = emb_df.loc[valid_ids].reset_index()
+        t1_df = t1_df[t1_df["track_rowid"].isin(valid_ids)][
+            ["track_rowid", "artist_rowid"]
+        ]
+        emb_df = emb_df.merge(t1_df, on="track_rowid", how="inner")
+        out = emb_df.groupby("artist_rowid", as_index=False)[emb_cols].mean()
+        out["artist_rowid"] = out["artist_rowid"].astype("int64")
+        for c in emb_cols:
+            out[c] = out[c].astype("float32")
+        return out
 
 
 class Albums:
+    """Album-level entity helpers built from checkpoint-supported tracks.
+
+    Albums are included only when at least ``SICK_ALBUM_MINTRACK`` of their
+    tracks are present in the checkpoint-supported subset of ``t1_df``.
+    """
+
     MINTRACKS = _get_config_parameter("SICK_ALBUM_MINTRACK")
 
     @staticmethod
-    def lookup(df: pd.DataFrame) -> pd.DataFrame:
-        """Aggregate track_lookup rows to one row per album, with primary artist.
+    def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
+        """Return track ids belonging to albums that meet the minimum threshold.
 
-        df must contain a logcounts (float32) column (from track_lookup.parquet).
+        Args:
+            t1_df: Enriched training vocab with unique ``track_rowid`` and
+                ``album_rowid`` columns.
+            model_dict: Training checkpoint containing the model vocab.
 
-        Returns columns: album_rowid (int64), album_name, artist_rowid (int64),
-        artist_name, logcounts (float32) — mean of per-track
-        logcounts across the album's tracks.
+        Returns:
+            ``pd.Index`` of ``track_rowid`` values whose album has at least
+            ``Albums.MINTRACKS`` checkpoint-supported tracks.
         """
-        df = df[
-            df.groupby("album_rowid")["album_rowid"].transform("count")
-            > Albums.MINTRACKS
-        ]
-        out = df.groupby(["album_rowid", "album_name"], as_index=False).agg(
-            logcounts=("logcounts", "mean")
+        base_ids = Tracks.valid_ids(t1_df, model_dict)
+        subset = t1_df[t1_df["track_rowid"].isin(base_ids)]
+        counts = subset.groupby("album_rowid")["album_rowid"].transform("count")
+        valid_tracks = subset[counts >= Albums.MINTRACKS]["track_rowid"]
+        return pd.Index(valid_tracks)
+
+    @staticmethod
+    def lookup(t1_df: pd.DataFrame, model_dict: dict) -> pd.DataFrame:
+        """Build the album lookup table from checkpoint-supported tracks.
+
+        Args:
+            t1_df: Enriched training vocab with ``track_rowid``, ``album_rowid``,
+                and ``playlist_count`` columns.
+            model_dict: Training checkpoint containing the model vocab.
+
+        Returns:
+            DataFrame with columns ``album_rowid`` (``int64``) and ``logcounts``
+            (``float32``). ``logcounts`` is the mean of per-track
+            ``log10(playlist_count)`` across valid album tracks.
+        """
+        valid_ids = Albums.valid_ids(t1_df, model_dict)
+        mask = t1_df["track_rowid"].isin(valid_ids)
+        out = (
+            np.log10(t1_df.loc[mask, "playlist_count"])
+            .astype("float32")
+            .groupby(t1_df.loc[mask, "album_rowid"], sort=False)
+            .mean()
+            .reset_index(name="logcounts")
         )
-        primary_artist = (
-            df.groupby("album_rowid")[["artist_rowid", "artist_name"]]
-            .first()
-            .reset_index()
-        )
-        out = out.merge(primary_artist, on="album_rowid", how="left")
         out["album_rowid"] = out["album_rowid"].astype("int64")
         out["logcounts"] = out["logcounts"].astype("float32")
         return out
 
     @staticmethod
-    def embeddings(
-        emb_df: pd.DataFrame,
-        lookup_df: pd.DataFrame,
-    ) -> pd.DataFrame:
-        """Mean-pool track embeddings to album level.
+    def embeddings(t1_df: pd.DataFrame, model_dict: dict) -> pd.DataFrame:
+        """Mean-pool checkpoint track embeddings to the album level.
 
-        Returns a DataFrame with columns [album_rowid, e0, …, e{D-1}], one row per
-        album with at least Albums.MINTRACKS tracks in `lookup_df`.
+        Args:
+            t1_df: Enriched training vocab with unique ``track_rowid`` and
+                ``album_rowid`` columns.
+            model_dict: Training checkpoint containing ``embeddings_in.weight``.
+
+        Returns:
+            DataFrame with columns ``album_rowid`` and ``e0..e{D-1}``, one row per
+            valid album. Embeddings are the mean of checkpoint track embeddings and
+            remain ``float32``.
         """
-        emb_cols = [c for c in emb_df.columns if c != "track_rowid"]
-        df = emb_df.merge(
-            lookup_df[["track_rowid", "album_rowid"]], on="track_rowid", how="inner"
+        emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
+        emb_df = pd.DataFrame(
+            extract_model_embeddings(model_dict),
+            index=extract_model_rowids(model_dict),
+            columns=emb_cols,
         )
-        assert (
-            df["album_rowid"].notna().all()
-        ), "Unexpected null album_rowid after merge"
-        df["album_rowid"] = df["album_rowid"].astype("int64")
-        agg = df.groupby("album_rowid", sort=False).agg(
-            **{c: (c, "mean") for c in emb_cols},
-            track_count=("track_rowid", "count"),
-        )
-        agg = agg[agg["track_count"] >= Albums.MINTRACKS]
-        result = agg[emb_cols].reset_index()
-        result["album_rowid"] = result["album_rowid"].astype("int64")
         for c in emb_cols:
-            result[c] = result[c].astype("float32")
-        return result
+            emb_df[c] = emb_df[c].astype("float32")
+        valid_ids = Albums.valid_ids(t1_df, model_dict)
+        emb_df.index.name = "track_rowid"
+        emb_df = emb_df.loc[valid_ids].reset_index()
+        t1_df = t1_df[t1_df["track_rowid"].isin(valid_ids)][
+            ["track_rowid", "album_rowid"]
+        ]
+        emb_df = emb_df.merge(t1_df, on="track_rowid", how="inner")
+        out = emb_df.groupby("album_rowid", as_index=False)[emb_cols].mean()
+        out["album_rowid"] = out["album_rowid"].astype("int64")
+        for c in emb_cols:
+            out[c] = out[c].astype("float32")
+        return out
 
 
 class Labels:
+    """Label-level entity helpers built from checkpoint-supported tracks.
+
+    Labels are included only when at least ``SICK_LABEL_MINTRACK`` of their
+    tracks are present in the checkpoint-supported subset of ``t1_df``.
+    """
+
     MINTRACKS = _get_config_parameter("SICK_LABEL_MINTRACK")
 
     @staticmethod
-    def lookup(df: pd.DataFrame) -> pd.DataFrame:
-        """Aggregate track_lookup rows to one row per label (excludes null/empty).
+    def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
+        """Return track ids belonging to labels that meet the minimum threshold.
 
-        df must contain a logcounts (float32) column (from track_lookup.parquet).
+        Args:
+            t1_df: Enriched training vocab with unique ``track_rowid`` and
+                ``label_rowid`` columns.
+            model_dict: Training checkpoint containing the model vocab.
 
-        Returns columns: label_rowid (int32), label, logcounts (float32).
-        label_rowid is a stable sequential int assigned in alphabetical label order.
+        Returns:
+            ``pd.Index`` of ``track_rowid`` values whose label has at least
+            ``Labels.MINTRACKS`` checkpoint-supported tracks.
         """
-        df = df[df["label"].notna() & (df["label"] != "")]
-        df = df[df.groupby("label")["label"].transform("count") > Labels.MINTRACKS]
-        out = df.groupby("label", as_index=False).agg(logcounts=("logcounts", "mean"))
+        base_ids = Tracks.valid_ids(t1_df, model_dict)
+        subset = t1_df[t1_df["track_rowid"].isin(base_ids)]
+        counts = subset.groupby("label_rowid")["label_rowid"].transform("count")
+        valid_tracks = subset[counts >= Labels.MINTRACKS]["track_rowid"]
+        return pd.Index(valid_tracks)
+
+    @staticmethod
+    def lookup(t1_df: pd.DataFrame, model_dict: dict) -> pd.DataFrame:
+        """Build the label lookup table from checkpoint-supported tracks.
+
+        Args:
+            t1_df: Enriched training vocab with ``track_rowid``, ``label_rowid``,
+                and ``playlist_count`` columns.
+            model_dict: Training checkpoint containing the model vocab.
+
+        Returns:
+            DataFrame with columns ``label_rowid`` (``int32``) and ``logcounts``
+            (``float32``). ``logcounts`` is the mean of per-track
+            ``log10(playlist_count)`` across valid label tracks.
+        """
+        valid_ids = Labels.valid_ids(t1_df, model_dict)
+        mask = t1_df["track_rowid"].isin(valid_ids)
+        out = (
+            np.log10(t1_df.loc[mask, "playlist_count"])
+            .astype("float32")
+            .groupby(t1_df.loc[mask, "label_rowid"], sort=False)
+            .mean()
+            .reset_index(name="logcounts")
+        )
+        out["label_rowid"] = out["label_rowid"].astype("int32")
         out["logcounts"] = out["logcounts"].astype("float32")
-        out.insert(0, "label_rowid", pd.RangeIndex(len(out), dtype="int32"))
         return out
 
     @staticmethod
-    def embeddings(
-        emb_df: pd.DataFrame,
-        lookup_df: pd.DataFrame,
-    ) -> pd.DataFrame:
-        """Mean-pool track embeddings to label level.
+    def embeddings(t1_df: pd.DataFrame, model_dict: dict) -> pd.DataFrame:
+        """Mean-pool checkpoint track embeddings to the label level.
 
-        Returns a DataFrame with columns [label, e0, …, e{D-1}], one row per
-        label with at least Labels.MINTRACKS tracks in `lookup_df`.
+        Args:
+            t1_df: Enriched training vocab with unique ``track_rowid`` and
+                ``label_rowid`` columns.
+            model_dict: Training checkpoint containing ``embeddings_in.weight``.
+
+        Returns:
+            DataFrame with columns ``label_rowid`` and ``e0..e{D-1}``, one row per
+            valid label. Embeddings are the mean of checkpoint track embeddings and
+            remain ``float32``.
         """
-        emb_cols = [c for c in emb_df.columns if c != "track_rowid"]
-        df = emb_df.merge(
-            lookup_df[["track_rowid", "label"]], on="track_rowid", how="inner"
+        emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
+        emb_df = pd.DataFrame(
+            extract_model_embeddings(model_dict),
+            index=extract_model_rowids(model_dict),
+            columns=emb_cols,
         )
-        df = df[df["label"].notna() & (df["label"] != "")]
-        agg = df.groupby("label", sort=False).agg(
-            **{c: (c, "mean") for c in emb_cols},
-            track_count=("track_rowid", "count"),
-        )
-        agg = agg[agg["track_count"] >= Labels.MINTRACKS]
-        result = agg[emb_cols].reset_index()
         for c in emb_cols:
-            result[c] = result[c].astype("float32")
-        return result
+            emb_df[c] = emb_df[c].astype("float32")
+        valid_ids = Labels.valid_ids(t1_df, model_dict)
+        emb_df.index.name = "track_rowid"
+        emb_df = emb_df.loc[valid_ids].reset_index()
+        t1_df = t1_df[t1_df["track_rowid"].isin(valid_ids)][
+            ["track_rowid", "label_rowid"]
+        ]
+        emb_df = emb_df.merge(t1_df, on="track_rowid", how="inner")
+        out = emb_df.groupby("label_rowid", as_index=False)[emb_cols].mean()
+        out["label_rowid"] = out["label_rowid"].astype("int32")
+        for c in emb_cols:
+            out[c] = out[c].astype("float32")
+        return out
