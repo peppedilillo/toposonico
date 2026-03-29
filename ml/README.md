@@ -42,7 +42,7 @@ python scripts/build_playlist_chunks.py path/to/chunks
 
 The chunks holds a lot of data. Choose a directory wisely.
 
-### Phase 2 — Training and embeddings (interactive, GPU)
+### Phase 2 — Training (interactive, GPU)
 
 > Use the `lambda_sniper.py` script for catching lambdalabs instances!
 
@@ -52,20 +52,23 @@ python scripts/build_trained_vocab.py
 python scripts/build_track_embeddings.py
 ```
 
-### Phase 3 — UMAP projection (interactive, GPU)
+### Phase 4 - Embeddings, lookups
+
+```shell
+python scripts/build_lookups.py `path/to/<checkpoint>.pt`
+python scripts/build_embeddings.py `path/to/<checkpoint>.pt`
+```
+
+### Phase 4 — UMAP projection (interactive, GPU)
 
 ```sh
 # open notebooks/umap.ipynb, do your thing and store them somewhere safe
 ```
 
-Voilà! Take note of the umap location for all entities, we will use it in the next phases.
-
 > **Warning:** all four entity UMAPs must come from the same UMAP fit — tracks are
 > `fit_transform`ed first, and albums/artists/labels are `transform`ed through that same
 > fitted model. Mixing parquets from different fits produces incompatible coordinates and
 > silently corrupts the geo map.
-
-
 
 ### Phase 4 - Writing manifest
 
@@ -82,4 +85,4 @@ Fill it.
 
 Voilà! Wasn't a _sick_ ride? You are done, rejoice!
 
-Joking.. But now we can build the db.
+Joking.. Now we can build the db.

@@ -107,12 +107,10 @@ class Tracks:
         """
         emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
         emb_df = pd.DataFrame(
-            extract_model_embeddings(model_dict),
+            extract_model_embeddings(model_dict).astype("float32", copy=False),
             index=extract_model_rowids(model_dict),
             columns=emb_cols,
         )
-        for c in emb_cols:
-            emb_df[c] = emb_df[c].astype("float32")
         valid_ids = Tracks.valid_ids(t1_df, model_dict)
         emb_df.index.name = "track_rowid"
         out = emb_df.loc[valid_ids].reset_index()
@@ -191,19 +189,19 @@ class Artists:
         """
         emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
         emb_df = pd.DataFrame(
-            extract_model_embeddings(model_dict),
+            extract_model_embeddings(model_dict).astype("float32", copy=False),
             index=extract_model_rowids(model_dict),
-            columns=emb_cols
+            columns=emb_cols,
         )
-        for c in emb_cols:
-            emb_df[c] = emb_df[c].astype("float32")
         valid_ids = Artists.valid_ids(t1_df, model_dict)
         emb_df.index.name = "track_rowid"
-        emb_df = emb_df.loc[valid_ids].reset_index()
-        t1_df = t1_df[t1_df["track_rowid"].isin(valid_ids)][
-            ["track_rowid", "artist_rowid"]
-        ]
-        emb_df = emb_df.merge(t1_df, on="track_rowid", how="inner")
+        emb_df = emb_df.loc[valid_ids]
+        artist_ids = (
+            t1_df.loc[t1_df["track_rowid"].isin(valid_ids), ["track_rowid", "artist_rowid"]]
+            .set_index("track_rowid")["artist_rowid"]
+            .reindex(emb_df.index)
+        )
+        emb_df["artist_rowid"] = artist_ids.to_numpy()
         out = emb_df.groupby("artist_rowid", as_index=False)[emb_cols].mean()
         out["artist_rowid"] = out["artist_rowid"].astype("int64")
         for c in emb_cols:
@@ -282,19 +280,19 @@ class Albums:
         """
         emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
         emb_df = pd.DataFrame(
-            extract_model_embeddings(model_dict),
+            extract_model_embeddings(model_dict).astype("float32", copy=False),
             index=extract_model_rowids(model_dict),
             columns=emb_cols,
         )
-        for c in emb_cols:
-            emb_df[c] = emb_df[c].astype("float32")
         valid_ids = Albums.valid_ids(t1_df, model_dict)
         emb_df.index.name = "track_rowid"
-        emb_df = emb_df.loc[valid_ids].reset_index()
-        t1_df = t1_df[t1_df["track_rowid"].isin(valid_ids)][
-            ["track_rowid", "album_rowid"]
-        ]
-        emb_df = emb_df.merge(t1_df, on="track_rowid", how="inner")
+        emb_df = emb_df.loc[valid_ids]
+        album_ids = (
+            t1_df.loc[t1_df["track_rowid"].isin(valid_ids), ["track_rowid", "album_rowid"]]
+            .set_index("track_rowid")["album_rowid"]
+            .reindex(emb_df.index)
+        )
+        emb_df["album_rowid"] = album_ids.to_numpy()
         out = emb_df.groupby("album_rowid", as_index=False)[emb_cols].mean()
         out["album_rowid"] = out["album_rowid"].astype("int64")
         for c in emb_cols:
@@ -373,19 +371,19 @@ class Labels:
         """
         emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
         emb_df = pd.DataFrame(
-            extract_model_embeddings(model_dict),
+            extract_model_embeddings(model_dict).astype("float32", copy=False),
             index=extract_model_rowids(model_dict),
             columns=emb_cols,
         )
-        for c in emb_cols:
-            emb_df[c] = emb_df[c].astype("float32")
         valid_ids = Labels.valid_ids(t1_df, model_dict)
         emb_df.index.name = "track_rowid"
-        emb_df = emb_df.loc[valid_ids].reset_index()
-        t1_df = t1_df[t1_df["track_rowid"].isin(valid_ids)][
-            ["track_rowid", "label_rowid"]
-        ]
-        emb_df = emb_df.merge(t1_df, on="track_rowid", how="inner")
+        emb_df = emb_df.loc[valid_ids]
+        label_ids = (
+            t1_df.loc[t1_df["track_rowid"].isin(valid_ids), ["track_rowid", "label_rowid"]]
+            .set_index("track_rowid")["label_rowid"]
+            .reindex(emb_df.index)
+        )
+        emb_df["label_rowid"] = label_ids.to_numpy()
         out = emb_df.groupby("label_rowid", as_index=False)[emb_cols].mean()
         out["label_rowid"] = out["label_rowid"].astype("int32")
         for c in emb_cols:
