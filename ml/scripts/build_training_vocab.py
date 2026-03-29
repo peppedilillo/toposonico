@@ -49,10 +49,8 @@ def main():
     )
     parser.add_argument(
         "--output",
-        default=os.environ.get("SICK_TRAINING_VOCAB_BASE")
-        or os.environ.get("SICK_TRAINING_VOCAB"),
-        help="Output parquet path. Defaults to `SICK_TRAINING_VOCAB_BASE`, "
-        "falling back to `SICK_TRAINING_VOCAB`.",
+        default=os.environ.get("SICK_T0_VOCAB"),
+        help="Output parquet path. Defaults to `SICK_T0_VOCAB`."
     )
     parser.add_argument(
         "--min-count",
@@ -76,7 +74,7 @@ def main():
 
     if args.output is None:
         raise ValueError(
-            "No `SICK_TRAINING_VOCAB` environment variable set. "
+            "No `SICK_T1_VOCAB` environment variable set. "
             "Either run with --output argument or define the environment variable."
         )
     output_path = Path(args.output)

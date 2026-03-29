@@ -88,7 +88,7 @@ def main():
     )
     parser.add_argument(
         "--vocab",
-        default=os.environ.get("SICK_TRAINING_VOCAB"),
+        default=os.environ.get("SICK_T1_VOCAB"),
         help="Global track vocab parquet — only tracks whose track_rowid appears "
         "in the vocab are written; all others are skipped.",
     )

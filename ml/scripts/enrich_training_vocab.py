@@ -150,15 +150,13 @@ def main():
     )
     parser.add_argument(
         "--input",
-        default=os.environ.get("SICK_TRAINING_VOCAB_BASE")
-        or os.environ.get("SICK_TRAINING_VOCAB"),
-        help="Base training vocab path. Defaults to `SICK_TRAINING_VOCAB_BASE`, "
-        "falling back to `SICK_TRAINING_VOCAB`.",
+        default=os.environ.get("SICK_T0_VOCAB"),
+        help="Base training vocab path. Defaults to `SICK_T0_VOCAB`."
     )
     parser.add_argument(
         "--output",
-        default=os.environ.get("SICK_TRAINING_VOCAB"),
-        help="Output path for enriched training vocab. Set to `SICK_TRAINING_VOCAB` by default.",
+        default=os.environ.get("SICK_T1_VOCAB"),
+        help="Output path for enriched training vocab. Set to `SICK_T1_VOCAB` by default.",
     )
     parser.add_argument(
         "--chunk-size",
@@ -175,12 +173,11 @@ def main():
         )
     if args.input is None:
         raise ValueError(
-            "No base training vocab path set. Use --input or set "
-            "`SICK_TRAINING_VOCAB_BASE` / `SICK_TRAINING_VOCAB`."
+            "No base training vocab path set. Use --input or set `SICK_T0_VOCAB`."
         )
     if args.output is None:
         raise ValueError(
-            "No output path set. Use --output or set `SICK_TRAINING_VOCAB`."
+            "No output path set. Use --output or set `SICK_T1_VOCAB`."
         )
 
     db_path = Path(args.database)
