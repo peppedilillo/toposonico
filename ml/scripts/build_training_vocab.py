@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Build a training vocabulary from the playlist SQLite database.
+"""Build the base training vocabulary from the playlist SQLite database.
 
 Counts distinct playlist appearances per track (full table scan of ~1.7B rows),
 filters by --min-count, then assigns contiguous track_ids (0..vocab_size-1)
 sorted by track_rowid. Output parquet contains track_rowid, track_id, and
-playlist_count — everything the training loop needs for OOV filtering,
-subsampling, and negative-sampling weights.
+playlist_count only. Metadata enrichment happens in a second stage via
+`enrich_training_vocab.py`.
 
 Usage:
     python scripts/build_training_vocab.py [--database DB] [--output OUTPUT] [--min-count N]
@@ -49,13 +49,15 @@ def main():
     )
     parser.add_argument(
         "--output",
-        default=os.environ.get("SICK_TRAINING_VOCAB"),
-        help="Output parquet path. Set to `SICK_TRAINING_VOCAB` by default.",
+        default=os.environ.get("SICK_TRAINING_VOCAB_BASE")
+        or os.environ.get("SICK_TRAINING_VOCAB"),
+        help="Output parquet path. Defaults to `SICK_TRAINING_VOCAB_BASE`, "
+        "falling back to `SICK_TRAINING_VOCAB`.",
     )
     parser.add_argument(
         "--min-count",
         type=int,
-        default=2,
+        default=5,
         help="Minimum playlist count to include a track (default: 2)",
     )
     args = parser.parse_args()

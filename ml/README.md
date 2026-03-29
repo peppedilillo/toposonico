@@ -36,13 +36,11 @@ Now the scripts should be wired to run with default inputs and output in `/outs`
 
 ```sh
 python scripts/build_training_vocab.py --min-count 2
+python scripts/enrich_training_vocab.py
 python scripts/build_playlist_chunks.py path/to/chunks
-python scripts/build_track_lookup.py
-python scripts/build_entity_lookups.py
 ```
 
-We will use `build_track_lookup.py` again so take note of where it lives.
-There is a lot of data, choose a directory for chunks wisely
+The chunks holds a lot of data. Choose a directory wisely.
 
 ### Phase 2 — Training and embeddings (interactive, GPU)
 
@@ -50,12 +48,9 @@ There is a lot of data, choose a directory for chunks wisely
 
 ```sh
 # open notebooks/train.ipynb, do your thing and store the checkpoint to `path/to/<checkpoint>.pt`
-python scripts/build_track_embeddings.py path/to/<checkpoint>.pt
-python scripts/build_entity_embeddings.py
+python scripts/build_trained_vocab.py
+python scripts/build_track_embeddings.py
 ```
-
-This script will also perform clean-up of tracks with duplicated ISRC.
-You can skip deduplication passing `--no-filter`.
 
 ### Phase 3 — UMAP projection (interactive, GPU)
 

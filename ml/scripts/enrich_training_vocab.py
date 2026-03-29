@@ -16,20 +16,23 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-CHUNK_SIZE_DEFAULT = 100_000
+CHUNK_SIZE_DEFAULT = 50_000
+TEMP_TABLE_NAME = "training_vocab_tmp"
 
 QUERY = """
     SELECT
-        t.rowid            AS track_rowid,
+        v.track_rowid      AS track_rowid,
+        v.track_id         AS track_id,
+        v.playlist_count   AS playlist_count,
         t.external_id_isrc AS id_isrc,
         ta.artist_rowid    AS artist_rowid,
         t.album_rowid      AS album_rowid,
         al.label           AS label
-    FROM tracks AS t
+    FROM {temp_table} AS v
+    INNER JOIN tracks        AS t  ON t.rowid         = v.track_rowid
     INNER JOIN albums        AS al ON t.album_rowid   = al.rowid
     INNER JOIN track_artists AS ta ON t.rowid         = ta.track_rowid
-    WHERE t.rowid IN ({placeholders})
-      AND ta.artist_rowid = (
+    WHERE ta.artist_rowid = (
         SELECT artist_rowid FROM track_artists WHERE track_rowid = t.rowid LIMIT 1
     )
 """
@@ -57,21 +60,62 @@ def assign_label_rowids(labels: pd.Series) -> dict[str, int]:
     return {label: idx for idx, label in enumerate(valid, start=1)}
 
 
-def chunked_track_rowids(track_rowids: pd.Series, chunk_size: int) -> list[list[int]]:
-    values = track_rowids.astype("int64").tolist()
-    return [values[i : i + chunk_size] for i in range(0, len(values), chunk_size)]
+def create_temp_vocab_table(conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME) -> None:
+    conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+    conn.execute(
+        f"""
+        CREATE TEMP TABLE {table_name} (
+            track_rowid     INTEGER PRIMARY KEY,
+            track_id        INTEGER NOT NULL,
+            playlist_count  INTEGER NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        f"CREATE INDEX {table_name}_track_rowid_idx ON {table_name}(track_rowid)"
+    )
 
 
-def fetch_metadata_batch(conn: sqlite3.Connection, track_rowids: list[int]) -> pd.DataFrame:
-    placeholders = ",".join("?" * len(track_rowids))
-    query = QUERY.format(placeholders=placeholders)
-    batch = pd.read_sql_query(query, conn, params=track_rowids)
-    if batch.empty:
-        return batch
-    batch["track_rowid"] = batch["track_rowid"].astype("int64")
-    batch["artist_rowid"] = batch["artist_rowid"].astype("int64")
-    batch["album_rowid"] = batch["album_rowid"].astype("int64")
-    return batch
+def load_temp_vocab_table(
+    conn: sqlite3.Connection,
+    vocab: pd.DataFrame,
+    chunk_size: int,
+    table_name: str = TEMP_TABLE_NAME,
+) -> None:
+    rows = list(vocab[["track_rowid", "track_id", "playlist_count"]].itertuples(index=False, name=None))
+    total = len(rows)
+    started_at = time.time()
+
+    for start in range(0, total, chunk_size):
+        batch = rows[start : start + chunk_size]
+        conn.executemany(
+            f"""
+            INSERT INTO {table_name} (track_rowid, track_id, playlist_count)
+            VALUES (?, ?, ?)
+            """,
+            batch,
+        )
+        done = min(start + chunk_size, total)
+        elapsed = time.time() - started_at
+        rate = done / elapsed if elapsed > 0 else 0.0
+        print(f"  {done:>10,} / {total:,} staged  ({rate:,.0f} rows/s)", end="\r")
+
+    print()
+
+
+def fetch_joined_metadata(
+    conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME
+) -> pd.DataFrame:
+    query = QUERY.format(temp_table=table_name)
+    metadata = pd.read_sql_query(query, conn)
+    if metadata.empty:
+        return metadata
+    metadata["track_rowid"] = metadata["track_rowid"].astype("int64")
+    metadata["track_id"] = metadata["track_id"].astype("int32")
+    metadata["playlist_count"] = metadata["playlist_count"].astype("int32")
+    metadata["artist_rowid"] = metadata["artist_rowid"].astype("int64")
+    metadata["album_rowid"] = metadata["album_rowid"].astype("int64")
+    return metadata
 
 
 def validate_metadata_coverage(vocab: pd.DataFrame, metadata: pd.DataFrame) -> None:
@@ -92,29 +136,6 @@ def validate_metadata_coverage(vocab: pd.DataFrame, metadata: pd.DataFrame) -> N
     if not extra.empty:
         preview = ", ".join(map(str, extra[:5].tolist()))
         raise RuntimeError(f"Unexpected metadata rows for track_rowid(s): {preview}")
-
-
-def fetch_vocab_metadata(
-    conn: sqlite3.Connection, vocab: pd.DataFrame, chunk_size: int
-) -> pd.DataFrame:
-    chunks = []
-    total_rows = 0
-    started_at = time.time()
-    track_chunks = chunked_track_rowids(vocab["track_rowid"], chunk_size)
-
-    for idx, batch_ids in enumerate(track_chunks, start=1):
-        chunk = fetch_metadata_batch(conn, batch_ids)
-        chunks.append(chunk)
-        total_rows += len(chunk)
-        elapsed = time.time() - started_at
-        rate = total_rows / elapsed if elapsed > 0 else 0.0
-        print(
-            f"  [{idx:>5}/{len(track_chunks)}] {total_rows:>10,} rows fetched  ({rate:,.0f} rows/s)",
-            end="\r",
-        )
-
-    print()
-    return pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
 
 
 def main():
@@ -143,7 +164,7 @@ def main():
         "--chunk-size",
         type=int,
         default=CHUNK_SIZE_DEFAULT,
-        help=f"Track ids per SQL batch query (default: {CHUNK_SIZE_DEFAULT:,})",
+        help=f"Rows per temp-table insert batch (default: {CHUNK_SIZE_DEFAULT:,})",
     )
     args = parser.parse_args()
 
@@ -185,9 +206,13 @@ def main():
     vocab["playlist_count"] = vocab["playlist_count"].astype("int32")
     print(f"  {len(vocab):,} rows loaded  ({time.time() - t0:.1f}s)")
 
-    print("Fetching metadata for vocab track ids...")
+    print("Staging base vocab in SQLite temp table...")
     conn = get_connection(db_path)
-    metadata = fetch_vocab_metadata(conn, vocab, args.chunk_size)
+    create_temp_vocab_table(conn)
+    load_temp_vocab_table(conn, vocab, args.chunk_size)
+
+    print("Fetching metadata through temp-table join...")
+    metadata = fetch_joined_metadata(conn)
     conn.close()
     validate_metadata_coverage(vocab, metadata)
     print(f"  {len(metadata):,} metadata rows validated")
@@ -198,8 +223,7 @@ def main():
     print()
 
     metadata["label_rowid"] = metadata["label"].map(label_rowids).astype("Int32")
-    enriched = vocab.merge(metadata, on="track_rowid", how="left", validate="one_to_one")
-    enriched = enriched[
+    enriched = metadata[
         [
             "track_rowid",
             "track_id",
@@ -209,10 +233,7 @@ def main():
             "label_rowid",
             "id_isrc",
         ]
-    ]
-    enriched["track_rowid"] = enriched["track_rowid"].astype("int64")
-    enriched["track_id"] = enriched["track_id"].astype("int32")
-    enriched["playlist_count"] = enriched["playlist_count"].astype("int32")
+    ].copy()
     enriched["artist_rowid"] = enriched["artist_rowid"].astype("int64")
     enriched["album_rowid"] = enriched["album_rowid"].astype("int64")
 
