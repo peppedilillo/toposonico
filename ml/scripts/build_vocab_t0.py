@@ -48,9 +48,7 @@ def main():
         help="Path to playlist SQLite database. Set to `SICK_PLAYLIST_DB` by default.",
     )
     parser.add_argument(
-        "--output",
-        default=os.environ.get("SICK_T0_VOCAB"),
-        help="Output parquet path. Defaults to `SICK_T0_VOCAB`."
+        "--output", default=os.environ.get("SICK_T0_VOCAB"), help="Output parquet path. Defaults to `SICK_T0_VOCAB`."
     )
     parser.add_argument(
         "--min-count",
@@ -105,9 +103,7 @@ def main():
     if args.min_count > 1:
         df = df[df["playlist_count"] >= args.min_count].reset_index(drop=True)
         n_dropped = n_total - len(df)
-        print(
-            f"  Dropped {n_dropped:,} tracks below min_count={args.min_count} ({100 * n_dropped / n_total:.1f}%)"
-        )
+        print(f"  Dropped {n_dropped:,} tracks below min_count={args.min_count} ({100 * n_dropped / n_total:.1f}%)")
 
     df = df.sort_values("track_rowid").reset_index(drop=True)
     df["track_id"] = np.arange(len(df), dtype=np.int32)

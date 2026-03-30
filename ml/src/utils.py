@@ -1,4 +1,5 @@
 """Training utilities: VRAM/RAM budget printing, vocab stats, model filename helpers, run-name generator."""
+
 from pathlib import Path
 import random
 import re
@@ -41,12 +42,8 @@ def print_vram_budget(
 
     print(f"Vocab size          : {vocab_size:>10,}")
     print()
-    print(
-        f"Embedding tables    : {embed * GB:>6.2f} GB  (2 tables × {vocab_size:,} × {embedding_dims} × fp32)"
-    )
-    print(
-        f"Optimizer state     : {optim * GB:>6.2f} GB  (SparseAdam exp_avg + exp_avg_sq, dense after warmup)"
-    )
+    print(f"Embedding tables    : {embed * GB:>6.2f} GB  (2 tables × {vocab_size:,} × {embedding_dims} × fp32)")
+    print(f"Optimizer state     : {optim * GB:>6.2f} GB  (SparseAdam exp_avg + exp_avg_sq, dense after warmup)")
     print(f"Weights             : {weights_ * MB:>6.1f} MB  (negative sample weights)")
     print(f"Neg. sample block   : {negs * MB:>6.1f} MB  (negative sampling reservoir)")
     print(
@@ -55,9 +52,7 @@ def print_vram_budget(
     print(f"Activations bwd     : {act_bwd * MB:>6.1f} MB  (sparse grad upper bound)")
     print()
     print(f"Tensor estimate     : {total * GB:>6.2f} GB")
-    print(
-        f"Realistic estimate  : {total_real * GB:>6.2f} GB  (×{allocator_overhead:.2f} allocator overhead)"
-    )
+    print(f"Realistic estimate  : {total_real * GB:>6.2f} GB  (×{allocator_overhead:.2f} allocator overhead)")
     if torch.cuda.is_available():
         vram_total = torch.cuda.get_device_properties(0).total_memory
         vram_free, _ = torch.cuda.mem_get_info()
@@ -88,9 +83,7 @@ def print_ram_budget(vocab_size: int, embedding_dims: int):
     print(f"Vocab size          : {vocab_size:>10,}")
     print()
     print(f"Checkpoint load     : {checkpoint * GB:>6.2f} GB  (both embedding tables)")
-    print(
-        f"Inference peak      : {inference * GB:>6.2f} GB  (+ normalised embeddings_in)"
-    )
+    print(f"Inference peak      : {inference * GB:>6.2f} GB  (+ normalised embeddings_in)")
 
     try:
         meminfo = {}
@@ -131,24 +124,17 @@ def extract_run_name(filename: str | Path) -> str:
     m = _RUN_NAME_RE.match(name)
     if m is None:
         raise ValueError(
-            f"Invalid model filename: {filename!r}. "
-            "Expected 'model_<word>_<word>_t<size>_ep<N>_v<version>.pt'"
+            f"Invalid model filename: {filename!r}. " "Expected 'model_<word>_<word>_t<size>_ep<N>_v<version>.pt'"
         )
     return m.group(1)
 
 
-def make_model_filename(
-    run_name: str, vocab_size: int, epoch: int, val_loss: float
-) -> str:
+def make_model_filename(run_name: str, vocab_size: int, epoch: int, val_loss: float) -> str:
     """Build a standard model filename from run name, vocab size, epoch, and validation loss."""
 
     def format_number(n):
         return next(
-            (
-                f"{n / d:.0f}" + s
-                for d, s in [(1e9, "B"), (1e6, "M"), (1e3, "K")]
-                if abs(n) >= d
-            ),
+            (f"{n / d:.0f}" + s for d, s in [(1e9, "B"), (1e6, "M"), (1e3, "K")] if abs(n) >= d),
             str(n),
         )
 

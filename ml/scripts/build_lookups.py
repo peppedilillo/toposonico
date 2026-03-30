@@ -62,18 +62,14 @@ def get_connection(database_path: Path) -> sqlite3.Connection:
     return sqlite3.connect(uri, uri=True)
 
 
-def create_temp_track_table(
-    conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME
-) -> None:
+def create_temp_track_table(conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME) -> None:
     """Create (or replace) a temporary track-rowid table for the metadata join."""
     conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-    conn.execute(
-        f"""
+    conn.execute(f"""
         CREATE TEMP TABLE {table_name} (
             track_rowid INTEGER PRIMARY KEY
         )
-        """
-    )
+        """)
 
 
 def load_temp_track_table(
@@ -145,29 +141,31 @@ def build_track_lookup(
     track_meta: pd.DataFrame,
 ) -> pd.DataFrame:
     track_lookup = Tracks.lookup(t1_df, model_dict)
-    label_ids = t1_df[t1_df["track_rowid"].isin(track_lookup["track_rowid"])][
-        ["track_rowid", "label_rowid"]
-    ].copy()
+    label_ids = t1_df[t1_df["track_rowid"].isin(track_lookup["track_rowid"])][["track_rowid", "label_rowid"]].copy()
     label_ids["track_rowid"] = label_ids["track_rowid"].astype("int64")
     label_ids["label_rowid"] = label_ids["label_rowid"].astype("int32")
     track_lookup = track_lookup.merge(track_meta, on="track_rowid", how="inner")
     track_lookup = track_lookup.merge(label_ids, on="track_rowid", how="inner")
-    return track_lookup[
-        [
-            "track_rowid",
-            "track_name",
-            "artist_rowid",
-            "artist_name",
-            "album_rowid",
-            "album_name",
-            "track_popularity",
-            "release_date",
-            "id_isrc",
-            "label",
-            "label_rowid",
-            "logcounts",
+    return (
+        track_lookup[
+            [
+                "track_rowid",
+                "track_name",
+                "artist_rowid",
+                "artist_name",
+                "album_rowid",
+                "album_name",
+                "track_popularity",
+                "release_date",
+                "id_isrc",
+                "label",
+                "label_rowid",
+                "logcounts",
+            ]
         ]
-    ].sort_values("track_rowid").reset_index(drop=True)
+        .sort_values("track_rowid")
+        .reset_index(drop=True)
+    )
 
 
 def build_artist_lookup(
@@ -182,9 +180,9 @@ def build_artist_lookup(
         .sort_values("artist_rowid")
     )
     artist_lookup = artist_lookup.merge(artist_meta, on="artist_rowid", how="inner")
-    return artist_lookup[
-        ["artist_rowid", "artist_name", "logcounts"]
-    ].sort_values("artist_rowid").reset_index(drop=True)
+    return (
+        artist_lookup[["artist_rowid", "artist_name", "logcounts"]].sort_values("artist_rowid").reset_index(drop=True)
+    )
 
 
 def build_album_lookup(
@@ -203,9 +201,11 @@ def build_album_lookup(
         .sort_values("album_rowid")
     )
     album_lookup = album_lookup.merge(album_meta, on="album_rowid", how="inner")
-    return album_lookup[
-        ["album_rowid", "album_name", "artist_rowid", "artist_name", "logcounts"]
-    ].sort_values("album_rowid").reset_index(drop=True)
+    return (
+        album_lookup[["album_rowid", "album_name", "artist_rowid", "artist_name", "logcounts"]]
+        .sort_values("album_rowid")
+        .reset_index(drop=True)
+    )
 
 
 def build_label_lookup(
@@ -223,9 +223,7 @@ def build_label_lookup(
     )
     label_lookup = label_lookup.merge(label_meta, on="label_rowid", how="inner")
     label_lookup["label_rowid"] = label_lookup["label_rowid"].astype("int32")
-    return label_lookup[
-        ["label_rowid", "label", "logcounts"]
-    ].sort_values("label_rowid").reset_index(drop=True)
+    return label_lookup[["label_rowid", "label", "logcounts"]].sort_values("label_rowid").reset_index(drop=True)
 
 
 def main():
@@ -367,23 +365,14 @@ def main():
     conn.close()
     if len(track_meta) != len(track_lookup_base):
         raise RuntimeError(
-            "Track metadata coverage mismatch: "
-            f"expected {len(track_lookup_base):,} rows, got {len(track_meta):,}"
+            "Track metadata coverage mismatch: " f"expected {len(track_lookup_base):,} rows, got {len(track_meta):,}"
         )
 
     print("Joining metadata and writing lookup parquets...")
-    build_track_lookup(t1_df, model_dict, track_meta).to_parquet(
-        output_paths["track"], index=False
-    )
-    build_artist_lookup(t1_df, model_dict, track_meta).to_parquet(
-        output_paths["artist"], index=False
-    )
-    build_album_lookup(t1_df, model_dict, track_meta).to_parquet(
-        output_paths["album"], index=False
-    )
-    build_label_lookup(t1_df, model_dict, track_meta).to_parquet(
-        output_paths["label"], index=False
-    )
+    build_track_lookup(t1_df, model_dict, track_meta).to_parquet(output_paths["track"], index=False)
+    build_artist_lookup(t1_df, model_dict, track_meta).to_parquet(output_paths["artist"], index=False)
+    build_album_lookup(t1_df, model_dict, track_meta).to_parquet(output_paths["album"], index=False)
+    build_label_lookup(t1_df, model_dict, track_meta).to_parquet(output_paths["label"], index=False)
 
     print(f"Done in {time.time() - t0:.1f}s")
 

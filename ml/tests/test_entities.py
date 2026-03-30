@@ -21,9 +21,7 @@ def _model_dict() -> dict:
         "vocab": {"track_rowid": np.array([10, 20, 30], dtype=np.int64)},
         "hparams": {"embed_dim": 2},
         "model_state_dict": {
-            "embeddings_in.weight": torch.tensor(
-                [[1.0, 1.5], [2.0, 2.5], [3.0, 3.5]], dtype=torch.float32
-            )
+            "embeddings_in.weight": torch.tensor([[1.0, 1.5], [2.0, 2.5], [3.0, 3.5]], dtype=torch.float32)
         },
     }
 
@@ -126,9 +124,7 @@ def test_unlabeled_checkpoint_track_is_excluded_from_exported_entities():
         ),
     ],
 )
-def test_entity_lookup_and_embedding_columns_match(
-    entity_cls, id_col, lookup_cols, embedding_cols
-):
+def test_entity_lookup_and_embedding_columns_match(entity_cls, id_col, lookup_cols, embedding_cols):
     lookup = entity_cls.lookup(_t1_df(), _model_dict())
     embeddings = entity_cls.embeddings(_t1_df(), _model_dict())
 

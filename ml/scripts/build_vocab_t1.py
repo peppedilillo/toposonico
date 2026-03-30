@@ -70,18 +70,14 @@ def assign_label_rowids(labels: pd.Series) -> dict[str, int]:
 def create_temp_vocab_table(conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME) -> None:
     """Create (or replace) a temporary vocab table for the join query."""
     conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-    conn.execute(
-        f"""
+    conn.execute(f"""
         CREATE TEMP TABLE {table_name} (
             track_rowid     INTEGER PRIMARY KEY,
             track_id        INTEGER NOT NULL,
             playlist_count  INTEGER NOT NULL
         )
-        """
-    )
-    conn.execute(
-        f"CREATE INDEX {table_name}_track_rowid_idx ON {table_name}(track_rowid)"
-    )
+        """)
+    conn.execute(f"CREATE INDEX {table_name}_track_rowid_idx ON {table_name}(track_rowid)")
 
 
 def load_temp_vocab_table(
@@ -112,9 +108,7 @@ def load_temp_vocab_table(
     print()
 
 
-def fetch_joined_metadata(
-    conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME
-) -> pd.DataFrame:
+def fetch_joined_metadata(conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME) -> pd.DataFrame:
     """Execute the enrichment join and return one row per track with entity ids."""
     query = QUERY.format(temp_table=table_name)
     metadata = pd.read_sql_query(query, conn)
@@ -165,7 +159,7 @@ def main():
     parser.add_argument(
         "--input",
         default=os.environ.get("SICK_T0_VOCAB"),
-        help="Base training vocab path. Defaults to `SICK_T0_VOCAB`."
+        help="Base training vocab path. Defaults to `SICK_T0_VOCAB`.",
     )
     parser.add_argument(
         "--output",
@@ -186,13 +180,9 @@ def main():
             "Either run with --database argument or define the environment variable."
         )
     if args.input is None:
-        raise ValueError(
-            "No base training vocab path set. Use --input or set `SICK_T0_VOCAB`."
-        )
+        raise ValueError("No base training vocab path set. Use --input or set `SICK_T0_VOCAB`.")
     if args.output is None:
-        raise ValueError(
-            "No output path set. Use --output or set `SICK_T1_VOCAB`."
-        )
+        raise ValueError("No output path set. Use --output or set `SICK_T1_VOCAB`.")
 
     db_path = Path(args.database)
     if not db_path.exists():

@@ -5,15 +5,14 @@ Usage:
     python scripts/manifest.py > manifest.toml
 """
 
-from datetime import datetime
 import argparse
+from datetime import datetime
 
-
-
-MANIFEST = ("""#                                               SICK MANIFEST
+MANIFEST = (
+    """#                                               SICK MANIFEST
 """
-f"#                                        {datetime.now().isoformat()}"
-"""
+    f"#                                        {datetime.now().isoformat()}"
+    """
 # use absolute paths and keep the quotes. track_db refers to the `track_clean.db` SQlite db used as source.
 [source]
 track_db = ""
@@ -35,7 +34,8 @@ track  = ""
 artist = ""
 album  = ""
 label  = ""
-""")
+"""
+)
 
 
 def main():
@@ -44,6 +44,7 @@ def main():
     )
     _ = parser.parse_args()
     print(MANIFEST, end="")
+
 
 if __name__ == "__main__":
     main()

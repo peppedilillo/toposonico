@@ -15,9 +15,7 @@ from src.model import skipgram_loss
 from src.model import Word2Vec
 
 
-def _make_chunks(
-    tmp_path: Path, n_chunks: int, n_playlists: int, vocab_size: int, seed: int
-) -> list[Path]:
+def _make_chunks(tmp_path: Path, n_chunks: int, n_playlists: int, vocab_size: int, seed: int) -> list[Path]:
     """Synthetic parquet chunks: random playlists with random track rowids."""
     rng = np.random.default_rng(seed)
     paths = []
@@ -26,9 +24,7 @@ def _make_chunks(
         for pid in range(i * n_playlists, (i + 1) * n_playlists):
             length = int(rng.integers(3, 12))
             for tid in rng.integers(0, vocab_size, size=length):
-                rows.append(
-                    {"playlist_rowid": np.int32(pid), "track_rowid": np.int64(tid)}
-                )
+                rows.append({"playlist_rowid": np.int32(pid), "track_rowid": np.int64(tid)})
         path = tmp_path / f"chunk_{i:06d}.parquet"
         pd.DataFrame(rows).to_parquet(path, index=False)
         paths.append(path)
@@ -89,24 +85,18 @@ def _run(chunk_paths: list[Path], seed: int, n_workers: int) -> torch.Tensor:
 
 def test_deterministic_single_worker(tmp_path):
     paths = _make_chunks(tmp_path, n_chunks=6, n_playlists=20, vocab_size=80, seed=42)
-    assert torch.equal(
-        _run(paths, seed=0, n_workers=1), _run(paths, seed=0, n_workers=1)
-    )
+    assert torch.equal(_run(paths, seed=0, n_workers=1), _run(paths, seed=0, n_workers=1))
 
 
 def test_deterministic_multi_worker(tmp_path):
     paths = _make_chunks(tmp_path, n_chunks=6, n_playlists=20, vocab_size=80, seed=42)
-    assert torch.equal(
-        _run(paths, seed=0, n_workers=4), _run(paths, seed=0, n_workers=4)
-    )
+    assert torch.equal(_run(paths, seed=0, n_workers=4), _run(paths, seed=0, n_workers=4))
 
 
 def test_different_seeds_differ(tmp_path):
     """Sanity check: different seeds must produce different embeddings."""
     paths = _make_chunks(tmp_path, n_chunks=6, n_playlists=20, vocab_size=80, seed=42)
-    assert not torch.equal(
-        _run(paths, seed=0, n_workers=1), _run(paths, seed=1, n_workers=1)
-    )
+    assert not torch.equal(_run(paths, seed=0, n_workers=1), _run(paths, seed=1, n_workers=1))
 
 
 def test_training_completes_with_zero_valid_fraction(tmp_path):
@@ -137,9 +127,7 @@ def test_training_completes_with_zero_valid_fraction(tmp_path):
     model = Word2Vec(vocab_size=len(vocab), embed_dim=EMBED_DIM)
     optimizer = SparseAdam(model.parameters(), lr=1e-3)
 
-    stream = PrefetchPairStream(
-        train_paths, process_chunk, epoch=0, seed=SEED, n_workers=1
-    )
+    stream = PrefetchPairStream(train_paths, process_chunk, epoch=0, seed=SEED, n_workers=1)
     model.train()
     while True:
         batch = stream.next_batch(BATCH_SIZE)

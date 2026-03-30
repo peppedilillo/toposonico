@@ -1,5 +1,5 @@
-from pathlib import Path
 import os
+from pathlib import Path
 import subprocess
 import sys
 
@@ -37,9 +37,7 @@ def _write_model(path: Path) -> None:
             "vocab": {"track_rowid": np.array([10, 20, 30], dtype=np.int64)},
             "hparams": {"embed_dim": 2},
             "model_state_dict": {
-                "embeddings_in.weight": torch.tensor(
-                    [[1.0, 1.5], [2.0, 2.5], [3.0, 3.5]], dtype=torch.float32
-                )
+                "embeddings_in.weight": torch.tensor([[1.0, 1.5], [2.0, 2.5], [3.0, 3.5]], dtype=torch.float32)
             },
         },
         path,
@@ -118,15 +116,7 @@ def test_build_embeddings_script_writes_expected_embedding_artifacts(tmp_path):
     t1_df = _load_t1_df(t1_path)
     model_dict = torch.load(model_path, map_location="cpu", weights_only=False)
 
-    pd.testing.assert_frame_equal(
-        track_embeddings, Tracks.embeddings(t1_df, model_dict), check_dtype=True
-    )
-    pd.testing.assert_frame_equal(
-        artist_embeddings, Artists.embeddings(t1_df, model_dict), check_dtype=True
-    )
-    pd.testing.assert_frame_equal(
-        album_embeddings, Albums.embeddings(t1_df, model_dict), check_dtype=True
-    )
-    pd.testing.assert_frame_equal(
-        label_embeddings, Labels.embeddings(t1_df, model_dict), check_dtype=True
-    )
+    pd.testing.assert_frame_equal(track_embeddings, Tracks.embeddings(t1_df, model_dict), check_dtype=True)
+    pd.testing.assert_frame_equal(artist_embeddings, Artists.embeddings(t1_df, model_dict), check_dtype=True)
+    pd.testing.assert_frame_equal(album_embeddings, Albums.embeddings(t1_df, model_dict), check_dtype=True)
+    pd.testing.assert_frame_equal(label_embeddings, Labels.embeddings(t1_df, model_dict), check_dtype=True)

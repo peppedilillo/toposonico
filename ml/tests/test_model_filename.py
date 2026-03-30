@@ -10,22 +10,13 @@ def test_roundtrip():
 
 
 def test_make_model_filename():
-    assert (
-        make_model_filename("pure_bolt", 5_000_000, 8, 1.4128)
-        == "pure_bolt_model_t5M_ep8_v1d4128.pt"
-    )
-    assert (
-        make_model_filename("vivid_dragon", 47_000_000, 12, 0.9461)
-        == "vivid_dragon_model_t47M_ep12_v0d9461.pt"
-    )
+    assert make_model_filename("pure_bolt", 5_000_000, 8, 1.4128) == "pure_bolt_model_t5M_ep8_v1d4128.pt"
+    assert make_model_filename("vivid_dragon", 47_000_000, 12, 0.9461) == "vivid_dragon_model_t47M_ep12_v0d9461.pt"
 
 
 def test_extract_run_name():
     assert extract_run_name("pure_bolt_model_t5M_ep8_v1d4128.pt") == "pure_bolt"
-    assert (
-        extract_run_name("/some/path/vivid_dragon_model_t47M_ep12_v0d9461.pt")
-        == "vivid_dragon"
-    )
+    assert extract_run_name("/some/path/vivid_dragon_model_t47M_ep12_v0d9461.pt") == "vivid_dragon"
 
 
 def test_extract_run_name_invalid():

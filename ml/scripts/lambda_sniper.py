@@ -86,9 +86,7 @@ def print_catalog(data, targets, regions) -> None:
         desc = itype.get("description", "")
         cents = itype.get("price_cents_per_hour")
         price = f"${cents / 100:.2f}/hr" if cents is not None else "n/a"
-        all_regions = [
-            r["name"] for r in entry.get("regions_with_capacity_available", [])
-        ]
+        all_regions = [r["name"] for r in entry.get("regions_with_capacity_available", [])]
         matching = [r for r in all_regions if region_matches(r, regions)]
         marker = "*" if name in target_set else " "
         rows.append((marker, name, desc, price, matching))
@@ -103,15 +101,11 @@ def print_catalog(data, targets, regions) -> None:
     print(f"  {'':1}  {'-'*name_w}  {'-'*desc_w}  {'-'*price_w}  -------")
     for marker, name, desc, price, matching in rows:
         regions_str = ", ".join(matching) if matching else "—"
-        print(
-            f"  {marker}  {name:<{name_w}}  {desc:<{desc_w}}  {price:>{price_w}}  {regions_str}"
-        )
+        print(f"  {marker}  {name:<{name_w}}  {desc:<{desc_w}}  {price:>{price_w}}  {regions_str}")
     print()
 
     if not any(r[0] == "*" and r[4] for r in rows):
-        print(
-            f"  None of the target instances have capacity in {prefix_str} regions right now."
-        )
+        print(f"  None of the target instances have capacity in {prefix_str} regions right now.")
     print()
 
 
@@ -157,9 +151,7 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
         print(f"[{ts()}] {e}")
         return
 
-    print(
-        f"[{ts()}] Sniping {', '.join(instances)} in {prefix_str} — polling every {poll_interval}s"
-    )
+    print(f"[{ts()}] Sniping {', '.join(instances)} in {prefix_str} — polling every {poll_interval}s")
 
     checks = 0
     start = time.time()
@@ -187,9 +179,7 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
                 if resp.ok:
                     ids = resp.json().get("data", {}).get("instance_ids", [])
                     print(f"[{ts()}] Launched! Instance ID(s): {', '.join(ids)}")
-                    print(
-                        f"[{ts()}] Check status: https://cloud.lambdalabs.com/instances"
-                    )
+                    print(f"[{ts()}] Check status: https://cloud.lambdalabs.com/instances")
                 else:
                     print(f"[{ts()}] Launch failed: {resp.text}")
                 return  # exit after first launch attempt, successful or not
@@ -251,9 +241,7 @@ def main():
         )
 
     try:
-        snipe(
-            args.api_key, args.instances, args.regions, args.poll_interval, args.dry_run
-        )
+        snipe(args.api_key, args.instances, args.regions, args.poll_interval, args.dry_run)
     except KeyboardInterrupt:
         print(f"\n[{ts()}] Stopped.")
 

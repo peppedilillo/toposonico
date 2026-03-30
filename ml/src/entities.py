@@ -5,6 +5,7 @@ All classes (Tracks, Artists, Albums, Labels) share the same interface:
   - lookup(t1_df, model_dict)     — entity rowid + logcounts
   - embeddings(t1_df, model_dict) — entity rowid + e0..e{D-1} (mean-pooled for non-track entities)
 """
+
 import os
 
 import numpy as np
@@ -12,12 +13,10 @@ import pandas as pd
 
 
 def _get_config_parameter(var: str) -> int:
-    """Read an integer from an environment variable; raise if unset. """
+    """Read an integer from an environment variable; raise if unset."""
     n = os.environ.get(var)
     if n is None:
-        raise EnvironmentError(
-            f"No {var} environment variable set. " f"Have you run `source config.env`?"
-        )
+        raise EnvironmentError(f"No {var} environment variable set. " f"Have you run `source config.env`?")
     return int(n)
 
 
@@ -59,7 +58,8 @@ class Tracks:
         assert t1_df["track_rowid"].is_unique, "Expected unique track_rowid in t1_df"
         model_rowids = extract_model_rowids(model_dict)
         valid_tracks = t1_df[
-            t1_df["track_rowid"].isin(model_rowids) & 
+            t1_df["track_rowid"].isin(model_rowids)
+            &
             # label are non-null but few tracks have empty label string.
             # these tracks are assigned a null ID in the training vocab. we drop them.
             t1_df["label_rowid"].notna()

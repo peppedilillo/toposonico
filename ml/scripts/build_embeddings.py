@@ -20,25 +20,23 @@ from pathlib import Path
 import time
 
 import numpy as np
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-import pandas as pd
 import torch
 
 from src.entities import Albums
 from src.entities import Artists
-from src.entities import Labels
-from src.entities import Tracks
 from src.entities import extract_model_dim
 from src.entities import extract_model_embeddings
 from src.entities import extract_model_rowids
+from src.entities import Labels
+from src.entities import Tracks
 
 CHUNK_SIZE_DEFAULT = 500_000
 
 
-def write_embedding_parquet(
-    df: pd.DataFrame, id_col: str, output_path: Path, chunk_size: int
-) -> None:
+def write_embedding_parquet(df: pd.DataFrame, id_col: str, output_path: Path, chunk_size: int) -> None:
     """Write a DataFrame of entity embeddings to parquet in streaming row groups.
 
     id_col is written with its original dtype (int32 for labels, int64 for others);
@@ -46,9 +44,7 @@ def write_embedding_parquet(
     """
     emb_cols = [c for c in df.columns if c != id_col]
     id_type = pa.int32() if df[id_col].dtype.name == "int32" else pa.int64()
-    schema = pa.schema(
-        [pa.field(id_col, id_type)] + [pa.field(c, pa.float32()) for c in emb_cols]
-    )
+    schema = pa.schema([pa.field(id_col, id_type)] + [pa.field(c, pa.float32()) for c in emb_cols])
 
     total_rows = len(df)
     written = 0
@@ -72,9 +68,7 @@ def write_embedding_parquet(
     print()
 
 
-def write_track_embeddings(
-    t1_df: pd.DataFrame, model_dict: dict, output_path: Path, chunk_size: int
-) -> int:
+def write_track_embeddings(t1_df: pd.DataFrame, model_dict: dict, output_path: Path, chunk_size: int) -> int:
     """Write track embeddings directly from the checkpoint weight matrix.
 
     Applies Tracks.valid_ids() filtering before writing. Separated from
@@ -93,10 +87,7 @@ def write_track_embeddings(
     rowids = rowids[mask].astype("int64")
     emb = emb[mask].astype("float32")
 
-    schema = pa.schema(
-        [pa.field("track_rowid", pa.int64())]
-        + [pa.field(c, pa.float32()) for c in emb_cols]
-    )
+    schema = pa.schema([pa.field("track_rowid", pa.int64())] + [pa.field(c, pa.float32()) for c in emb_cols])
 
     total_rows = len(rowids)
     written = 0
@@ -236,9 +227,7 @@ def main():
         chunk_size=args.chunk_size,
     )
     size_mb = output_paths["track"].stat().st_size / 1_048_576
-    print(
-        f"  {n_rows:,} rows  ->  {output_paths['track']}  ({size_mb:.1f} MB, {time.time() - t1:.1f}s)"
-    )
+    print(f"  {n_rows:,} rows  ->  {output_paths['track']}  ({size_mb:.1f} MB, {time.time() - t1:.1f}s)")
 
     for name, cls, output_path in [
         ("artist", Artists, output_paths["artist"]),
@@ -255,9 +244,7 @@ def main():
             chunk_size=args.chunk_size,
         )
         size_mb = output_path.stat().st_size / 1_048_576
-        print(
-            f"  {len(result):,} rows  ->  {output_path}  ({size_mb:.1f} MB, {time.time() - t1:.1f}s)"
-        )
+        print(f"  {len(result):,} rows  ->  {output_path}  ({size_mb:.1f} MB, {time.time() - t1:.1f}s)")
 
     print(f"\nDone in {time.time() - t0:.1f}s")
 

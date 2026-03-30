@@ -1,6 +1,6 @@
 # SICK_*_MINTRACK must be set before importing entities, which reads them at class-definition time.
-from pathlib import Path
 import os
+from pathlib import Path
 import sqlite3
 import subprocess
 import sys
@@ -12,8 +12,7 @@ import torch
 
 def _write_tracks_db(path: Path) -> None:
     conn = sqlite3.connect(path)
-    conn.executescript(
-        """
+    conn.executescript("""
         CREATE TABLE artists (
             rowid INTEGER PRIMARY KEY,
             name TEXT NOT NULL
@@ -38,8 +37,7 @@ def _write_tracks_db(path: Path) -> None:
             track_rowid INTEGER NOT NULL,
             artist_rowid INTEGER NOT NULL
         );
-        """
-    )
+        """)
     conn.executemany(
         "INSERT INTO artists(rowid, name) VALUES (?, ?)",
         [(1, "Artist One"), (2, "Artist Two")],
@@ -88,9 +86,7 @@ def _write_model(path: Path) -> None:
             "vocab": {"track_rowid": np.array([10, 20, 30], dtype=np.int64)},
             "hparams": {"embed_dim": 2},
             "model_state_dict": {
-                "embeddings_in.weight": torch.tensor(
-                    [[1.0, 1.5], [2.0, 2.5], [3.0, 3.5]], dtype=torch.float32
-                )
+                "embeddings_in.weight": torch.tensor([[1.0, 1.5], [2.0, 2.5], [3.0, 3.5]], dtype=torch.float32)
             },
         },
         path,

@@ -110,32 +110,22 @@ def main():
     print(f"Offset     : {args.offset}")
     print()
     print("Fetching playlist rowids...")
-    all_playlist_rowids = pd.read_sql_query(PLAYLIST_ROWIDS_QUERY, conn)[
-        "rowid"
-    ].tolist()
+    all_playlist_rowids = pd.read_sql_query(PLAYLIST_ROWIDS_QUERY, conn)["rowid"].tolist()
     n = len(all_playlist_rowids)
 
     if args.offset != 0 and not (-(n - 1) <= args.offset <= n - 1):
         raise ValueError(
-            f"--offset {args.offset} out of range; valid range is [{-(n-1)}, {n-1}] "
-            f"for {n:,} playlists."
+            f"--offset {args.offset} out of range; valid range is [{-(n-1)}, {n-1}] " f"for {n:,} playlists."
         )
 
-    playlist_rowids = (
-        all_playlist_rowids[args.offset :] if args.offset != 0 else all_playlist_rowids
-    )
+    playlist_rowids = all_playlist_rowids[args.offset :] if args.offset != 0 else all_playlist_rowids
     total_playlists = len(playlist_rowids)
 
-    batches = [
-        playlist_rowids[i : i + args.chunk_size]
-        for i in range(0, total_playlists, args.chunk_size)
-    ]
+    batches = [playlist_rowids[i : i + args.chunk_size] for i in range(0, total_playlists, args.chunk_size)]
     total_chunks = len(batches)
 
     if args.offset != 0:
-        print(
-            f"  {n:,} playlists in DB, {total_playlists:,} selected (offset={args.offset}) → {total_chunks:,} chunks"
-        )
+        print(f"  {n:,} playlists in DB, {total_playlists:,} selected (offset={args.offset}) → {total_chunks:,} chunks")
     else:
         print(f"  {total_playlists:,} playlists → {total_chunks:,} chunks")
     print()
@@ -165,18 +155,12 @@ def main():
         total_rows_written += len(df)
 
         elapsed = time.time() - t0
-        print(
-            f"  [{i+1:{w}}/{total_chunks}] {out_path.name}"
-            f"  {len(df):>10,} rows"
-            f"  {elapsed:>6.0f}s elapsed"
-        )
+        print(f"  [{i+1:{w}}/{total_chunks}] {out_path.name}" f"  {len(df):>10,} rows" f"  {elapsed:>6.0f}s elapsed")
 
     conn.close()
 
     if skipped:
-        print(
-            f"\n  {skipped} chunk(s) skipped (already exist). Use --overwrite to regenerate."
-        )
+        print(f"\n  {skipped} chunk(s) skipped (already exist). Use --overwrite to regenerate.")
 
     manifest = {
         "total_chunks": total_chunks,
