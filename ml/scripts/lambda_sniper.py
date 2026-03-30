@@ -103,8 +103,6 @@ def print_catalog(data, targets, regions) -> int:
         print(
             f"  None of the target instances have capacity in {prefix_str} regions right now."
         )
-    else:
-        print()
     print()
 
     # 2 (blank line + header) + 1 (separator) + len(rows) + 1 (blank) + 1 (warning/blank) + 1 (trailing blank)
@@ -150,7 +148,6 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
     print(
         f"[{ts()}] Sniping {', '.join(instances)} in {prefix_str} — polling every {poll_interval}s"
     )
-    print(flush=True)  # placeholder status line — overwritten on first iteration
 
     checks = 0
     start = time.time()
