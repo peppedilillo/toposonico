@@ -155,9 +155,10 @@ class Artists:
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            DataFrame with columns `artist_rowid` (`int64`) and `logcounts`
-            (`float32`). `logcounts` is the mean of per-track
-            `log10(playlist_count)` across valid artist tracks.
+            DataFrame with columns `artist_rowid` (`int64`), `logcounts`
+            (`float32`), and `ntracks` (`int32`). `logcounts` is the mean of
+            per-track `log10(playlist_count)` across valid artist tracks.
+            `ntracks` is the number of valid tracks per artist.
         """
         valid_ids = Artists.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
@@ -167,9 +168,13 @@ class Artists:
             .groupby(t1_df.loc[mask, "artist_rowid"], sort=False)
             .mean()
             .reset_index(name="logcounts")
-        )
+        ).merge(
+            t1_df.loc[mask].value_counts("artist_rowid"),
+            on="artist_rowid"
+        ).rename(columns={"count": "ntracks"})
         out["artist_rowid"] = out["artist_rowid"].astype("int64")
         out["logcounts"] = out["logcounts"].astype("float32")
+        out["ntracks"] = out["ntracks"].astype("int32")
         return out
 
     @staticmethod
@@ -337,9 +342,10 @@ class Labels:
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            DataFrame with columns `label_rowid` (`int32`) and `logcounts`
-            (`float32`). `logcounts` is the mean of per-track
-            `log10(playlist_count)` across valid label tracks.
+            DataFrame with columns `label_rowid` (`int32`), `logcounts`
+            (`float32`), and `ntracks` (`int32`). `logcounts` is the mean of
+            per-track `log10(playlist_count)` across valid label tracks.
+            `ntracks` is the number of valid tracks per label.
         """
         valid_ids = Labels.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
@@ -349,9 +355,13 @@ class Labels:
             .groupby(t1_df.loc[mask, "label_rowid"], sort=False)
             .mean()
             .reset_index(name="logcounts")
-        )
+        ).merge(
+            t1_df.loc[mask].value_counts("label_rowid"),
+            on="label_rowid"
+        ).rename(columns={"count": "ntracks"})
         out["label_rowid"] = out["label_rowid"].astype("int32")
         out["logcounts"] = out["logcounts"].astype("float32")
+        out["ntracks"] = out["ntracks"].astype("int32")
         return out
 
     @staticmethod

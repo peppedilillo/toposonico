@@ -35,23 +35,39 @@ TRACK_METADATA_QUERY = """
                 LIMIT 1
             ) AS artist_rowid
         FROM {temp_table} AS tt
+    ), primary_genre AS (
+        SELECT
+            pa.artist_rowid AS artist_rowid,
+            (
+                SELECT genre
+                FROM artist_genres
+                WHERE artist_rowid = pa.artist_rowid
+                LIMIT 1
+            ) AS artist_genre
+        FROM primary_artists AS pa
+        GROUP BY pa.artist_rowid
     )
     SELECT
-        tt.track_rowid      AS track_rowid,
-        t.name             AS track_name,
-        t.popularity       AS track_popularity,
-        t.external_id_isrc AS id_isrc,
-        pa.artist_rowid    AS artist_rowid,
-        a.name             AS artist_name,
-        t.album_rowid      AS album_rowid,
-        al.name            AS album_name,
-        al.label           AS label,
-        al.release_date    AS release_date
+        tt.track_rowid               AS track_rowid,
+        t.name                       AS track_name,
+        t.popularity                 AS track_popularity,
+        t.external_id_isrc           AS id_isrc,
+        pa.artist_rowid              AS artist_rowid,
+        pg.artist_genre              AS artist_genre,
+        a.name                       AS artist_name,
+        t.album_rowid                AS album_rowid,
+        al.name                      AS album_name,
+        al.label                     AS label,
+        al.total_tracks              AS total_tracks,
+        al.album_type                AS album_type,
+        al.release_date              AS release_date,
+        al.release_date_precision    AS release_date_precision
     FROM {temp_table} AS tt
-    INNER JOIN primary_artists AS pa ON pa.track_rowid = tt.track_rowid
-    INNER JOIN tracks          AS t  ON t.rowid        = tt.track_rowid
-    INNER JOIN albums          AS al ON t.album_rowid  = al.rowid
-    INNER JOIN artists         AS a  ON a.rowid        = pa.artist_rowid
+    INNER JOIN primary_artists AS pa ON pa.track_rowid  = tt.track_rowid
+    LEFT JOIN  primary_genre   AS pg ON pg.artist_rowid = pa.artist_rowid
+    INNER JOIN tracks          AS t  ON t.rowid         = tt.track_rowid
+    INNER JOIN albums          AS al ON t.album_rowid   = al.rowid
+    INNER JOIN artists         AS a  ON a.rowid         = pa.artist_rowid
     ORDER BY tt.track_rowid
 """
 
@@ -176,12 +192,15 @@ def build_artist_lookup(
     artist_lookup = Artists.lookup(t1_df, model_dict)
     artist_meta = (
         track_meta.groupby("artist_rowid", as_index=False)
-        .agg(artist_name=("artist_name", "first"))
+        .agg(
+            artist_name=("artist_name", "first"),
+            artist_genre=("artist_genre", "first"),
+        )
         .sort_values("artist_rowid")
     )
     artist_lookup = artist_lookup.merge(artist_meta, on="artist_rowid", how="inner")
     return (
-        artist_lookup[["artist_rowid", "artist_name", "logcounts"]].sort_values("artist_rowid").reset_index(drop=True)
+        artist_lookup[["artist_rowid", "artist_name", "artist_genre", "logcounts", "ntracks",]].sort_values("artist_rowid").reset_index(drop=True)
     )
 
 
@@ -197,12 +216,16 @@ def build_album_lookup(
             album_name=("album_name", "first"),
             artist_rowid=("artist_rowid", "first"),
             artist_name=("artist_name", "first"),
+            album_type=("album_type", "first"),
+            release_date=("release_date", "first"),
+            release_date_precision=("release_date_precision", "first"),
+            total_tracks=("total_tracks", "first"),
         )
         .sort_values("album_rowid")
     )
     album_lookup = album_lookup.merge(album_meta, on="album_rowid", how="inner")
     return (
-        album_lookup[["album_rowid", "album_name", "artist_rowid", "artist_name", "logcounts"]]
+        album_lookup[["album_rowid", "album_name", "artist_rowid", "artist_name", "album_type", "release_date", "release_date_precision", "logcounts", "total_tracks",]]
         .sort_values("album_rowid")
         .reset_index(drop=True)
     )
@@ -223,7 +246,7 @@ def build_label_lookup(
     )
     label_lookup = label_lookup.merge(label_meta, on="label_rowid", how="inner")
     label_lookup["label_rowid"] = label_lookup["label_rowid"].astype("int32")
-    return label_lookup[["label_rowid", "label", "logcounts"]].sort_values("label_rowid").reset_index(drop=True)
+    return label_lookup[["label_rowid", "label", "logcounts", "ntracks"]].sort_values("label_rowid").reset_index(drop=True)
 
 
 def main():

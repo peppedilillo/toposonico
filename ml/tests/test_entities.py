@@ -81,18 +81,22 @@ def test_unlabeled_checkpoint_track_is_excluded_from_exported_entities():
     model_dict = _model_dict()
 
     assert 30 not in Tracks.valid_ids(t1_df, model_dict).tolist()
-    assert Artists.lookup(t1_df, model_dict)["artist_rowid"].tolist() == [1]
+    artist_lookup = Artists.lookup(t1_df, model_dict)
+    assert artist_lookup["artist_rowid"].tolist() == [1]
     assert Albums.lookup(t1_df, model_dict)["album_rowid"].tolist() == [11]
-    assert Labels.lookup(t1_df, model_dict)["label_rowid"].tolist() == [111]
+    label_lookup = Labels.lookup(t1_df, model_dict)
+    assert label_lookup["label_rowid"].tolist() == [111]
 
     np.testing.assert_allclose(
-        Artists.lookup(t1_df, model_dict)["logcounts"].to_numpy(),
+        artist_lookup["logcounts"].to_numpy(),
         np.array([1.5], dtype=np.float32),
     )
+    assert artist_lookup["ntracks"].tolist() == [2]
     np.testing.assert_allclose(
         Albums.lookup(t1_df, model_dict)["logcounts"].to_numpy(),
         np.array([1.5], dtype=np.float32),
     )
+    assert label_lookup["ntracks"].tolist() == [2]
 
 
 @pytest.mark.parametrize(
@@ -107,7 +111,7 @@ def test_unlabeled_checkpoint_track_is_excluded_from_exported_entities():
         (
             Artists,
             "artist_rowid",
-            ["artist_rowid", "logcounts"],
+            ["artist_rowid", "logcounts", "ntracks"],
             ["artist_rowid", "e0", "e1"],
         ),
         (
@@ -119,7 +123,7 @@ def test_unlabeled_checkpoint_track_is_excluded_from_exported_entities():
         (
             Labels,
             "label_rowid",
-            ["label_rowid", "logcounts"],
+            ["label_rowid", "logcounts", "ntracks"],
             ["label_rowid", "e0", "e1"],
         ),
     ],

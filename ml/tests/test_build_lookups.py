@@ -22,7 +22,10 @@ def _write_tracks_db(path: Path) -> None:
             rowid INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
             label TEXT,
-            release_date TEXT
+            album_type TEXT,
+            total_tracks INTEGER,
+            release_date TEXT,
+            release_date_precision TEXT
         );
 
         CREATE TABLE tracks (
@@ -37,16 +40,21 @@ def _write_tracks_db(path: Path) -> None:
             track_rowid INTEGER NOT NULL,
             artist_rowid INTEGER NOT NULL
         );
+
+        CREATE TABLE artist_genres (
+            artist_rowid INTEGER NOT NULL,
+            genre TEXT NOT NULL
+        );
         """)
     conn.executemany(
         "INSERT INTO artists(rowid, name) VALUES (?, ?)",
         [(1, "Artist One"), (2, "Artist Two")],
     )
     conn.executemany(
-        "INSERT INTO albums(rowid, name, label, release_date) VALUES (?, ?, ?, ?)",
+        "INSERT INTO albums(rowid, name, label, album_type, total_tracks, release_date, release_date_precision) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
-            (11, "Album One", "Label One", "2024-01-01"),
-            (22, "Album Two", "Label Two", "2023-05-05"),
+            (11, "Album One", "Label One", "album", 10, "2024-01-01", "day"),
+            (22, "Album Two", "Label Two", "single", 1, "2023-05-05", "day"),
         ],
     )
     conn.executemany(
@@ -61,6 +69,10 @@ def _write_tracks_db(path: Path) -> None:
     conn.executemany(
         "INSERT INTO track_artists(track_rowid, artist_rowid) VALUES (?, ?)",
         [(10, 1), (20, 1), (30, 1), (40, 2)],
+    )
+    conn.executemany(
+        "INSERT INTO artist_genres(artist_rowid, genre) VALUES (?, ?)",
+        [(1, "rock"), (1, "indie"), (2, "pop")],
     )
     conn.commit()
     conn.close()
@@ -163,9 +175,11 @@ def test_build_lookups_script_writes_expected_lookup_artifacts(tmp_path):
         np.array([1.0, 2.0], dtype=np.float32),
     )
 
-    assert list(artist_lookup.columns) == ["artist_rowid", "artist_name", "logcounts"]
+    assert list(artist_lookup.columns) == ["artist_rowid", "artist_name", "artist_genre", "logcounts", "ntracks"]
     assert artist_lookup["artist_rowid"].tolist() == [1]
     assert artist_lookup["artist_name"].tolist() == ["Artist One"]
+    assert artist_lookup["artist_genre"].tolist() == ["rock"]
+    assert artist_lookup["ntracks"].tolist() == [2]
     np.testing.assert_allclose(
         artist_lookup["logcounts"].to_numpy(),
         np.array([1.5], dtype=np.float32),
@@ -176,7 +190,11 @@ def test_build_lookups_script_writes_expected_lookup_artifacts(tmp_path):
         "album_name",
         "artist_rowid",
         "artist_name",
+        "album_type",
+        "release_date",
+        "release_date_precision",
         "logcounts",
+        "total_tracks",
     ]
     assert album_lookup["album_rowid"].tolist() == [11]
     assert album_lookup["album_name"].tolist() == ["Album One"]
@@ -187,7 +205,7 @@ def test_build_lookups_script_writes_expected_lookup_artifacts(tmp_path):
         np.array([1.5], dtype=np.float32),
     )
 
-    assert list(label_lookup.columns) == ["label_rowid", "label", "logcounts"]
+    assert list(label_lookup.columns) == ["label_rowid", "label", "logcounts", "ntracks"]
     assert label_lookup["label_rowid"].tolist() == [111]
     assert label_lookup["label"].tolist() == ["Label One"]
     np.testing.assert_allclose(
