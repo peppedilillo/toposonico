@@ -23,14 +23,14 @@ from typing import Sequence
 
 import pandas as pd
 
-from src.utils import get_auxpaths, read_manifest
+from src.utils import get_geopaths, read_manifest
 
 
 ENTITIES = {
     "track":  "track_rowid",
     "album":  "album_rowid",
     "artist": "artist_rowid",
-    "label":  "label",
+    "label":  "label_rowid",
 }
 
 
@@ -121,7 +121,7 @@ def main():
     manifest = read_manifest(args.manifest)
     umap_paths = {entity: Path(p) for entity, p in manifest["umap"].items()}
 
-    geo_paths = get_auxpaths()["geo"]
+    geo_paths = get_geopaths()
     next(iter(geo_paths.values())).parent.mkdir(parents=True, exist_ok=True)
 
     hwidth = args.width / 2.
