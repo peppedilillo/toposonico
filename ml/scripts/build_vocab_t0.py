@@ -54,7 +54,7 @@ def main():
         "--min-count",
         type=int,
         default=5,
-        help="Minimum playlist count to include a track (default: 2)",
+        help="Minimum playlist count to include a track (default: 5)",
     )
     args = parser.parse_args()
 
@@ -72,7 +72,7 @@ def main():
 
     if args.output is None:
         raise ValueError(
-            "No `SICK_T1_VOCAB` environment variable set. "
+            "No `SICK_T0_VOCAB` environment variable set. "
             "Either run with --output argument or define the environment variable."
         )
     output_path = Path(args.output)
