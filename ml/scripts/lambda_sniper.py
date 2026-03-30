@@ -38,6 +38,7 @@ def ts():
 
 
 def elapsed(start: float) -> str:
+    """Return elapsed time as a human-readable string (e.g. '2m05s', '1h03m')."""
     s = int(time.time() - start)
     h, m = divmod(s, 3600)
     m, s = divmod(m, 60)
@@ -49,6 +50,7 @@ def elapsed(start: float) -> str:
 
 
 def get_ssh_key(api_key):
+    """Return the name of the first SSH key registered on the account."""
     resp = requests.get(f"{API_BASE}/ssh-keys", auth=auth(api_key), timeout=10)
     resp.raise_for_status()
     keys = resp.json().get("data", [])
@@ -58,6 +60,7 @@ def get_ssh_key(api_key):
 
 
 def fetch_catalog(api_key):
+    """Return the raw instance-types data dict from the Lambda API."""
     resp = requests.get(f"{API_BASE}/instance-types", auth=auth(api_key), timeout=10)
     resp.raise_for_status()
     return resp.json().get("data", {})
@@ -67,7 +70,13 @@ def region_matches(name, prefixes):
     return any(name.startswith(p) for p in prefixes)
 
 
-def print_catalog(data, targets, regions) -> int:
+def print_catalog(data, targets, regions) -> None:
+    """Print a table of all instance types with price and regional availability.
+
+    Target instances (those in `targets`) are marked with * in the first column.
+    Only regions whose name starts with one of `regions` are shown in the Regions column.
+    Prints a warning line if no target has capacity in any matching region.
+    """
     target_set = set(targets)
     prefix_str = ", ".join(f"{p}*" for p in regions)
 
@@ -105,11 +114,9 @@ def print_catalog(data, targets, regions) -> int:
         )
     print()
 
-    # 2 (blank line + header) + 1 (separator) + len(rows) + 1 (blank) + 1 (warning/blank) + 1 (trailing blank)
-    return len(rows) + 6
-
 
 def launch(api_key, itype, region, key_name):
+    """POST a launch request. Returns the raw response without raising on error."""
     return requests.post(
         f"{API_BASE}/instance-operations/launch",
         json={
@@ -124,6 +131,11 @@ def launch(api_key, itype, region, key_name):
 
 
 def snipe(api_key, instances, regions, poll_interval, dry_run):
+    """Fetch the catalog once, print it, then poll until a target instance is available.
+
+    Exits after the first launch attempt (successful or not). With dry_run=True,
+    prints the catalog and returns immediately without polling.
+    """
     prefix_str = ", ".join(f"{p}*" for p in regions)
 
     print(f"[{ts()}] Fetching instance catalog...")
@@ -133,7 +145,7 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
         print(f"[{ts()}] Failed to fetch catalog: {e}")
         return
 
-    catalog_lines = print_catalog(data, instances, regions)
+    print_catalog(data, instances, regions)
 
     if dry_run:
         print(f"[{ts()}] DRY RUN — exiting without polling.")
@@ -156,9 +168,6 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
         try:
             data = fetch_catalog(api_key)
             checks += 1
-
-            print(f"\033[{catalog_lines + 1}A\033[J", end="", flush=True)
-            catalog_lines = print_catalog(data, instances, regions)
 
             for itype in instances:
                 if itype not in data:
@@ -183,7 +192,7 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
                     )
                 else:
                     print(f"[{ts()}] Launch failed: {resp.text}")
-                return
+                return  # exit after first launch attempt, successful or not
 
             print(
                 f"[{ts()}] #{checks:04d}  {elapsed(start)} elapsed — no capacity",
@@ -224,7 +233,7 @@ def main():
     parser.add_argument(
         "--poll-interval",
         type=float,
-        default=12.01,
+        default=12.01,  # slightly non-round to reduce collision with round-interval rate limits
         metavar="SECS",
         help="Seconds between polls (default: 12.01)",
     )
