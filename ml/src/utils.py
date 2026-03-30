@@ -1,3 +1,4 @@
+"""Training utilities: VRAM/RAM budget printing, vocab stats, model filename helpers, run-name generator."""
 from pathlib import Path
 import random
 import re
@@ -120,6 +121,7 @@ def print_vocab_stats(vocab: pd.DataFrame):
     print(f"Track count max  : {vocab['playlist_count'].max()}")
 
 
+# Matches: {adj}_{noun}_model_t{size}_ep{N}_v{loss}.pt  e.g. magic_falcon_model_t11M_ep8_v1d3279.pt
 _RUN_NAME_RE = re.compile(r"^([a-z]+_[a-z]+)_model_t\w+_ep\d+_v\w+\.pt$")
 
 
@@ -138,7 +140,7 @@ def extract_run_name(filename: str | Path) -> str:
 def make_model_filename(
     run_name: str, vocab_size: int, epoch: int, val_loss: float
 ) -> str:
-    """Parse standard model filename."""
+    """Build a standard model filename from run name, vocab size, epoch, and validation loss."""
 
     def format_number(n):
         return next(
@@ -155,6 +157,7 @@ def make_model_filename(
 
 
 def human_hash(sep="_"):
+    """Return a random adjective_noun string (e.g. 'magic_falcon') for run naming."""
     adjectives = [
         "angry",
         "bold",

@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
-"""Build embedding tables from the enriched training vocab and model checkpoint."""
+"""Build embedding parquets from the enriched training vocab and model checkpoint.
+
+Writes one parquet per entity type (track, artist, album, label). Track embeddings
+are written directly from the checkpoint; artist/album/label embeddings are
+mean-pooled from their constituent track embeddings via the entity classes.
+
+Usage:
+    python scripts/build_embeddings.py MODEL [--input PATH] [--track-output PATH]
+                                             [--artist-output PATH] [--album-output PATH]
+                                             [--label-output PATH] [--chunk-size N]
+
+Example:
+    python scripts/build_embeddings.py outs/magic_falcon_model_t11M_ep8_v1d3279.pt
+"""
 
 import argparse
 import os
@@ -26,6 +39,11 @@ CHUNK_SIZE_DEFAULT = 500_000
 def write_embedding_parquet(
     df: pd.DataFrame, id_col: str, output_path: Path, chunk_size: int
 ) -> None:
+    """Write a DataFrame of entity embeddings to parquet in streaming row groups.
+
+    id_col is written with its original dtype (int32 for labels, int64 for others);
+    all embedding columns are written as float32.
+    """
     emb_cols = [c for c in df.columns if c != id_col]
     id_type = pa.int32() if df[id_col].dtype.name == "int32" else pa.int64()
     schema = pa.schema(
@@ -57,6 +75,14 @@ def write_embedding_parquet(
 def write_track_embeddings(
     t1_df: pd.DataFrame, model_dict: dict, output_path: Path, chunk_size: int
 ) -> int:
+    """Write track embeddings directly from the checkpoint weight matrix.
+
+    Applies Tracks.valid_ids() filtering before writing. Separated from
+    write_embedding_parquet because tracks are read straight from the numpy
+    weight matrix rather than from an entity class result.
+
+    Returns the number of rows written.
+    """
     valid_ids = Tracks.valid_ids(t1_df, model_dict)
     rowids = extract_model_rowids(model_dict)
     emb = extract_model_embeddings(model_dict)

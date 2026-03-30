@@ -57,6 +57,7 @@ TRACK_METADATA_QUERY = """
 
 
 def get_connection(database_path: Path) -> sqlite3.Connection:
+    """Open a read-only SQLite connection to the given database path."""
     uri = f"file:{database_path}?mode=ro"
     return sqlite3.connect(uri, uri=True)
 
@@ -64,6 +65,7 @@ def get_connection(database_path: Path) -> sqlite3.Connection:
 def create_temp_track_table(
     conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME
 ) -> None:
+    """Create (or replace) a temporary track-rowid table for the metadata join."""
     conn.execute(f"DROP TABLE IF EXISTS {table_name}")
     conn.execute(
         f"""
@@ -80,6 +82,7 @@ def load_temp_track_table(
     chunk_size: int,
     table_name: str = TEMP_TABLE_NAME,
 ) -> None:
+    """Insert track rowids into the temp table in chunks, printing progress."""
     rows = [(int(track_rowid),) for track_rowid in track_rowids.tolist()]
     total = len(rows)
     started_at = time.time()
@@ -100,6 +103,12 @@ def fetch_track_metadata(
     chunk_size: int,
     table_name: str = TEMP_TABLE_NAME,
 ) -> pd.DataFrame:
+    """Fetch joined track metadata for rows staged in the temp table.
+
+    Returns one row per track with name, popularity, ISRC, primary artist,
+    album, label, and release date. Streams results in chunks to avoid
+    materialising the full result set at once.
+    """
     query = TRACK_METADATA_QUERY.format(temp_table=table_name)
     cursor = conn.execute(query)
     col_names = [desc[0] for desc in cursor.description]

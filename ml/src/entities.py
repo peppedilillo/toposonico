@@ -1,3 +1,10 @@
+"""Entity helpers for extracting and aggregating embeddings from a model checkpoint.
+
+All classes (Tracks, Artists, Albums, Labels) share the same interface:
+  - valid_ids(t1_df, model_dict)  — track rowids that qualify for this entity type
+  - lookup(t1_df, model_dict)     — entity rowid + logcounts
+  - embeddings(t1_df, model_dict) — entity rowid + e0..e{D-1} (mean-pooled for non-track entities)
+"""
 import os
 
 import numpy as np
@@ -5,6 +12,7 @@ import pandas as pd
 
 
 def _get_config_parameter(var: str) -> int:
+    """Read an integer from an environment variable; raise if unset. """
     n = os.environ.get(var)
     if n is None:
         raise EnvironmentError(
@@ -14,29 +22,17 @@ def _get_config_parameter(var: str) -> int:
 
 
 def extract_model_rowids(model_dict: dict) -> np.array:
-    """Return checkpoint track rowids in the same order as the embedding table.
-
-    Args:
-        model_dict: Checkpoint dictionary loaded from ``torch.load(...)``.
-
-    Returns:
-        Numpy array of ``track_rowid`` values aligned with
-        ``embeddings_in.weight`` rows.
-    """
+    """Return checkpoint track rowids in the same order as the embedding table."""
     return model_dict["vocab"]["track_rowid"]
 
 
 def extract_model_embeddings(model_dict: dict) -> np.array:
-    """Return checkpoint input embeddings as a NumPy array.
-
-    The returned matrix is aligned with :func:`extract_model_rowids`, so row ``i``
-    corresponds to ``extract_model_rowids(model_dict)[i]``.
-    """
+    """Return checkpoint input embeddings as a NumPy array."""
     return model_dict["model_state_dict"]["embeddings_in.weight"].numpy()
 
 
 def extract_model_dim(model_dict: dict) -> int:
-    """Return checkpoint embedding dimensionality."""
+    """Return checkpoint embedding dimension."""
     return model_dict["hparams"]["embed_dim"]
 
 
@@ -44,26 +40,29 @@ class Tracks:
     """Track-level entity helpers scoped to checkpoint-supported tracks.
 
     Unlike the higher-level entity classes, tracks do not apply any minimum-track
-    threshold. All methods operate on the intersection of ``t1_df`` and the
+    threshold. All methods operate on the intersection of `t1_df` and the
     checkpoint vocabulary.
     """
 
     @staticmethod
     def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
-        """Return exported ``track_rowid`` values present in ``t1_df`` and the checkpoint.
+        """Return exported `track_rowid` values present in `t1_df` and the checkpoint.
 
         Args:
-            t1_df: Enriched training vocab with unique ``track_rowid`` values.
+            t1_df: Enriched training vocab with unique `track_rowid` values.
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            ``pd.Index`` of checkpoint-supported, labeled ``track_rowid`` values in
-            the same order as they appear in ``t1_df``.
+            `pd.Index` of checkpoint-supported, labeled `track_rowid` values in
+            the same order as they appear in `t1_df`.
         """
         assert t1_df["track_rowid"].is_unique, "Expected unique track_rowid in t1_df"
         model_rowids = extract_model_rowids(model_dict)
         valid_tracks = t1_df[
-            t1_df["track_rowid"].isin(model_rowids) & t1_df["label_rowid"].notna()
+            t1_df["track_rowid"].isin(model_rowids) & 
+            # label are non-null but few tracks have empty label string.
+            # these tracks are assigned a null ID in the training vocab. we drop them.
+            t1_df["label_rowid"].notna()
         ]["track_rowid"]
         return pd.Index(valid_tracks)
 
@@ -72,13 +71,13 @@ class Tracks:
         """Build the track lookup table for checkpoint-supported tracks.
 
         Args:
-            t1_df: Enriched training vocab with ``track_rowid`` and
-                ``playlist_count`` columns.
+            t1_df: Enriched training vocab with `track_rowid` and
+                `playlist_count` columns.
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            DataFrame with columns ``track_rowid`` (``int64``) and ``logcounts``
-            (``float32``), where ``logcounts = log10(playlist_count)``.
+            DataFrame with columns `track_rowid` (`int64`) and `logcounts`
+            (`float32`), where `logcounts = log10(playlist_count)`.
         """
         valid_ids = Tracks.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
@@ -94,16 +93,16 @@ class Tracks:
 
     @staticmethod
     def embeddings(t1_df: pd.DataFrame, model_dict: dict) -> pd.DataFrame:
-        """Return checkpoint track embeddings for tracks present in ``t1_df``.
+        """Return checkpoint track embeddings for tracks present in `t1_df`.
 
         Args:
-            t1_df: Enriched training vocab with unique ``track_rowid`` values.
-            model_dict: Training checkpoint containing ``embeddings_in.weight``.
+            t1_df: Enriched training vocab with unique `track_rowid` values.
+            model_dict: Training checkpoint containing `embeddings_in.weight`.
 
         Returns:
-            DataFrame with columns ``track_rowid`` and ``e0..e{D-1}``, one row per
-            checkpoint-supported track in ``t1_df``. Embedding columns are
-            ``float32``.
+            DataFrame with columns `track_rowid` and `e0..e{D-1}`, one row per
+            checkpoint-supported track in `t1_df`. Embedding columns are
+            `float32`.
         """
         emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
         emb_df = pd.DataFrame(
@@ -121,8 +120,8 @@ class Tracks:
 class Artists:
     """Artist-level entity helpers built from checkpoint-supported tracks.
 
-    Artists are included only when at least ``SICK_ARTIST_MINTRACK`` of their
-    tracks are present in the checkpoint-supported subset of ``t1_df``.
+    Artists are included only when at least `SICK_ARTIST_MINTRACK` of their
+    tracks are present in the checkpoint-supported subset of `t1_df`.
     """
 
     MINTRACKS = _get_config_parameter("SICK_ARTIST_MINTRACK")
@@ -132,13 +131,13 @@ class Artists:
         """Return track ids belonging to artists that meet the minimum threshold.
 
         Args:
-            t1_df: Enriched training vocab with unique ``track_rowid`` and
-                ``artist_rowid`` columns.
+            t1_df: Enriched training vocab with unique `track_rowid` and
+                `artist_rowid` columns.
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            ``pd.Index`` of ``track_rowid`` values whose artist has at least
-            ``Artists.MINTRACKS`` checkpoint-supported tracks.
+            `pd.Index` of `track_rowid` values whose artist has at least
+            `Artists.MINTRACKS` checkpoint-supported tracks.
         """
         base_ids = Tracks.valid_ids(t1_df, model_dict)
         subset = t1_df[t1_df["track_rowid"].isin(base_ids)]
@@ -151,14 +150,14 @@ class Artists:
         """Build the artist lookup table from checkpoint-supported tracks.
 
         Args:
-            t1_df: Enriched training vocab with ``track_rowid``, ``artist_rowid``,
-                and ``playlist_count`` columns.
+            t1_df: Enriched training vocab with `track_rowid`, `artist_rowid`,
+                and `playlist_count` columns.
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            DataFrame with columns ``artist_rowid`` (``int64``) and ``logcounts``
-            (``float32``). ``logcounts`` is the mean of per-track
-            ``log10(playlist_count)`` across valid artist tracks.
+            DataFrame with columns `artist_rowid` (`int64`) and `logcounts`
+            (`float32`). `logcounts` is the mean of per-track
+            `log10(playlist_count)` across valid artist tracks.
         """
         valid_ids = Artists.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
@@ -178,14 +177,14 @@ class Artists:
         """Mean-pool checkpoint track embeddings to the artist level.
 
         Args:
-            t1_df: Enriched training vocab with unique ``track_rowid`` and
-                ``artist_rowid`` columns.
-            model_dict: Training checkpoint containing ``embeddings_in.weight``.
+            t1_df: Enriched training vocab with unique `track_rowid` and
+                `artist_rowid` columns.
+            model_dict: Training checkpoint containing `embeddings_in.weight`.
 
         Returns:
-            DataFrame with columns ``artist_rowid`` and ``e0..e{D-1}``, one row per
+            DataFrame with columns `artist_rowid` and `e0..e{D-1}`, one row per
             valid artist. Embeddings are the mean of checkpoint track embeddings and
-            remain ``float32``.
+            remain `float32`.
         """
         emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
         emb_df = pd.DataFrame(
@@ -212,8 +211,8 @@ class Artists:
 class Albums:
     """Album-level entity helpers built from checkpoint-supported tracks.
 
-    Albums are included only when at least ``SICK_ALBUM_MINTRACK`` of their
-    tracks are present in the checkpoint-supported subset of ``t1_df``.
+    Albums are included only when at least `SICK_ALBUM_MINTRACK` of their
+    tracks are present in the checkpoint-supported subset of `t1_df`.
     """
 
     MINTRACKS = _get_config_parameter("SICK_ALBUM_MINTRACK")
@@ -223,13 +222,13 @@ class Albums:
         """Return track ids belonging to albums that meet the minimum threshold.
 
         Args:
-            t1_df: Enriched training vocab with unique ``track_rowid`` and
-                ``album_rowid`` columns.
+            t1_df: Enriched training vocab with unique `track_rowid` and
+                `album_rowid` columns.
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            ``pd.Index`` of ``track_rowid`` values whose album has at least
-            ``Albums.MINTRACKS`` checkpoint-supported tracks.
+            `pd.Index` of `track_rowid` values whose album has at least
+            `Albums.MINTRACKS` checkpoint-supported tracks.
         """
         base_ids = Tracks.valid_ids(t1_df, model_dict)
         subset = t1_df[t1_df["track_rowid"].isin(base_ids)]
@@ -242,14 +241,14 @@ class Albums:
         """Build the album lookup table from checkpoint-supported tracks.
 
         Args:
-            t1_df: Enriched training vocab with ``track_rowid``, ``album_rowid``,
-                and ``playlist_count`` columns.
+            t1_df: Enriched training vocab with `track_rowid`, `album_rowid`,
+                and `playlist_count` columns.
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            DataFrame with columns ``album_rowid`` (``int64``) and ``logcounts``
-            (``float32``). ``logcounts`` is the mean of per-track
-            ``log10(playlist_count)`` across valid album tracks.
+            DataFrame with columns `album_rowid` (`int64`) and `logcounts`
+            (`float32`). `logcounts` is the mean of per-track
+            `log10(playlist_count)` across valid album tracks.
         """
         valid_ids = Albums.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
@@ -269,14 +268,14 @@ class Albums:
         """Mean-pool checkpoint track embeddings to the album level.
 
         Args:
-            t1_df: Enriched training vocab with unique ``track_rowid`` and
-                ``album_rowid`` columns.
-            model_dict: Training checkpoint containing ``embeddings_in.weight``.
+            t1_df: Enriched training vocab with unique `track_rowid` and
+                `album_rowid` columns.
+            model_dict: Training checkpoint containing `embeddings_in.weight`.
 
         Returns:
-            DataFrame with columns ``album_rowid`` and ``e0..e{D-1}``, one row per
+            DataFrame with columns `album_rowid` and `e0..e{D-1}`, one row per
             valid album. Embeddings are the mean of checkpoint track embeddings and
-            remain ``float32``.
+            remain `float32`.
         """
         emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
         emb_df = pd.DataFrame(
@@ -303,8 +302,8 @@ class Albums:
 class Labels:
     """Label-level entity helpers built from checkpoint-supported tracks.
 
-    Labels are included only when at least ``SICK_LABEL_MINTRACK`` of their
-    tracks are present in the checkpoint-supported subset of ``t1_df``.
+    Labels are included only when at least `SICK_LABEL_MINTRACK` of their
+    tracks are present in the checkpoint-supported subset of `t1_df`.
     """
 
     MINTRACKS = _get_config_parameter("SICK_LABEL_MINTRACK")
@@ -314,13 +313,13 @@ class Labels:
         """Return track ids belonging to labels that meet the minimum threshold.
 
         Args:
-            t1_df: Enriched training vocab with unique ``track_rowid`` and
-                ``label_rowid`` columns.
+            t1_df: Enriched training vocab with unique `track_rowid` and
+                `label_rowid` columns.
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            ``pd.Index`` of ``track_rowid`` values whose label has at least
-            ``Labels.MINTRACKS`` checkpoint-supported tracks.
+            `pd.Index` of `track_rowid` values whose label has at least
+            `Labels.MINTRACKS` checkpoint-supported tracks.
         """
         base_ids = Tracks.valid_ids(t1_df, model_dict)
         subset = t1_df[t1_df["track_rowid"].isin(base_ids)]
@@ -333,14 +332,14 @@ class Labels:
         """Build the label lookup table from checkpoint-supported tracks.
 
         Args:
-            t1_df: Enriched training vocab with ``track_rowid``, ``label_rowid``,
-                and ``playlist_count`` columns.
+            t1_df: Enriched training vocab with `track_rowid`, `label_rowid`,
+                and `playlist_count` columns.
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            DataFrame with columns ``label_rowid`` (``int32``) and ``logcounts``
-            (``float32``). ``logcounts`` is the mean of per-track
-            ``log10(playlist_count)`` across valid label tracks.
+            DataFrame with columns `label_rowid` (`int32`) and `logcounts`
+            (`float32`). `logcounts` is the mean of per-track
+            `log10(playlist_count)` across valid label tracks.
         """
         valid_ids = Labels.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
@@ -360,14 +359,14 @@ class Labels:
         """Mean-pool checkpoint track embeddings to the label level.
 
         Args:
-            t1_df: Enriched training vocab with unique ``track_rowid`` and
-                ``label_rowid`` columns.
-            model_dict: Training checkpoint containing ``embeddings_in.weight``.
+            t1_df: Enriched training vocab with unique `track_rowid` and
+                `label_rowid` columns.
+            model_dict: Training checkpoint containing `embeddings_in.weight`.
 
         Returns:
-            DataFrame with columns ``label_rowid`` and ``e0..e{D-1}``, one row per
+            DataFrame with columns `label_rowid` and `e0..e{D-1}`, one row per
             valid label. Embeddings are the mean of checkpoint track embeddings and
-            remain ``float32``.
+            remain `float32`.
         """
         emb_cols = [f"e{i}" for i in range(extract_model_dim(model_dict))]
         emb_df = pd.DataFrame(

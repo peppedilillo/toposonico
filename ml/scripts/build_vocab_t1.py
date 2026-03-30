@@ -51,16 +51,24 @@ SCHEMA = pa.schema(
 
 
 def get_connection(database_path: Path) -> sqlite3.Connection:
+    """Open a read-only SQLite connection to the given database path."""
     uri = f"file:{database_path}?mode=ro"
     return sqlite3.connect(uri, uri=True)
 
 
 def assign_label_rowids(labels: pd.Series) -> dict[str, int]:
+    """Return a deterministic {label_string: label_rowid} mapping.
+
+    Labels are sorted lexicographically so the mapping is stable across runs.
+    Ids start at 1; 0 is reserved as the null/unknown sentinel (NULL in parquet,
+    stored as pd.NA via Int32 nullable dtype).
+    """
     valid = sorted({label for label in labels.dropna().unique() if label != ""})
     return {label: idx for idx, label in enumerate(valid, start=1)}
 
 
 def create_temp_vocab_table(conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME) -> None:
+    """Create (or replace) a temporary vocab table for the join query."""
     conn.execute(f"DROP TABLE IF EXISTS {table_name}")
     conn.execute(
         f"""
@@ -82,6 +90,7 @@ def load_temp_vocab_table(
     chunk_size: int,
     table_name: str = TEMP_TABLE_NAME,
 ) -> None:
+    """Insert vocab rows into the temp table in chunks, printing progress."""
     rows = list(vocab[["track_rowid", "track_id", "playlist_count"]].itertuples(index=False, name=None))
     total = len(rows)
     started_at = time.time()
@@ -106,6 +115,7 @@ def load_temp_vocab_table(
 def fetch_joined_metadata(
     conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME
 ) -> pd.DataFrame:
+    """Execute the enrichment join and return one row per track with entity ids."""
     query = QUERY.format(temp_table=table_name)
     metadata = pd.read_sql_query(query, conn)
     if metadata.empty:
@@ -119,6 +129,10 @@ def fetch_joined_metadata(
 
 
 def validate_metadata_coverage(vocab: pd.DataFrame, metadata: pd.DataFrame) -> None:
+    """Raise if the join result does not cover exactly the expected track_rowids.
+
+    Checks for duplicates, missing rows, and unexpected extra rows.
+    """
     expected = pd.Index(vocab["track_rowid"])
     actual = pd.Index(metadata["track_rowid"])
 

@@ -51,6 +51,7 @@ CHUNK_QUERY = """
 
 
 def get_connection(database_path: Path) -> sqlite3.Connection:
+    """Open a read-only SQLite connection to the given database path."""
     uri = f"file:{database_path}?mode=ro"
     return sqlite3.connect(uri, uri=True)
 

@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 import torch
 
+# SICK_*_MINTRACK must be set before importing entities, which reads them at class-definition time.
 os.environ.setdefault("SICK_ARTIST_MINTRACK", "2")
 os.environ.setdefault("SICK_ALBUM_MINTRACK", "2")
 os.environ.setdefault("SICK_LABEL_MINTRACK", "2")

@@ -1,3 +1,4 @@
+# SICK_*_MINTRACK must be set before importing entities, which reads them at class-definition time.
 from pathlib import Path
 import os
 import sqlite3

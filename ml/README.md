@@ -35,11 +35,13 @@ Now the scripts should be wired to run with default inputs and output in `/outs`
 ### Phase 1 — Data prep (one-time; slow — full DB scan)
 
 ```sh
-python scripts/build_training_vocab.py --min-count 2
-python scripts/enrich_training_vocab.py
+python scripts/build_vocab_t0.py --min-count 2
+python scripts/build_vocab_t1.py
 python scripts/build_playlist_chunks.py path/to/chunks
 ```
 
+The `t0` vocab only holds tracks and playlist ids.
+The `t1` vocab is enriched with id for artists, albums and labels.
 The chunks holds a lot of data. Choose a directory wisely.
 
 ### Phase 2 — Training (interactive, GPU)
@@ -48,8 +50,6 @@ The chunks holds a lot of data. Choose a directory wisely.
 
 ```sh
 # open notebooks/train.ipynb, do your thing and store the checkpoint to `path/to/<checkpoint>.pt`
-python scripts/build_trained_vocab.py
-python scripts/build_track_embeddings.py
 ```
 
 ### Phase 4 - Embeddings, lookups

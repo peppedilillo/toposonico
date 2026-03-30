@@ -1,3 +1,4 @@
+"""Data pipeline: vocab building, chunk preprocessing, skip-gram pair generation, and pair streaming."""
 from collections import Counter
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -24,15 +25,16 @@ def split(chunk_paths: list[Path], valid_fraction: float, seed: int):
 
 # noinspection PyUnusedLocal
 def build_vocab_from_chunks(chunk_paths: list[Path], cmin: int):
-    """Builds a table mappings between Spotify track row-ids, counts playlist appearances
-    and filters them for tracks showing in greater-equal than `cmin` playlists.
+    """Build a track vocab from parquet chunk files.
+
+    Counts distinct playlist appearances per track across all chunks, filters
+    to tracks with playlist_count >= cmin, and assigns contiguous track_ids
+    sorted by track_rowid.
     """
-    # for each track, counts in how many playlist it appears
     counter = Counter()
     for path in chunk_paths:
         pt = pd.read_parquet(path, columns=["playlist_rowid", "track_rowid"])
         counter.update(pt.groupby("track_rowid")["playlist_rowid"].nunique().to_dict())
-    # removes tracks appearing in less than `cmin` playlist
     vocab = (
         pd.DataFrame(counter.items(), columns=["track_rowid", "playlist_count"])
         .query("playlist_count >= @cmin")
@@ -46,6 +48,22 @@ def build_vocab_from_chunks(chunk_paths: list[Path], cmin: int):
 def get_nsampler(
     weights_gpu: torch.Tensor, k: int, batch_size: int, block: int = 64
 ) -> tuple[Callable, Callable]:
+    """Return (sample, flush) callables for block-buffered negative sampling on GPU.
+
+    Draws a large block of samples at once via torch.multinomial to amortise
+    CUDA kernel launch overhead, then serves slices from the block on subsequent
+    calls. flush() discards the current block (call between epochs to reseed).
+
+    Args:
+        weights_gpu: Normalised sampling weights on the target device.
+        k:           Negatives per positive.
+        batch_size:  Expected batch size (used to size the block).
+        block:       Block multiplier; total reservoir = batch_size × k × block.
+
+    Returns:
+        sample(n): Draw n×k negatives, returned as shape (n, k).
+        flush():   Reset the reservoir.
+    """
     total = batch_size * k * block
     cache = [torch.empty(0, dtype=torch.long, device=weights_gpu.device), 0]
 
@@ -68,9 +86,9 @@ def get_nsampler(
 def precompute_pairs(pt: pd.DataFrame, w: int) -> torch.Tensor:
     """Generate all (center, context) skip-gram pairs for a chunk.
 
-    Works entirely in numpy: finds playlist boundaries, builds per-track
-    metadata with np.repeat, then loops over the 2W offsets (~10 iters)
-    doing vectorised index arithmetic across all tracks at once.
+    Finds playlist boundaries, builds per-track metadata with np.repeat,
+    then loops over the 2W offsets (~10 iters) doing vectorised index arithmetic
+    across all tracks at once.
     """
     # sort by playlist_rowid so boundary detection works even if the
     # parquet rows aren't perfectly grouped (no ORDER BY in the SQL)
@@ -80,7 +98,6 @@ def precompute_pairs(pt: pd.DataFrame, w: int) -> torch.Tensor:
     pids = pt["playlist_rowid"].values
     tids = pt["track_id"].values
 
-    # --- playlist boundaries ---
     breaks = np.empty(len(pids), dtype=bool)
     breaks[0] = True
     breaks[1:] = pids[1:] != pids[:-1]
@@ -93,7 +110,6 @@ def precompute_pairs(pt: pd.DataFrame, w: int) -> torch.Tensor:
     if len(starts) == 0:
         return torch.empty(2, 0, dtype=torch.long)
 
-    # --- per-track metadata (vectorised via np.repeat) ---
     total = lengths.sum()
     pos = np.arange(total, dtype=np.int32)
     cum = np.cumsum(lengths)
@@ -106,7 +122,6 @@ def precompute_pairs(pt: pd.DataFrame, w: int) -> torch.Tensor:
     # effective window per track: min(2W, L-1), mirrors the original code
     ew = np.minimum(2 * w, flat_len - 1)
 
-    # --- generate pairs for each offset ---
     all_centers = []
     all_contexts = []
     for k in range(-w, w + 1):
@@ -140,7 +155,7 @@ def make_cached_reader() -> Callable:
     return the cached DataFrame immediately.  Useful on cloud machines with ample RAM
     (e.g. A100 + 200 GiB) to eliminate per-epoch disk I/O.
 
-    Usage::
+    Usage:
         reader = make_cached_reader()
         process_chunk = init_chunk_processor(vocab, W, reader=reader)
     """
@@ -193,6 +208,7 @@ def init_chunk_processor(
     )  # indexed by track_id
 
     def subsample(pt: pd.DataFrame, chunk_rng: np.random.Generator) -> pd.DataFrame:
+        """Word2Vec probabilist subsampling."""
         p = keep_probs[pt["track_id"].values]
         mask = chunk_rng.random(len(pt)) < p
         return pt[mask].reset_index(drop=True)
@@ -313,6 +329,7 @@ class PrefetchPairStream:
 
     @property
     def estimated_total_pairs(self) -> int | None:
+        """Extrapolate total pair count from chunks processed so far. None before any chunk completes."""
         if self._chunks_done == 0:
             return None
         return int(self._pairs_produced / self._chunks_done * self._n_chunks)
@@ -375,6 +392,7 @@ class SerialPairStream:
 
     @property
     def estimated_total_pairs(self) -> int | None:
+        """Extrapolate total pair count from chunks processed so far."""
         if self._chunks_done == 0:
             return None
         return int(self._pairs_produced / self._chunks_done * self._n_chunks)
