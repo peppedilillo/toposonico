@@ -5,13 +5,13 @@ Counts distinct playlist appearances per track (full table scan of ~1.7B rows),
 filters by --min-count, then assigns contiguous track_ids (0..vocab_size-1)
 sorted by track_rowid. Output parquet contains track_rowid, track_id, and
 playlist_count only. Metadata enrichment happens in a second stage via
-`enrich_training_vocab.py`.
+`build_vocab_t1.py`.
 
 Usage:
-    python scripts/build_training_vocab.py [--database DB] [--output OUTPUT] [--min-count N]
+    python scripts/build_vocab_t0.py [--database DB] [--output OUTPUT] [--min-count N]
 
 Example:
-    python scripts/build_training_vocab.py --min-count 2
+    python scripts/build_vocab_t0.py --min-count 2
 """
 
 import argparse
