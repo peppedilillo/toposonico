@@ -124,7 +124,7 @@ class Artists:
     tracks are present in the checkpoint-supported subset of `t1_df`.
     """
 
-    MINTRACKS = _get_config_int_parameter("SICK_ARTIST_MINTRACK")
+    MINTRACK = _get_config_int_parameter("SICK_ARTIST_MINTRACK")
 
     @staticmethod
     def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
@@ -137,12 +137,12 @@ class Artists:
 
         Returns:
             `pd.Index` of `track_rowid` values whose artist has at least
-            `Artists.MINTRACKS` checkpoint-supported tracks.
+            `Artists.MINTRACK` checkpoint-supported tracks.
         """
         base_ids = Tracks.valid_ids(t1_df, model_dict)
         subset = t1_df[t1_df["track_rowid"].isin(base_ids)]
         counts = subset.groupby("artist_rowid")["artist_rowid"].transform("count")
-        valid_tracks = subset[counts >= Artists.MINTRACKS]["track_rowid"]
+        valid_tracks = subset[counts >= Artists.MINTRACK]["track_rowid"]
         return pd.Index(valid_tracks)
 
     @staticmethod
@@ -156,9 +156,10 @@ class Artists:
 
         Returns:
             DataFrame with columns `artist_rowid` (`int64`), `logcounts`
-            (`float32`), and `ntracks` (`int32`). `logcounts` is the mean of
-            per-track `log10(playlist_count)` across valid artist tracks.
-            `ntracks` is the number of valid tracks per artist.
+            (`float32`), `ntrack` (`int32`), and `nalbum` (`int32`).
+            `logcounts` is the mean of per-track `log10(playlist_count)`
+            across valid artist tracks. `ntrack` is the number of valid
+            tracks per artist. `nalbum` is the number of distinct albums.
         """
         valid_ids = Artists.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
@@ -171,10 +172,16 @@ class Artists:
         ).merge(
             t1_df.loc[mask].value_counts("artist_rowid"),
             on="artist_rowid"
-        ).rename(columns={"count": "ntracks"})
+        ).rename(columns={"count": "ntrack"}
+        ).merge(
+            t1_df.loc[mask].groupby("artist_rowid", as_index=False).agg(
+                nalbum=("album_rowid", pd.Series.nunique)
+            )
+        )
         out["artist_rowid"] = out["artist_rowid"].astype("int64")
         out["logcounts"] = out["logcounts"].astype("float32")
-        out["ntracks"] = out["ntracks"].astype("int32")
+        out["ntrack"] = out["ntrack"].astype("int32")
+        out["nalbum"] = out["nalbum"].astype("int32")
         return out
 
     @staticmethod
@@ -220,7 +227,7 @@ class Albums:
     tracks are present in the checkpoint-supported subset of `t1_df`.
     """
 
-    MINTRACKS = _get_config_int_parameter("SICK_ALBUM_MINTRACK")
+    MINTRACK = _get_config_int_parameter("SICK_ALBUM_MINTRACK")
 
     @staticmethod
     def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
@@ -233,12 +240,12 @@ class Albums:
 
         Returns:
             `pd.Index` of `track_rowid` values whose album has at least
-            `Albums.MINTRACKS` checkpoint-supported tracks.
+            `Albums.MINTRACK` checkpoint-supported tracks.
         """
         base_ids = Tracks.valid_ids(t1_df, model_dict)
         subset = t1_df[t1_df["track_rowid"].isin(base_ids)]
         counts = subset.groupby("album_rowid")["album_rowid"].transform("count")
-        valid_tracks = subset[counts >= Albums.MINTRACKS]["track_rowid"]
+        valid_tracks = subset[counts >= Albums.MINTRACK]["track_rowid"]
         return pd.Index(valid_tracks)
 
     @staticmethod
@@ -311,7 +318,7 @@ class Labels:
     tracks are present in the checkpoint-supported subset of `t1_df`.
     """
 
-    MINTRACKS = _get_config_int_parameter("SICK_LABEL_MINTRACK")
+    MINTRACK = _get_config_int_parameter("SICK_LABEL_MINTRACK")
 
     @staticmethod
     def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
@@ -324,12 +331,12 @@ class Labels:
 
         Returns:
             `pd.Index` of `track_rowid` values whose label has at least
-            `Labels.MINTRACKS` checkpoint-supported tracks.
+            `Labels.MINTRACK` checkpoint-supported tracks.
         """
         base_ids = Tracks.valid_ids(t1_df, model_dict)
         subset = t1_df[t1_df["track_rowid"].isin(base_ids)]
         counts = subset.groupby("label_rowid")["label_rowid"].transform("count")
-        valid_tracks = subset[counts >= Labels.MINTRACKS]["track_rowid"]
+        valid_tracks = subset[counts >= Labels.MINTRACK]["track_rowid"]
         return pd.Index(valid_tracks)
 
     @staticmethod
@@ -343,13 +350,14 @@ class Labels:
 
         Returns:
             DataFrame with columns `label_rowid` (`int32`), `logcounts`
-            (`float32`), and `ntracks` (`int32`). `logcounts` is the mean of
+            (`float32`), and `ntrack` (`int32`). `logcounts` is the mean of
             per-track `log10(playlist_count)` across valid label tracks.
-            `ntracks` is the number of valid tracks per label.
+            `ntrack` is the number of valid tracks per label.
         """
         valid_ids = Labels.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
         out = (
+            # adds mean of log10(track counts)
             np.log10(t1_df.loc[mask, "playlist_count"])
             .astype("float32")
             .groupby(t1_df.loc[mask, "label_rowid"], sort=False)
@@ -358,10 +366,23 @@ class Labels:
         ).merge(
             t1_df.loc[mask].value_counts("label_rowid"),
             on="label_rowid"
-        ).rename(columns={"count": "ntracks"})
+        ).rename(columns={"count": "ntrack"}
+        ).merge(
+            # adds number of albums released by each label
+            t1_df.loc[mask].groupby("label_rowid", as_index=False).agg(
+                nalbum=("album_rowid", pd.Series.nunique)
+            )
+        ).merge(
+            # adds number of artists in roster
+            t1_df.loc[mask].groupby("label_rowid", as_index=False).agg(
+                nartist=("artist_rowid", pd.Series.nunique)
+            )
+        )
         out["label_rowid"] = out["label_rowid"].astype("int32")
         out["logcounts"] = out["logcounts"].astype("float32")
-        out["ntracks"] = out["ntracks"].astype("int32")
+        out["ntrack"] = out["ntrack"].astype("int32")
+        out["nalbum"] = out["nalbum"].astype("int32")
+        out["nartist"] = out["nartist"].astype("int32")
         return out
 
     @staticmethod

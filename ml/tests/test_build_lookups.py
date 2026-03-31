@@ -175,11 +175,12 @@ def test_build_lookups_script_writes_expected_lookup_artifacts(tmp_path):
         np.array([1.0, 2.0], dtype=np.float32),
     )
 
-    assert list(artist_lookup.columns) == ["artist_rowid", "artist_name", "artist_genre", "logcounts", "ntracks"]
+    assert list(artist_lookup.columns) == ["artist_rowid", "artist_name", "artist_genre", "logcounts", "ntrack", "nalbum"]
     assert artist_lookup["artist_rowid"].tolist() == [1]
     assert artist_lookup["artist_name"].tolist() == ["Artist One"]
     assert artist_lookup["artist_genre"].tolist() == ["rock"]
-    assert artist_lookup["ntracks"].tolist() == [2]
+    assert artist_lookup["ntrack"].tolist() == [2]
+    assert artist_lookup["nalbum"].tolist() == [1]
     np.testing.assert_allclose(
         artist_lookup["logcounts"].to_numpy(),
         np.array([1.5], dtype=np.float32),
@@ -189,6 +190,8 @@ def test_build_lookups_script_writes_expected_lookup_artifacts(tmp_path):
         "album_rowid",
         "album_name",
         "artist_rowid",
+        "label_rowid",
+        "label",
         "artist_name",
         "album_type",
         "release_date",
@@ -205,7 +208,7 @@ def test_build_lookups_script_writes_expected_lookup_artifacts(tmp_path):
         np.array([1.5], dtype=np.float32),
     )
 
-    assert list(label_lookup.columns) == ["label_rowid", "label", "logcounts", "ntracks"]
+    assert list(label_lookup.columns) == ["label_rowid", "label", "logcounts", "ntrack", "nalbum", "nartist"]
     assert label_lookup["label_rowid"].tolist() == [111]
     assert label_lookup["label"].tolist() == ["Label One"]
     np.testing.assert_allclose(

@@ -200,7 +200,7 @@ def build_artist_lookup(
     )
     artist_lookup = artist_lookup.merge(artist_meta, on="artist_rowid", how="inner")
     return (
-        artist_lookup[["artist_rowid", "artist_name", "artist_genre", "logcounts", "ntracks",]].sort_values("artist_rowid").reset_index(drop=True)
+        artist_lookup[["artist_rowid", "artist_name", "artist_genre", "logcounts", "ntrack", "nalbum",]].sort_values("artist_rowid").reset_index(drop=True)
     )
 
 
@@ -210,8 +210,12 @@ def build_album_lookup(
     track_meta: pd.DataFrame,
 ) -> pd.DataFrame:
     album_lookup = Albums.lookup(t1_df, model_dict)
+    enriched = track_meta.merge(
+        t1_df[["track_rowid", "label_rowid"]].drop_duplicates("track_rowid"),
+        on="track_rowid", how="left",
+    )
     album_meta = (
-        track_meta.groupby("album_rowid", as_index=False)
+        enriched.groupby("album_rowid", as_index=False)
         .agg(
             album_name=("album_name", "first"),
             artist_rowid=("artist_rowid", "first"),
@@ -248,7 +252,7 @@ def build_label_lookup(
     )
     label_lookup = label_lookup.merge(label_meta, on="label_rowid", how="inner")
     label_lookup["label_rowid"] = label_lookup["label_rowid"].astype("int32")
-    return label_lookup[["label_rowid", "label", "logcounts", "ntracks"]].sort_values("label_rowid").reset_index(drop=True)
+    return label_lookup[["label_rowid", "label", "logcounts", "ntrack", "nalbum", "nartist"]].sort_values("label_rowid").reset_index(drop=True)
 
 
 def main():
