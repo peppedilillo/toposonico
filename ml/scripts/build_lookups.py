@@ -216,6 +216,8 @@ def build_album_lookup(
             album_name=("album_name", "first"),
             artist_rowid=("artist_rowid", "first"),
             artist_name=("artist_name", "first"),
+            label_rowid=("label_rowid", "first"),
+            label=("label", "first"),
             album_type=("album_type", "first"),
             release_date=("release_date", "first"),
             release_date_precision=("release_date_precision", "first"),
@@ -225,7 +227,7 @@ def build_album_lookup(
     )
     album_lookup = album_lookup.merge(album_meta, on="album_rowid", how="inner")
     return (
-        album_lookup[["album_rowid", "album_name", "artist_rowid", "artist_name", "album_type", "release_date", "release_date_precision", "logcounts", "total_tracks",]]
+        album_lookup[["album_rowid", "album_name", "artist_rowid", "label_rowid", "label", "artist_name", "album_type", "release_date", "release_date_precision", "logcounts", "total_tracks",]]
         .sort_values("album_rowid")
         .reset_index(drop=True)
     )

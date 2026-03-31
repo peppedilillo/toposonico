@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 
-def _get_config_parameter(var: str) -> int:
+def _get_config_int_parameter(var: str) -> int:
     """Read an integer from an environment variable; raise if unset."""
     n = os.environ.get(var)
     if n is None:
@@ -124,7 +124,7 @@ class Artists:
     tracks are present in the checkpoint-supported subset of `t1_df`.
     """
 
-    MINTRACKS = _get_config_parameter("SICK_ARTIST_MINTRACK")
+    MINTRACKS = _get_config_int_parameter("SICK_ARTIST_MINTRACK")
 
     @staticmethod
     def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
@@ -220,7 +220,7 @@ class Albums:
     tracks are present in the checkpoint-supported subset of `t1_df`.
     """
 
-    MINTRACKS = _get_config_parameter("SICK_ALBUM_MINTRACK")
+    MINTRACKS = _get_config_int_parameter("SICK_ALBUM_MINTRACK")
 
     @staticmethod
     def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
@@ -311,7 +311,7 @@ class Labels:
     tracks are present in the checkpoint-supported subset of `t1_df`.
     """
 
-    MINTRACKS = _get_config_parameter("SICK_LABEL_MINTRACK")
+    MINTRACKS = _get_config_int_parameter("SICK_LABEL_MINTRACK")
 
     @staticmethod
     def valid_ids(t1_df: pd.DataFrame, model_dict: dict) -> pd.Index:
