@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Build the full db pipeline: geo → knn → db
+# Build the db pipeline: geo → [optional sim] → db
 #
 # Usage:
 #   source config.env && bash build.sh
-#   bash build.sh               # auto-sources config.env if SICK_OUT_DIR is unset
-#   bash build.sh --from-knn    # skip geomap, run knn + db
-#   bash build.sh --from-db     # skip geomap + knn, run db only
+#   bash build.sh                 # auto-sources config.env if SICK_OUT_DIR is unset
+#   bash build.sh --with-sim      # build persisted similarity artifacts too
+#   bash build.sh --from-db       # skip geomap, run optional sim + db only
 
 set -euo pipefail
 
@@ -22,7 +22,30 @@ if [[ -z "${SICK_OUT_DIR:-}" ]]; then
     fi
 fi
 
+RUN_GEO=1
+RUN_SIM=0
+RUN_DB=1
+
+for arg in "$@"; do
+    case "$arg" in
+        --from-db)
+            RUN_GEO=0
+            ;;
+        --with-sim)
+            RUN_SIM=1
+            ;;
+        *)
+            echo "Error: unknown argument: $arg"
+            exit 1
+            ;;
+    esac
+done
+
 required_vars=(SICK_MANIFEST SICK_DB)
+if [[ $RUN_SIM -eq 1 ]]; then
+    required_vars+=(SICK_SIM_DIR)
+fi
+
 missing=()
 for var in "${required_vars[@]}"; do
     [[ -z "${!var:-}" ]] && missing+=("$var")
@@ -31,15 +54,6 @@ if [[ ${#missing[@]} -gt 0 ]]; then
     echo "Error: missing env vars: ${missing[*]}"
     exit 1
 fi
-
-RUN_GEO=1
-RUN_KNN=1
-RUN_DB=1
-
-for arg in "$@"; do
-    [[ "$arg" == "--from-knn" ]] && RUN_GEO=0
-    [[ "$arg" == "--from-db"  ]] && RUN_GEO=0 && RUN_KNN=0
-done
 
 # ---------------------------------------------------------------------------
 if [[ $RUN_GEO -eq 1 ]]; then
@@ -50,16 +64,15 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-if [[ $RUN_KNN -eq 1 ]]; then
+if [[ $RUN_SIM -eq 1 ]]; then
     echo ""
-    echo "=== Step 2: build_knn ==="
-    uv run python "$SCRIPT_DIR/scripts/build_knn.py"
+    echo "=== Step 2: build_sim ==="
+    uv run python "$SCRIPT_DIR/scripts/build_sim.py" --overwrite
 else
     echo ""
     echo "=== Step 2: skipped ==="
 fi
 
-# ---------------------------------------------------------------------------
 if [[ $RUN_DB -eq 1 ]]; then
     echo ""
     echo "=== Step 3: build_db ==="

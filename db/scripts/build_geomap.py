@@ -18,20 +18,12 @@ Examples:
 
 import argparse
 import os
-from pathlib import Path
 from typing import Sequence
 
 import pandas as pd
 
-from src.utils import get_geopaths, read_manifest
-
-
-ENTITIES = {
-    "track":  "track_rowid",
-    "album":  "album_rowid",
-    "artist": "artist_rowid",
-    "label":  "label_rowid",
-}
+from src.utils import get_geo_paths, read_manifest
+from src.utils import ENTITY_KEYS as EKEYS
 
 
 def umap2geo(
@@ -119,29 +111,29 @@ def main():
         raise ValueError("--padding / $SICK_GEO_PADDING not set")
 
     manifest = read_manifest(args.manifest)
-    umap_paths = {entity: Path(p) for entity, p in manifest["umap"].items()}
-
-    geo_paths = get_geopaths()
-    next(iter(geo_paths.values())).parent.mkdir(parents=True, exist_ok=True)
-
+    umap = manifest["umap"]
+    geo_paths = get_geo_paths()
     hwidth = args.width / 2.
 
-    umap_frames = []
-    entity_names = []
-    for entity, path in umap_paths.items():
-        key_col = ENTITIES[entity]
-        df = pd.read_parquet(path, columns=[key_col, "umap_x", "umap_y"])
-        umap_frames.append((df, key_col))
-        entity_names.append(entity)
+    umap_frames = [
+        (pd.read_parquet(umap.track,  columns=[EKEYS.track,  "umap_x", "umap_y"]), EKEYS.track),
+        (pd.read_parquet(umap.artist, columns=[EKEYS.artist, "umap_x", "umap_y"]), EKEYS.artist),
+        (pd.read_parquet(umap.album,  columns=[EKEYS.album,  "umap_x", "umap_y"]), EKEYS.album),
+        (pd.read_parquet(umap.label,  columns=[EKEYS.label,  "umap_x", "umap_y"]), EKEYS.label),
+    ]
 
-    geo_frames = umap2geo(
-        umap_frames, max_lon=hwidth, max_lat=hwidth, padding=args.padding
+    track_geo, artist_geo, album_geo, label_geo = umap2geo(
+        umap_frames, max_lon=hwidth, max_lat=hwidth, padding=args.padding,
     )
 
-    for entity, geo in zip(entity_names, geo_frames):
-        out_path = geo_paths[entity]
-        geo.to_parquet(out_path, index=False)
-        print(f"{entity:8s}  {len(geo):>9,} rows  →  {out_path}")
+    track_geo.to_parquet(geo_paths.track, index=False)
+    print(f"{'track':8s}  {len(track_geo):>9,} rows  →  {geo_paths.track}")
+    artist_geo.to_parquet(geo_paths.artist, index=False)
+    print(f"{'artist':8s}  {len(artist_geo):>9,} rows  →  {geo_paths.artist}")
+    album_geo.to_parquet(geo_paths.album, index=False)
+    print(f"{'album':8s}  {len(album_geo):>9,} rows  →  {geo_paths.album}")
+    label_geo.to_parquet(geo_paths.label, index=False)
+    print(f"{'label':8s}  {len(label_geo):>9,} rows  →  {geo_paths.label}")
 
     print()
     print("Done.")
