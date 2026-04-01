@@ -59,7 +59,7 @@ def _get_config_float(var: str) -> float:
 
 
 def read_manifest(
-    manifest_path: str | Path,
+    manifest_path: str | Path | None = None,
     required_sections: tuple[str, ...] | None = MANIFEST_REQUIRED_SECTIONS,
 ) -> dict[str, EntityPaths | dict[str, Path]]:
     """Reads and validates a manifest TOML, returning a nested Path dict.
@@ -67,6 +67,12 @@ def read_manifest(
     Entity sections (embedding, lookup, umap) are returned as EntityPaths;
     non-entity sections (source) are returned as plain dicts.
     """
+    if manifest_path is None:
+        manifest_path = os.environ.get("SICK_MANIFEST")
+    manifest_path = Path(manifest_path)
+    if not manifest_path.is_file():
+        raise ValueError("Manifest file not found. Set $SICK_MANIFEST or provide path.")
+
     entity_keys = {"embedding", "lookup", "umap"}
     with open(manifest_path, "rb") as f:
         m = tomllib.load(f)
@@ -138,3 +144,19 @@ def get_index_filter_sim_paths() -> EntityPaths:
     d = Path(outdir) / "sim"
     d.mkdir(parents=True, exist_ok=True)
     return EntityPaths(**{e: d / f"index_filter_{e}.npy" for e in ENTITIES})
+
+
+def get_index_faiss_paths() -> EntityPaths:
+    def _path(var: str) -> Path:
+        v = os.environ.get(var)
+        if v is None:
+            raise ValueError(f"${var} not set")
+        p = Path(v)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+    return EntityPaths(
+        track=_path("SICK_INDEX_FAISS_TRACK"),
+        artist=_path("SICK_INDEX_FAISS_ARTIST"),
+        album=_path("SICK_INDEX_FAISS_ALBUM"),
+        label=_path("SICK_INDEX_FAISS_LABEL"),
+    )

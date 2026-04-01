@@ -14,11 +14,11 @@ from src.utils import read_manifest, get_index_filter_sim_paths, get_index_filte
 from src.utils import ENTITY_KEYS as EKEYS
 
 
-INDEX_DB_LABEL_MIN_NARTIST = _get_config_int("SICK_INDEX_DB_LABEL_MIN_NARTIST")
-INDEX_DB_ARTIST_MIN_NTRACK = _get_config_int("SICK_INDEX_DB_ARTIST_MIN_NTRACK")
-INDEX_DB_ALBUM_MIN_TOTAL_TRACKS = _get_config_int("SICK_INDEX_DB_ALBUM_MIN_TOTAL_TRACKS")
-INDEX_DB_TRACK_MIN_LOGCOUNT = _get_config_float("SICK_INDEX_DB_TRACK_MIN_LOGCOUNT")
-INDEX_SIM_TRACK_MIN_LOGCOUNT = _get_config_float("SICK_INDEX_SIM_TRACK_MIN_LOGCOUNT")
+INDEX_FILTER_DB_LABEL_MIN_NARTIST = _get_config_int("SICK_INDEX_FILTER_DB_LABEL_MIN_NARTIST")
+INDEX_FILTER_DB_ARTIST_MIN_NTRACK = _get_config_int("SICK_INDEX_FILTER_DB_ARTIST_MIN_NTRACK")
+INDEX_FILTER_DB_ALBUM_MIN_TOTAL_TRACKS = _get_config_int("SICK_INDEX_FILTER_DB_ALBUM_MIN_TOTAL_TRACKS")
+INDEX_FILTER_DB_TRACK_MIN_LOGCOUNT = _get_config_float("SICK_INDEX_FILTER_DB_TRACK_MIN_LOGCOUNT")
+INDEX_FILTER_TRACK_MIN_LOGCOUNT = _get_config_float("SICK_INDEX_FILTER_SIM_TRACK_MIN_LOGCOUNT")
 
 
 def save_indexes(indexes: EntityIndex, paths: EntityPaths) -> None:
@@ -54,15 +54,15 @@ def build_indexes(manifest_path: Path | str):
     print("Building DB filter indexes...")
     lookups = f.filter_cascade(
         lookups.track, lambda df: f.filter_track(df, INDEX_DB_TRACK_MIN_LOGCOUNT),
-        lookups.album, lambda df: f.filter_album(df, INDEX_DB_ALBUM_MIN_TOTAL_TRACKS),
-        lookups.artist, lambda df: f.filter_artist(df, INDEX_DB_ARTIST_MIN_NTRACK),
-        lookups.label, lambda df: f.filter_label(df, INDEX_DB_LABEL_MIN_NARTIST),
+        lookups.album, lambda df: f.filter_album(df, INDEX_FILTER_DB_ALBUM_MIN_TOTAL_TRACKS),
+        lookups.artist, lambda df: f.filter_artist(df, INDEX_FILTER_DB_ARTIST_MIN_NTRACK),
+        lookups.label, lambda df: f.filter_label(df, INDEX_FILTER_DB_LABEL_MIN_NARTIST),
     )
     indexes_db = lookup2index(lookups)
 
     print("Building SIM filter indexes...")
     lookups = f.filter_separate(
-        lookups.track, lambda df: f.filter_track(df, INDEX_SIM_TRACK_MIN_LOGCOUNT),
+        lookups.track, lambda df: f.filter_track(df, INDEX_FILTER_TRACK_MIN_LOGCOUNT),
         lookups.album, lambda x: x,
         lookups.artist, lambda x: x,
         lookups.label, lambda x: x,

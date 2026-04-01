@@ -103,12 +103,12 @@ def _write_manifest(tmp_path: Path, lookups: EntityTable) -> Path:
 
 def _load_build_filter_index_module(monkeypatch, tmp_path: Path):
     monkeypatch.syspath_prepend(str(ROOT))
-    monkeypatch.setenv("SICK_INDEX_DB_LABEL_MIN_NARTIST", "2")
-    monkeypatch.setenv("SICK_INDEX_DB_ARTIST_MIN_NTRACK", "2")
-    monkeypatch.setenv("SICK_INDEX_DB_ALBUM_MIN_TOTAL_TRACKS", "2")
-    monkeypatch.setenv("SICK_INDEX_DB_TRACK_MIN_LOGCOUNT", "1.0")
-    monkeypatch.setenv("SICK_INDEX_SIM_TRACK_MIN_LOGCOUNT", "2.0")
-    monkeypatch.setenv("SICK_INDEX_FILTER_DIR", str(tmp_path / "filter"))
+    monkeypatch.setenv("SICK_INDEX_FILTER_DB_LABEL_MIN_NARTIST", "2")
+    monkeypatch.setenv("SICK_INDEX_FILTER_DB_ARTIST_MIN_NTRACK", "2")
+    monkeypatch.setenv("SICK_INDEX_FILTER_DB_ALBUM_MIN_TOTAL_TRACKS", "2")
+    monkeypatch.setenv("SICK_INDEX_FILTER_DB_TRACK_MIN_LOGCOUNT", "1.0")
+    monkeypatch.setenv("SICK_INDEX_FILTER_DB_TRACK_MIN_LOGCOUNT", "2.0")
+    monkeypatch.setenv("SICK_INDEX_FILTER_SIM_TRACK_MIN_LOGCOUNT", str(tmp_path / "filter"))
 
     module_name = "tests_build_filter_index_module"
     sys.modules.pop(module_name, None)
