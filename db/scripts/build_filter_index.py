@@ -53,7 +53,7 @@ def build_indexes(manifest_path: Path | str):
 
     print("Building DB filter indexes...")
     lookups = f.filter_cascade(
-        lookups.track, lambda df: f.filter_track(df, INDEX_DB_TRACK_MIN_LOGCOUNT),
+        lookups.track, lambda df: f.filter_track(df, INDEX_FILTER_DB_TRACK_MIN_LOGCOUNT),
         lookups.album, lambda df: f.filter_album(df, INDEX_FILTER_DB_ALBUM_MIN_TOTAL_TRACKS),
         lookups.artist, lambda df: f.filter_artist(df, INDEX_FILTER_DB_ARTIST_MIN_NTRACK),
         lookups.label, lambda df: f.filter_label(df, INDEX_FILTER_DB_LABEL_MIN_NARTIST),

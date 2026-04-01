@@ -41,7 +41,6 @@ MANIFEST_REQUIRED_SECTIONS = ("source", "embedding", "lookup", "umap")
 ENTITY_KEYS = EntityKey()
 
 
-
 def _get_config_int(var: str) -> int:
     """Read an integer from an environment variable; raise if unset."""
     n = os.environ.get(var)
@@ -118,30 +117,30 @@ def check_manifest(
 
 def get_geo_paths() -> EntityPaths:
     """Return per-entity geomap parquet paths rooted at $SICK_GEO_DIR."""
-    outdir = os.environ.get("SICK_GEO_DIR")
+    outdir = os.environ.get("SICK_OUT_DIR")
     if outdir is None:
-        raise ValueError("$SICK_GEO_DIR not set")
-    d = Path(outdir)
+        raise ValueError("$SICK_OUT_DIR not set")
+    d = Path(outdir) / "geo"
     d.mkdir(parents=True, exist_ok=True)
     return EntityPaths(**{e: d / f"geo_{e}.parquet" for e in ENTITIES})
 
 
 def get_index_filter_db_paths() -> EntityPaths:
-    """Return per-entity filter index paths rooted at $SICK_INDEX_FILTER_DIR."""
-    outdir = os.environ.get("SICK_INDEX_FILTER_DIR")
+    """Return per-entity filter index paths."""
+    outdir = os.environ.get("SICK_OUT_DIR")
     if outdir is None:
-        raise ValueError("$SICK_INDEX_FILTER_DIR not set")
-    d = Path(outdir) / "db"
+        raise ValueError("$SICK_OUT_DIR not set")
+    d = Path(outdir) / "index" / "filter" / "db"
     d.mkdir(parents=True, exist_ok=True)
     return EntityPaths(**{e: d / f"index_filter_{e}.npy" for e in ENTITIES})
 
 
 def get_index_filter_sim_paths() -> EntityPaths:
     """Return per-entity filter index paths rooted at $SICK_INDEX_FILTER_DIR."""
-    outdir = os.environ.get("SICK_INDEX_FILTER_DIR")
+    outdir = os.environ.get("SICK_OUT_DIR")
     if outdir is None:
-        raise ValueError("$SICK_INDEX_FILTER_DIR not set")
-    d = Path(outdir) / "sim"
+        raise ValueError("$SICK_OUT_DIR not set")
+    d = Path(outdir) / "index" / "filter" / "sim"
     d.mkdir(parents=True, exist_ok=True)
     return EntityPaths(**{e: d / f"index_filter_{e}.npy" for e in ENTITIES})
 

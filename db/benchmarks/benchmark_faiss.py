@@ -55,7 +55,6 @@ RESET = "\033[0m"
 HLINE = f"{DIM_C}{'─' * 85}{RESET}"
 
 
-# ── auto-params ────────────────────────────────────────────────────────
 def compute_params(n: int, dim: int) -> dict:
     """Derive build and sweep parameters from dataset shape."""
     nlist = int(np.clip(4 * np.sqrt(n), 256, 16384))
@@ -89,7 +88,6 @@ def subsample_training(xb: np.ndarray, max_size: int, seed: int = SEED) -> np.nd
     return np.ascontiguousarray(xb[idx])
 
 
-# ── glibc memory reclaim ────────────────────────────────────────────
 _LIBC = None
 def _get_libc():
     global _LIBC
@@ -330,7 +328,6 @@ def load_filtered_data(embedding_path: str | Path, filter_index_path: str | Path
     return xb, xq, gt
 
 
-# ── benchmarks ───────────────────────────────────────────────────────
 def bench_hnsw(xb, xq, gt, k, params):
     header("HNSW Flat  (HNSW32)")
     n, dim = xb.shape
@@ -470,7 +467,6 @@ def bench_opq_ivfhnsw_pq(xb, xq, gt, k, params):
     return idx_bytes
 
 
-# ── main ─────────────────────────────────────────────────────────────
 def run_benchmarks(xb, xq, gt, k, params, benchmark_names):
     """Run selected benchmarks and return (name, idx_bytes) pairs."""
     dispatch = {

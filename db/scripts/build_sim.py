@@ -50,11 +50,6 @@ def main():
         metavar="PATH",
         help="Path to ml manifest TOML. $SICK_MANIFEST",
     )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing index files.",
-    )
     args = parser.parse_args()
 
     if args.manifest is None:
@@ -65,41 +60,21 @@ def main():
     filter_paths = get_index_filter_sim_paths()
     faiss_paths = get_index_faiss_paths()
 
-    # ── track ────────────────────────────────────────────────────────
-    if not args.overwrite and faiss_paths.track.is_file():
-        print(f"track     skipped (exists: {faiss_paths.track})")
-    else:
-        print("track")
-        spec = track_spec(np.load(filter_paths.track))
-        build_entity(spec, emb.track, EKEYS.track, faiss_paths.track)
-    print()
+    print("track")
+    spec = track_spec(np.load(filter_paths.track))
+    build_entity(spec, emb.track, EKEYS.track, faiss_paths.track)
 
-    # ── album ────────────────────────────────────────────────────────
-    if not args.overwrite and faiss_paths.album.is_file():
-        print(f"album     skipped (exists: {faiss_paths.album})")
-    else:
-        print("album")
-        spec = album_spec(np.load(filter_paths.album))
-        build_entity(spec, emb.album, EKEYS.album, faiss_paths.album)
-    print()
+    print("album")
+    spec = album_spec(np.load(filter_paths.album))
+    build_entity(spec, emb.album, EKEYS.album, faiss_paths.album)
 
-    # ── artist ───────────────────────────────────────────────────────
-    if not args.overwrite and faiss_paths.artist.is_file():
-        print(f"artist    skipped (exists: {faiss_paths.artist})")
-    else:
-        print("artist")
-        spec = artist_spec(np.load(filter_paths.artist))
-        build_entity(spec, emb.artist, EKEYS.artist, faiss_paths.artist)
-    print()
+    print("artist")
+    spec = artist_spec(np.load(filter_paths.artist))
+    build_entity(spec, emb.artist, EKEYS.artist, faiss_paths.artist)
 
-    # ── label ────────────────────────────────────────────────────────
-    if not args.overwrite and faiss_paths.label.is_file():
-        print(f"label     skipped (exists: {faiss_paths.label})")
-    else:
-        print("label")
-        spec = label_spec(np.load(filter_paths.label))
-        build_entity(spec, emb.label, EKEYS.label, faiss_paths.label)
-    print()
+    print("label")
+    spec = label_spec(np.load(filter_paths.label))
+    build_entity(spec, emb.label, EKEYS.label, faiss_paths.label)
 
     print("Done.")
 

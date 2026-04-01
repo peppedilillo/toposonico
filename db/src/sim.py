@@ -112,7 +112,7 @@ def train_index(spec: SimIndexSpec, xb: np.ndarray) -> faiss.Index:
     train_n = ivf_train_size(spec.n, spec.nlist)
     xt = subsample_training(xb, train_n)
     index.train(xt)
-    index = faiss.IndexIDMap(index)
+    index = faiss.IndexIDMap2(index)
     index.add_with_ids(xb, spec.filter_index)
     return index
 
