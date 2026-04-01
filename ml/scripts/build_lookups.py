@@ -81,11 +81,13 @@ def get_connection(database_path: Path) -> sqlite3.Connection:
 def create_temp_track_table(conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME) -> None:
     """Create (or replace) a temporary track-rowid table for the metadata join."""
     conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-    conn.execute(f"""
+    conn.execute(
+        f"""
         CREATE TEMP TABLE {table_name} (
             track_rowid INTEGER PRIMARY KEY
         )
-        """)
+        """
+    )
 
 
 def load_temp_track_table(
@@ -200,7 +202,18 @@ def build_artist_lookup(
     )
     artist_lookup = artist_lookup.merge(artist_meta, on="artist_rowid", how="inner")
     return (
-        artist_lookup[["artist_rowid", "artist_name", "artist_genre", "logcount", "ntrack", "nalbum",]].sort_values("artist_rowid").reset_index(drop=True)
+        artist_lookup[
+            [
+                "artist_rowid",
+                "artist_name",
+                "artist_genre",
+                "logcount",
+                "ntrack",
+                "nalbum",
+            ]
+        ]
+        .sort_values("artist_rowid")
+        .reset_index(drop=True)
     )
 
 
@@ -212,7 +225,8 @@ def build_album_lookup(
     album_lookup = Albums.lookup(t1_df, model_dict)
     enriched = track_meta.merge(
         t1_df[["track_rowid", "label_rowid"]].drop_duplicates("track_rowid"),
-        on="track_rowid", how="left",
+        on="track_rowid",
+        how="left",
     )
     album_meta = (
         enriched.groupby("album_rowid", as_index=False)
@@ -231,7 +245,21 @@ def build_album_lookup(
     )
     album_lookup = album_lookup.merge(album_meta, on="album_rowid", how="inner")
     return (
-        album_lookup[["album_rowid", "album_name", "artist_rowid", "label_rowid", "label", "artist_name", "album_type", "release_date", "release_date_precision", "logcount", "total_tracks",]]
+        album_lookup[
+            [
+                "album_rowid",
+                "album_name",
+                "artist_rowid",
+                "label_rowid",
+                "label",
+                "artist_name",
+                "album_type",
+                "release_date",
+                "release_date_precision",
+                "logcount",
+                "total_tracks",
+            ]
+        ]
         .sort_values("album_rowid")
         .reset_index(drop=True)
     )
@@ -252,7 +280,11 @@ def build_label_lookup(
     )
     label_lookup = label_lookup.merge(label_meta, on="label_rowid", how="inner")
     label_lookup["label_rowid"] = label_lookup["label_rowid"].astype("int32")
-    return label_lookup[["label_rowid", "label", "logcount", "ntrack", "nalbum", "nartist"]].sort_values("label_rowid").reset_index(drop=True)
+    return (
+        label_lookup[["label_rowid", "label", "logcount", "ntrack", "nalbum", "nartist"]]
+        .sort_values("label_rowid")
+        .reset_index(drop=True)
+    )
 
 
 def main():

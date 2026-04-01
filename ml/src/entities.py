@@ -164,18 +164,17 @@ class Artists:
         valid_ids = Artists.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
         out = (
-            np.log10(t1_df.loc[mask, "playlist_count"])
-            .astype("float32")
-            .groupby(t1_df.loc[mask, "artist_rowid"], sort=False)
-            .mean()
-            .reset_index(name="logcount")
-        ).merge(
-            t1_df.loc[mask].value_counts("artist_rowid"),
-            on="artist_rowid"
-        ).rename(columns={"count": "ntrack"}
-        ).merge(
-            t1_df.loc[mask].groupby("artist_rowid", as_index=False).agg(
-                nalbum=("album_rowid", pd.Series.nunique)
+            (
+                np.log10(t1_df.loc[mask, "playlist_count"])
+                .astype("float32")
+                .groupby(t1_df.loc[mask, "artist_rowid"], sort=False)
+                .mean()
+                .reset_index(name="logcount")
+            )
+            .merge(t1_df.loc[mask].value_counts("artist_rowid"), on="artist_rowid")
+            .rename(columns={"count": "ntrack"})
+            .merge(
+                t1_df.loc[mask].groupby("artist_rowid", as_index=False).agg(nalbum=("album_rowid", pd.Series.nunique))
             )
         )
         out["artist_rowid"] = out["artist_rowid"].astype("int64")
@@ -357,25 +356,27 @@ class Labels:
         valid_ids = Labels.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
         out = (
-            # adds mean of log10(track counts)
-            np.log10(t1_df.loc[mask, "playlist_count"])
-            .astype("float32")
-            .groupby(t1_df.loc[mask, "label_rowid"], sort=False)
-            .mean()
-            .reset_index(name="logcount")
-        ).merge(
-            t1_df.loc[mask].value_counts("label_rowid"),
-            on="label_rowid"
-        ).rename(columns={"count": "ntrack"}
-        ).merge(
-            # adds number of albums released by each label
-            t1_df.loc[mask].groupby("label_rowid", as_index=False).agg(
-                nalbum=("album_rowid", pd.Series.nunique)
+            (
+                # adds mean of log10(track counts)
+                np.log10(t1_df.loc[mask, "playlist_count"])
+                .astype("float32")
+                .groupby(t1_df.loc[mask, "label_rowid"], sort=False)
+                .mean()
+                .reset_index(name="logcount")
             )
-        ).merge(
-            # adds number of artists in roster
-            t1_df.loc[mask].groupby("label_rowid", as_index=False).agg(
-                nartist=("artist_rowid", pd.Series.nunique)
+            .merge(t1_df.loc[mask].value_counts("label_rowid"), on="label_rowid")
+            .rename(columns={"count": "ntrack"})
+            .merge(
+                # adds number of albums released by each label
+                t1_df.loc[mask]
+                .groupby("label_rowid", as_index=False)
+                .agg(nalbum=("album_rowid", pd.Series.nunique))
+            )
+            .merge(
+                # adds number of artists in roster
+                t1_df.loc[mask]
+                .groupby("label_rowid", as_index=False)
+                .agg(nartist=("artist_rowid", pd.Series.nunique))
             )
         )
         out["label_rowid"] = out["label_rowid"].astype("int32")

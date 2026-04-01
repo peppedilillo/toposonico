@@ -12,7 +12,8 @@ import torch
 
 def _write_tracks_db(path: Path) -> None:
     conn = sqlite3.connect(path)
-    conn.executescript("""
+    conn.executescript(
+        """
         CREATE TABLE artists (
             rowid INTEGER PRIMARY KEY,
             name TEXT NOT NULL
@@ -45,7 +46,8 @@ def _write_tracks_db(path: Path) -> None:
             artist_rowid INTEGER NOT NULL,
             genre TEXT NOT NULL
         );
-        """)
+        """
+    )
     conn.executemany(
         "INSERT INTO artists(rowid, name) VALUES (?, ?)",
         [(1, "Artist One"), (2, "Artist Two")],
@@ -175,7 +177,14 @@ def test_build_lookups_script_writes_expected_lookup_artifacts(tmp_path):
         np.array([1.0, 2.0], dtype=np.float32),
     )
 
-    assert list(artist_lookup.columns) == ["artist_rowid", "artist_name", "artist_genre", "logcount", "ntrack", "nalbum"]
+    assert list(artist_lookup.columns) == [
+        "artist_rowid",
+        "artist_name",
+        "artist_genre",
+        "logcount",
+        "ntrack",
+        "nalbum",
+    ]
     assert artist_lookup["artist_rowid"].tolist() == [1]
     assert artist_lookup["artist_name"].tolist() == ["Artist One"]
     assert artist_lookup["artist_genre"].tolist() == ["rock"]
