@@ -1,60 +1,67 @@
 """Compute joint lon/lat coordinates for all entity types from UMAP projections.
 
-Reads UMAP parquets for all entity types from the ml manifest, computes a single
-global bounding box across all of them (with padding), then writes per-entity
+Reads UMAP parquets from the ml manifest, applies per-entity filter indices (built by
+build_index.py) to restrict to the DB-visible subset, then computes a single global
+bounding box across all four entity types (with padding) and writes per-entity
 geo-parquets containing only the key column + lon + lat.
 
-Always run with all 4 entities together to keep coordinate alignment stable.
-All four parquets must come from the same UMAP fit — mixing parquets from different
-fits produces incompatible coordinates.
+Always run with all 4 entities together to keep coordinates spatially aligned.
+All four UMAP parquets must come from the same UMAP fit — mixing parquets from
+different fits produces incompatible coordinates.
+
+Output directory is set via $SICK_OUT_DIR; parquets land in $SICK_OUT_DIR/geo/.
 
 Usage:
     uv run python scripts/build_geomap.py [options]
 
 Examples:
     source config.env && uv run python scripts/build_geomap.py
-    uv run python scripts/build_geomap.py --manifest ml/outs/manifest.toml --output-dir outs/geo/
+    uv run python scripts/build_geomap.py --manifest ml/outs/manifest.toml
 """
 
 import argparse
 import os
-from typing import Sequence
 
+import numpy as np
 import pandas as pd
 
 from src.utils import ENTITY_KEYS as EKEYS
 from src.utils import get_geo_paths
 from src.utils import read_manifest
+from src.utils import get_index_filter_db_paths
+from src.utils import EntityPaths
+from src.utils import EntityTable
 
 
 def umap2geo(
-    umap_frames: Sequence[tuple[pd.DataFrame, str]],
+    umap: EntityTable,
     max_lon: float = 22.5,
     max_lat: float = 22.5,
     padding: float = 1.0,
-) -> list[pd.DataFrame]:
-    """Map UMAP coordinates to fake lon/lat using a shared bounding box.
+) -> EntityTable:
+    """Map UMAP coordinates to lon/lat using a joint bounding box across all entity types.
 
-    Computes a single global bbox across all input frames (so entity types stay
-    spatially aligned), applies fractional padding, then normalises each frame to
-    [-max_lon, +max_lon] × [-max_lat, +max_lat].
+    Computes a single global bbox over all four entity DataFrames (so entity types stay
+    spatially aligned), applies coordinate-space padding, then normalises each frame into
+    [-|max_lon|, +|max_lon|] × [-|max_lat|, +|max_lat|].
 
     Args:
-        umap_frames: sequence of (df, key_col) pairs. Each df must have columns
-            ``umap_x`` and ``umap_y`` plus the key column.
-        max_lon: half-width in degrees for the x axis (default 22.5).
+        umap: EntityTable of four DataFrames. Each must have ``umap_x``, ``umap_y``,
+            and the entity key column (e.g. ``track_rowid``).
+        max_lon: half-width in degrees for the x axis (default 22.5). Passing a
+            negative value flips the x-axis (east↔west mirror) — used in main() to
+            correct UMAP's default x-axis orientation.
         max_lat: half-width in degrees for the y axis (default 22.5).
-        padding: padding added to each side of the global bbox (default 1.).
+        padding: margin added to each side of the global UMAP bbox before
+            normalisation, in UMAP coordinate space (default 1.0).
 
     Returns:
-        List of DataFrames, one per input, with columns [key_col, lon, lat] (float32).
+        EntityTable of four DataFrames, each with columns [key_col, lon, lat] (float32).
     """
-    import numpy as np
-
-    x_min = min(df.umap_x.min() for df, _ in umap_frames)
-    x_max = max(df.umap_x.max() for df, _ in umap_frames)
-    y_min = min(df.umap_y.min() for df, _ in umap_frames)
-    y_max = max(df.umap_y.max() for df, _ in umap_frames)
+    x_min = min(df.umap_x.min() for df in umap)
+    x_max = max(df.umap_x.max() for df in umap)
+    y_min = min(df.umap_y.min() for df in umap)
+    y_max = max(df.umap_y.max() for df in umap)
 
     x_min -= padding
     x_max += padding
@@ -62,7 +69,12 @@ def umap2geo(
     y_max += padding
 
     results = []
-    for df, key_col in umap_frames:
+    for key_col, df in (
+        (EKEYS.track, umap.track),
+        (EKEYS.artist, umap.artist),
+        (EKEYS.album, umap.album),
+        (EKEYS.label, umap.label),
+    ):
         x_norm = (df.umap_x - x_min) / (x_max - x_min)
         y_norm = (df.umap_y - y_min) / (y_max - y_min)
         results.append(
@@ -74,7 +86,25 @@ def umap2geo(
                 }
             )
         )
-    return results
+    return EntityTable(*results)
+
+
+def read_and_filter(umaps: EntityPaths, filters: EntityPaths) -> EntityTable:
+    """Load UMAP parquets and restrict each entity to the rows listed in its filter index.
+
+    Args:
+        umaps: per-entity paths to UMAP parquets (must contain umap_x, umap_y, key column).
+        filters: per-entity paths to .npy arrays of key values to keep (the DB-visible subset).
+
+    Returns:
+        EntityTable of filtered DataFrames.
+    """
+    return EntityTable(
+        track=pd.read_parquet(umaps.track).set_index(EKEYS.track).loc[np.load(filters.track)].reset_index(),
+        artist=pd.read_parquet(umaps.artist).set_index(EKEYS.artist).loc[np.load(filters.artist)].reset_index(),
+        album=pd.read_parquet(umaps.album).set_index(EKEYS.album).loc[np.load(filters.album)].reset_index(),
+        label=pd.read_parquet(umaps.label).set_index(EKEYS.label).loc[np.load(filters.label)].reset_index(),
+    )
 
 
 def main():
@@ -111,33 +141,22 @@ def main():
     if args.padding is None:
         raise ValueError("--padding / $SICK_GEO_PADDING not set")
 
+    hwidth = args.width / 2.0
+    geo_paths = get_geo_paths()
     manifest = read_manifest(args.manifest)
     umap = manifest["umap"]
-    geo_paths = get_geo_paths()
-    hwidth = args.width / 2.0
+    filters = get_index_filter_db_paths()
 
-    umap_frames = [
-        (pd.read_parquet(umap.track, columns=[EKEYS.track, "umap_x", "umap_y"]), EKEYS.track),
-        (pd.read_parquet(umap.artist, columns=[EKEYS.artist, "umap_x", "umap_y"]), EKEYS.artist),
-        (pd.read_parquet(umap.album, columns=[EKEYS.album, "umap_x", "umap_y"]), EKEYS.album),
-        (pd.read_parquet(umap.label, columns=[EKEYS.label, "umap_x", "umap_y"]), EKEYS.label),
-    ]
+    geo = umap2geo(read_and_filter(umap, filters), -hwidth, +hwidth, args.padding)
 
-    track_geo, artist_geo, album_geo, label_geo = umap2geo(
-        umap_frames,
-        max_lon=hwidth,
-        max_lat=hwidth,
-        padding=args.padding,
-    )
-
-    track_geo.to_parquet(geo_paths.track, index=False)
-    print(f"{'track':8s}  {len(track_geo):>9,} rows  →  {geo_paths.track}")
-    artist_geo.to_parquet(geo_paths.artist, index=False)
-    print(f"{'artist':8s}  {len(artist_geo):>9,} rows  →  {geo_paths.artist}")
-    album_geo.to_parquet(geo_paths.album, index=False)
-    print(f"{'album':8s}  {len(album_geo):>9,} rows  →  {geo_paths.album}")
-    label_geo.to_parquet(geo_paths.label, index=False)
-    print(f"{'label':8s}  {len(label_geo):>9,} rows  →  {geo_paths.label}")
+    geo.track.to_parquet(geo_paths.track, index=False)
+    print(f"{'track':8s}  {len(geo.track):>9,} rows  →  {geo_paths.track}")
+    geo.artist.to_parquet(geo_paths.artist, index=False)
+    print(f"{'artist':8s}  {len(geo.artist):>9,} rows  →  {geo_paths.artist}")
+    geo.album.to_parquet(geo_paths.album, index=False)
+    print(f"{'album':8s}  {len(geo.album):>9,} rows  →  {geo_paths.album}")
+    geo.label.to_parquet(geo_paths.label, index=False)
+    print(f"{'label':8s}  {len(geo.label):>9,} rows  →  {geo_paths.label}")
 
     print()
     print("Done.")
