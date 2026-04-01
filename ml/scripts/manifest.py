@@ -17,13 +17,13 @@ MANIFEST = (
 [source]
 track_db = ""
 
-[embeddings]
+[embedding]
 track  = ""
 artist = ""
 album  = ""
 label  = ""
 
-[lookups]
+[lookup]
 track  = ""
 artist = ""
 album  = ""

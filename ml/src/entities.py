@@ -2,7 +2,7 @@
 
 All classes (Tracks, Artists, Albums, Labels) share the same interface:
   - valid_ids(t1_df, model_dict)  — track rowids that qualify for this entity type
-  - lookup(t1_df, model_dict)     — entity rowid + logcounts
+  - lookup(t1_df, model_dict)     — entity rowid + logcount
   - embeddings(t1_df, model_dict) — entity rowid + e0..e{D-1} (mean-pooled for non-track entities)
 """
 
@@ -76,19 +76,19 @@ class Tracks:
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            DataFrame with columns `track_rowid` (`int64`) and `logcounts`
-            (`float32`), where `logcounts = log10(playlist_count)`.
+            DataFrame with columns `track_rowid` (`int64`) and `logcount`
+            (`float32`), where `logcount = log10(playlist_count)`.
         """
         valid_ids = Tracks.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
         out = pd.DataFrame(
             {
                 "track_rowid": t1_df.loc[mask, "track_rowid"].to_numpy(),
-                "logcounts": np.log10(t1_df.loc[mask, "playlist_count"]).astype("float32"),
+                "logcount": np.log10(t1_df.loc[mask, "playlist_count"]).astype("float32"),
             }
         )
         out["track_rowid"] = out["track_rowid"].astype("int64")
-        out["logcounts"] = out["logcounts"].astype("float32")
+        out["logcount"] = out["logcount"].astype("float32")
         return out
 
     @staticmethod
@@ -155,9 +155,9 @@ class Artists:
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            DataFrame with columns `artist_rowid` (`int64`), `logcounts`
+            DataFrame with columns `artist_rowid` (`int64`), `logcount`
             (`float32`), `ntrack` (`int32`), and `nalbum` (`int32`).
-            `logcounts` is the mean of per-track `log10(playlist_count)`
+            `logcount` is the mean of per-track `log10(playlist_count)`
             across valid artist tracks. `ntrack` is the number of valid
             tracks per artist. `nalbum` is the number of distinct albums.
         """
@@ -168,7 +168,7 @@ class Artists:
             .astype("float32")
             .groupby(t1_df.loc[mask, "artist_rowid"], sort=False)
             .mean()
-            .reset_index(name="logcounts")
+            .reset_index(name="logcount")
         ).merge(
             t1_df.loc[mask].value_counts("artist_rowid"),
             on="artist_rowid"
@@ -179,7 +179,7 @@ class Artists:
             )
         )
         out["artist_rowid"] = out["artist_rowid"].astype("int64")
-        out["logcounts"] = out["logcounts"].astype("float32")
+        out["logcount"] = out["logcount"].astype("float32")
         out["ntrack"] = out["ntrack"].astype("int32")
         out["nalbum"] = out["nalbum"].astype("int32")
         return out
@@ -258,8 +258,8 @@ class Albums:
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            DataFrame with columns `album_rowid` (`int64`) and `logcounts`
-            (`float32`). `logcounts` is the mean of per-track
+            DataFrame with columns `album_rowid` (`int64`) and `logcount`
+            (`float32`). `logcount` is the mean of per-track
             `log10(playlist_count)` across valid album tracks.
         """
         valid_ids = Albums.valid_ids(t1_df, model_dict)
@@ -269,10 +269,10 @@ class Albums:
             .astype("float32")
             .groupby(t1_df.loc[mask, "album_rowid"], sort=False)
             .mean()
-            .reset_index(name="logcounts")
+            .reset_index(name="logcount")
         )
         out["album_rowid"] = out["album_rowid"].astype("int64")
-        out["logcounts"] = out["logcounts"].astype("float32")
+        out["logcount"] = out["logcount"].astype("float32")
         return out
 
     @staticmethod
@@ -349,8 +349,8 @@ class Labels:
             model_dict: Training checkpoint containing the model vocab.
 
         Returns:
-            DataFrame with columns `label_rowid` (`int32`), `logcounts`
-            (`float32`), and `ntrack` (`int32`). `logcounts` is the mean of
+            DataFrame with columns `label_rowid` (`int32`), `logcount`
+            (`float32`), and `ntrack` (`int32`). `logcount` is the mean of
             per-track `log10(playlist_count)` across valid label tracks.
             `ntrack` is the number of valid tracks per label.
         """
@@ -362,7 +362,7 @@ class Labels:
             .astype("float32")
             .groupby(t1_df.loc[mask, "label_rowid"], sort=False)
             .mean()
-            .reset_index(name="logcounts")
+            .reset_index(name="logcount")
         ).merge(
             t1_df.loc[mask].value_counts("label_rowid"),
             on="label_rowid"
@@ -379,7 +379,7 @@ class Labels:
             )
         )
         out["label_rowid"] = out["label_rowid"].astype("int32")
-        out["logcounts"] = out["logcounts"].astype("float32")
+        out["logcount"] = out["logcount"].astype("float32")
         out["ntrack"] = out["ntrack"].astype("int32")
         out["nalbum"] = out["nalbum"].astype("int32")
         out["nartist"] = out["nartist"].astype("int32")

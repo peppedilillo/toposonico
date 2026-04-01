@@ -49,15 +49,15 @@ def test_tracks_valid_ids_requires_unique_track_rowid():
         Tracks.valid_ids(t1_df, _model_dict())
 
 
-def test_tracks_lookup_returns_checkpoint_tracks_with_logcounts():
+def test_tracks_lookup_returns_checkpoint_tracks_with_logcount():
     out = Tracks.lookup(_t1_df(), _model_dict())
 
     assert out["track_rowid"].tolist() == [10, 20]
-    assert list(out.columns) == ["track_rowid", "logcounts"]
+    assert list(out.columns) == ["track_rowid", "logcount"]
     assert out["track_rowid"].dtype == np.int64
-    assert out["logcounts"].dtype == np.float32
+    assert out["logcount"].dtype == np.float32
     np.testing.assert_allclose(
-        out["logcounts"].to_numpy(),
+        out["logcount"].to_numpy(),
         np.array([1.0, 2.0], dtype=np.float32),
     )
 
@@ -88,13 +88,13 @@ def test_unlabeled_checkpoint_track_is_excluded_from_exported_entities():
     assert label_lookup["label_rowid"].tolist() == [111]
 
     np.testing.assert_allclose(
-        artist_lookup["logcounts"].to_numpy(),
+        artist_lookup["logcount"].to_numpy(),
         np.array([1.5], dtype=np.float32),
     )
     assert artist_lookup["ntrack"].tolist() == [2]
     assert artist_lookup["nalbum"].tolist() == [1]
     np.testing.assert_allclose(
-        Albums.lookup(t1_df, model_dict)["logcounts"].to_numpy(),
+        Albums.lookup(t1_df, model_dict)["logcount"].to_numpy(),
         np.array([1.5], dtype=np.float32),
     )
     assert label_lookup["ntrack"].tolist() == [2]
@@ -108,25 +108,25 @@ def test_unlabeled_checkpoint_track_is_excluded_from_exported_entities():
         (
             Tracks,
             "track_rowid",
-            ["track_rowid", "logcounts"],
+            ["track_rowid", "logcount"],
             ["track_rowid", "e0", "e1"],
         ),
         (
             Artists,
             "artist_rowid",
-            ["artist_rowid", "logcounts", "ntrack", "nalbum"],
+            ["artist_rowid", "logcount", "ntrack", "nalbum"],
             ["artist_rowid", "e0", "e1"],
         ),
         (
             Albums,
             "album_rowid",
-            ["album_rowid", "logcounts"],
+            ["album_rowid", "logcount"],
             ["album_rowid", "e0", "e1"],
         ),
         (
             Labels,
             "label_rowid",
-            ["label_rowid", "logcounts", "ntrack", "nalbum", "nartist"],
+            ["label_rowid", "logcount", "ntrack", "nalbum", "nartist"],
             ["label_rowid", "e0", "e1"],
         ),
     ],
