@@ -2,7 +2,7 @@
 FAISS Index Benchmark
   k=100  |  n_query=100  |  benchmarks: hnsw, hnsw_sq, ivf, ivf_hnsw_quantizer, opq_ivfhnsw_pq
   entities: track, artist, album, label
-  manifest: /home/peppe/Dropbox/Progetti/ml/spotify-rec/ml/outs/magic_falcon/manifest.toml
+  manifest: ..magic_falcon/manifest.toml
 
 ═════════════════════════════════════════════════════════════════════════════════════
   TRACK
@@ -11,18 +11,18 @@ FAISS Index Benchmark
 ─────────────────────────────────────────────────────────────────────────────────────
   ◆  Data Loading
 ─────────────────────────────────────────────────────────────────────────────────────
-  ▸ Reading /home/peppe/Dropbox/Progetti/ml/spotify-rec/ml/outs/magic_falcon/embedding_track.parquet … done (10.07s)
-  ▸ Filtering with outs/index/filter/sim/index_filter_track.npy … done (2.99s)
+  ▸ Reading ..magic_falcon/embedding_track.parquet … done (11.89s)
+  ▸ Filtering with outs/index/filter/sim/index_filter_track.npy … done (2.71s)
     11,172,047 → 3,007,648 (26.9%)
-  ▸ Extracting embedding matrix … done (0.78s)
-  ▸ L2-normalizing (cosine space) … done (0.09s)
-  ▸ Sampling 100 query vectors … done (0.43s)
-  ▸ Computing ground truth (brute-force FlatIP, k=100, chunked) … done (2.08s)
+  ▸ Extracting embedding matrix … done (1.05s)
+  ▸ L2-normalizing (cosine space) … done (0.10s)
+  ▸ Sampling 100 query vectors … done (0.50s)
+  ▸ Computing ground truth (brute-force FlatIP, k=100, chunked) … done (5.83s)
 
   Dataset
     Base vectors :    3,007,548  ×  128d
     Queries      :          100
-    RSS after load:      8.4 GB
+    RSS after load:      8.1 GB
 
   Auto-params
     nlist            :      6,936
@@ -32,75 +32,482 @@ FAISS Index Benchmark
 ─────────────────────────────────────────────────────────────────────────────────────
   ◆  HNSW Flat  (HNSW32)
 ─────────────────────────────────────────────────────────────────────────────────────
-  ▸ Adding 3,007,548 vectors … done (36.39s)
+  ▸ Adding 3,007,548 vectors … done (39.64s)
 
   Memory
     Index size (estimated)  :       2.9 GB   (1024 bytes/vector)
-    Process RSS delta       : +     2.3 GB   (current RSS: 10.7 GB)
+    Process RSS delta       : +     2.3 GB   (current RSS: 10.4 GB)
 
   Parameters                             ms/query      R@1     R@10    R@100  missing
   ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
-  efSearch=16                               0.041   0.9900   0.9740   0.8342   0.0000
-  efSearch=32                               0.055   0.9900   0.9840   0.9209   0.0000
-  efSearch=64                               0.058   0.9900   0.9880   0.9670   0.0000
-  efSearch=128                              0.068   0.9900   0.9900   0.9833   0.0000
-  efSearch=256                              0.084   1.0000   1.0000   0.9973   0.0000
+  efSearch=16                               0.040   0.9800   0.9630   0.8242   0.0000
+  efSearch=32                               0.055   0.9800   0.9750   0.9145   0.0000
+  efSearch=64                               0.059   0.9800   0.9760   0.9576   0.0000
+  efSearch=128                              0.069   0.9800   0.9780   0.9740   0.0000
+  efSearch=256                              0.085   1.0000   0.9970   0.9965   0.0000
 
 ─────────────────────────────────────────────────────────────────────────────────────
   ◆  HNSW + Scalar Quantizer  (HNSW16_SQ8)
 ─────────────────────────────────────────────────────────────────────────────────────
   ▸ Training scalar quantizer … done (0.09s)
-  ▸ Adding 3,007,548 vectors … done (13.84s)
+  ▸ Adding 3,007,548 vectors … done (15.63s)
 
   Memory
     Index size (estimated)  :       1.1 GB   (384 bytes/vector)
-    Process RSS delta       : +   882.0 MB   (current RSS: 9.3 GB)
+    Process RSS delta       : +   880.8 MB   (current RSS: 8.9 GB)
 
   Parameters                             ms/query      R@1     R@10    R@100  missing
   ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
-  efSearch=16                               0.025   0.8200   0.8930   0.6343   0.0130
-  efSearch=32                               0.030   0.8200   0.9240   0.7871   0.0004
-  efSearch=64                               0.032   0.8300   0.9340   0.8985   0.0000
-  efSearch=128                              0.037   0.8300   0.9380   0.9373   0.0000
-  efSearch=256                              0.049   0.8300   0.9390   0.9493   0.0000
+  efSearch=16                               0.028   0.8000   0.8710   0.6191   0.0124
+  efSearch=32                               0.030   0.8200   0.9160   0.7800   0.0009
+  efSearch=64                               0.032   0.8200   0.9230   0.8876   0.0000
+  efSearch=128                              0.038   0.8200   0.9260   0.9267   0.0000
+  efSearch=256                              0.049   0.8200   0.9300   0.9388   0.0000
 
 ─────────────────────────────────────────────────────────────────────────────────────
   ◆  IVF Flat  (IVF6936,Flat)
 ─────────────────────────────────────────────────────────────────────────────────────
-  ▸ Training IVF (6,936 centroids, 443,904 vectors) … done (87.30s)
-  ▸ Adding 3,007,548 vectors … done (60.49s)
+  ▸ Training IVF (6,936 centroids, 443,904 vectors) … done (102.97s)
+  ▸ Adding 3,007,548 vectors … done (68.69s)
 
   Memory
     Index size (estimated)  :       1.5 GB   (520 bytes/vector)
-    Process RSS delta       : +     1.9 GB   (current RSS: 10.3 GB)
+    Process RSS delta       : +     1.9 GB   (current RSS: 9.9 GB)
 
   Parameters                             ms/query      R@1     R@10    R@100  missing
   ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
-  nprobe=1                                  0.022   0.7000   0.6440   0.5202   0.0000
-  nprobe=4                                  0.033   0.9400   0.9020   0.8458   0.0000
-  nprobe=16                                 0.102   0.9800   0.9780   0.9691   0.0000
-  nprobe=64                                 0.356   1.0000   0.9990   0.9980   0.0000
-  nprobe=256                                1.339   1.0000   1.0000   0.9998   0.0000
+  nprobe=1                                  0.043   0.7000   0.6440   0.5202   0.0000
+  nprobe=4                                  0.034   0.9400   0.9020   0.8458   0.0000
+  nprobe=16                                 0.103   0.9800   0.9780   0.9691   0.0000
+  nprobe=64                                 0.357   1.0000   0.9990   0.9980   0.0000
+  nprobe=256                                1.350   1.0000   1.0000   0.9998   0.0000
 
 ─────────────────────────────────────────────────────────────────────────────────────
   ◆  IVF Flat + HNSW Quantizer  (IVF6936_HNSW32,Flat)
 ─────────────────────────────────────────────────────────────────────────────────────
-  ▸ Training IVF+HNSW quantizer (6,936 centroids, 443,904 vectors) … done (80.03s)
-  ▸ Adding 3,007,548 vectors … done (2.37s)
+  ▸ Training IVF+HNSW quantizer (6,936 centroids, 443,904 vectors) … done (85.50s)
+  ▸ Adding 3,007,548 vectors … done (2.82s)
 
   Memory
     Index size (estimated)  :       1.5 GB   (520 bytes/vector)
-    Process RSS delta       : +   790.9 MB   (current RSS: 10.4 GB)
+    Process RSS delta       : +   795.1 MB   (current RSS: 10.0 GB)
 
   Parameters                             ms/query      R@1     R@10    R@100  missing
   ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
-  nprobe=1  (quantizer efSearch=64)         0.024   0.7000   0.6420   0.5180   0.0000
-  nprobe=4  (quantizer efSearch=64)         0.030   0.9400   0.9010   0.8437   0.0000
-  nprobe=16  (quantizer efSearch=64)        0.098   0.9800   0.9770   0.9673   0.0000
-  nprobe=64  (quantizer efSearch=64)        0.358   1.0000   0.9980   0.9962   0.0000
-  nprobe=256  (quantizer efSearch=64)       1.323   1.0000   0.9990   0.9983   0.0000
+  nprobe=1  (quantizer efSearch=64)         0.027   0.7000   0.6430   0.5183   0.0000
+  nprobe=4  (quantizer efSearch=64)         0.030   0.9400   0.9020   0.8440   0.0000
+  nprobe=16  (quantizer efSearch=64)        0.100   0.9800   0.9780   0.9676   0.0000
+  nprobe=64  (quantizer efSearch=64)        0.354   1.0000   0.9990   0.9967   0.0000
+  nprobe=256  (quantizer efSearch=64)       1.338   1.0000   1.0000   0.9988   0.0000
 
 ─────────────────────────────────────────────────────────────────────────────────────
   ◆  OPQ + IVF/HNSW + PQ fast-scan  (OPQ128_128,IVF6936_HNSW32,PQ128x4fsr)
 ─────────────────────────────────────────────────────────────────────────────────────
-  ▸ Training OPQ+IVF/HNSW+PQ (6,936 centroids, 443,904 vectors) … 
+  ▸ Training OPQ+IVF/HNSW+PQ (6,936 centroids, 443,904 vectors) … done (159.85s)
+  ▸ Adding 3,007,548 vectors … done (5.03s)
+
+  Memory
+    Index size (estimated)  :     218.4 MB   (76 bytes/vector)
+    Process RSS delta       : +   318.7 MB   (current RSS: 9.6 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  nprobe=1  (efSearch=64)                   0.008   0.4500   0.5780   0.5109   0.0000
+  nprobe=4  (efSearch=64)                   0.007   0.5700   0.7660   0.7984   0.0000
+  nprobe=16  (efSearch=64)                  0.017   0.6100   0.8160   0.8884   0.0000
+  nprobe=64  (efSearch=64)                  0.050   0.6200   0.8290   0.9060   0.0000
+  nprobe=256  (efSearch=64)                 0.133   0.6200   0.8300   0.9068   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  Memory Summary
+─────────────────────────────────────────────────────────────────────────────────────
+  Index                                Size    bytes/vec   vs raw f32
+  ──────────────────────────── ──────────── ──────────── ────────────
+  (raw float32 baseline)             1.4 GB          512        1.00x
+  hnsw                               2.9 GB         1024        2.00x
+  hnsw_sq                            1.1 GB          384        0.75x
+  ivf                                1.5 GB          520        1.02x
+  ivf_hnsw_quantizer                 1.5 GB          520        1.02x
+  opq_ivfhnsw_pq                   218.4 MB           76        0.15x
+
+═════════════════════════════════════════════════════════════════════════════════════
+  ARTIST
+
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  Data Loading
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Reading ..magic_falcon/embedding_artist.parquet … done (0.87s)
+  ▸ Filtering with outs/index/filter/sim/index_filter_artist.npy … done (0.06s)
+    950,662 → 170,766 (18.0%)
+  ▸ Extracting embedding matrix … done (0.05s)
+  ▸ L2-normalizing (cosine space) … done (0.00s)
+  ▸ Sampling 100 query vectors … done (0.04s)
+  ▸ Computing ground truth (brute-force FlatIP, k=100, chunked) … done (0.13s)
+
+  Dataset
+    Base vectors :      170,666  ×  128d
+    Queries      :          100
+    RSS after load:      2.4 GB
+
+  Auto-params
+    nlist            :      1,652
+    ivf_train_size   :    105,728
+    pq_train_size    :    105,728
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  HNSW Flat  (HNSW32)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Adding 170,666 vectors … done (0.83s)
+
+  Memory
+    Index size (estimated)  :     127.6 MB   (784 bytes/vector)
+    Process RSS delta       : +   140.3 MB   (current RSS: 2.5 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  efSearch=16                               0.007   1.0000   0.9970   0.9147   0.0023
+  efSearch=32                               0.006   1.0000   0.9980   0.9736   0.0000
+  efSearch=64                               0.008   1.0000   1.0000   0.9939   0.0000
+  efSearch=128                              0.013   1.0000   1.0000   0.9993   0.0000
+  efSearch=256                              0.021   1.0000   1.0000   0.9997   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  HNSW + Scalar Quantizer  (HNSW16_SQ8)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training scalar quantizer … done (0.01s)
+  ▸ Adding 170,666 vectors … done (0.37s)
+
+  Memory
+    Index size (estimated)  :      44.3 MB   (272 bytes/vector)
+    Process RSS delta       : +    78.8 MB   (current RSS: 2.5 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  efSearch=16                               0.004   0.8700   0.9370   0.6564   0.0604
+  efSearch=32                               0.003   0.8800   0.9570   0.8432   0.0046
+  efSearch=64                               0.004   0.8800   0.9590   0.9580   0.0000
+  efSearch=128                              0.006   0.8800   0.9590   0.9812   0.0000
+  efSearch=256                              0.010   0.8800   0.9590   0.9854   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  IVF Flat  (IVF1652,Flat)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training IVF (1,652 centroids, 105,728 vectors) … done (5.29s)
+  ▸ Adding 170,666 vectors … done (0.93s)
+
+  Memory
+    Index size (estimated)  :      85.5 MB   (525 bytes/vector)
+    Process RSS delta       : +   157.0 MB   (current RSS: 2.6 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  nprobe=1                                  0.007   0.7100   0.6890   0.5003   0.0901
+  nprobe=4                                  0.007   0.9900   0.9530   0.8650   0.0000
+  nprobe=16                                 0.019   1.0000   0.9970   0.9857   0.0000
+  nprobe=64                                 0.066   1.0000   1.0000   0.9995   0.0000
+  nprobe=256                                0.261   1.0000   1.0000   1.0000   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  IVF Flat + HNSW Quantizer  (IVF1652_HNSW32,Flat)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training IVF+HNSW quantizer (1,652 centroids, 105,728 vectors) … done (4.89s)
+  ▸ Adding 170,666 vectors … done (0.15s)
+
+  Memory
+    Index size (estimated)  :      85.9 MB   (528 bytes/vector)
+    Process RSS delta       : +   128.0 MB   (current RSS: 2.6 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  nprobe=1  (quantizer efSearch=64)         0.006   0.7100   0.6890   0.5002   0.0900
+  nprobe=4  (quantizer efSearch=64)         0.007   0.9900   0.9540   0.8643   0.0000
+  nprobe=16  (quantizer efSearch=64)        0.019   1.0000   0.9960   0.9854   0.0000
+  nprobe=64  (quantizer efSearch=64)        0.067   1.0000   1.0000   0.9995   0.0000
+  nprobe=256  (quantizer efSearch=64)       0.252   1.0000   1.0000   1.0000   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  OPQ + IVF/HNSW + PQ fast-scan  (OPQ128_128,IVF1652_HNSW32,PQ128x4fsr)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training OPQ+IVF/HNSW+PQ (1,652 centroids, 105,728 vectors) … done (61.35s)
+  ▸ Adding 170,666 vectors … done (0.28s)
+
+  Memory
+    Index size (estimated)  :      14.7 MB   (90 bytes/vector)
+    Process RSS delta       : +    79.8 MB   (current RSS: 2.5 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  nprobe=1  (efSearch=64)                   0.005   0.5500   0.6070   0.4982   0.0894
+  nprobe=4  (efSearch=64)                   0.027   0.7300   0.8070   0.8434   0.0000
+  nprobe=16  (efSearch=64)                  0.006   0.7300   0.8320   0.9415   0.0000
+  nprobe=64  (efSearch=64)                  0.012   0.7300   0.8320   0.9494   0.0000
+  nprobe=256  (efSearch=64)                 0.024   0.7200   0.8260   0.9400   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  Memory Summary
+─────────────────────────────────────────────────────────────────────────────────────
+  Index                                Size    bytes/vec   vs raw f32
+  ──────────────────────────── ──────────── ──────────── ────────────
+  (raw float32 baseline)            83.3 MB          512        1.00x
+  hnsw                             127.6 MB          784        1.53x
+  hnsw_sq                           44.3 MB          272        0.53x
+  ivf                               85.5 MB          525        1.03x
+  ivf_hnsw_quantizer                85.9 MB          528        1.03x
+  opq_ivfhnsw_pq                    14.7 MB           90        0.18x
+
+═════════════════════════════════════════════════════════════════════════════════════
+  ALBUM
+
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  Data Loading
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Reading ..magic_falcon/embedding_album.parquet … done (3.71s)
+  ▸ Filtering with outs/index/filter/sim/index_filter_album.npy … done (1.36s)
+    4,725,761 → 1,431,033 (30.3%)
+  ▸ Extracting embedding matrix … done (0.38s)
+  ▸ L2-normalizing (cosine space) … done (0.04s)
+  ▸ Sampling 100 query vectors … done (0.25s)
+  ▸ Computing ground truth (brute-force FlatIP, k=100, chunked) … done (1.48s)
+
+  Dataset
+    Base vectors :    1,430,933  ×  128d
+    Queries      :          100
+    RSS after load:      5.4 GB
+
+  Auto-params
+    nlist            :      4,784
+    ivf_train_size   :    306,176
+    pq_train_size    :    306,176
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  HNSW Flat  (HNSW32)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Adding 1,430,933 vectors … done (15.13s)
+
+  Memory
+    Index size (estimated)  :       1.4 GB   (1024 bytes/vector)
+    Process RSS delta       : +     1.1 GB   (current RSS: 6.5 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  efSearch=16                               0.017   1.0000   0.9910   0.8839   0.0000
+  efSearch=32                               0.016   1.0000   0.9970   0.9640   0.0000
+  efSearch=64                               0.022   1.0000   1.0000   0.9914   0.0000
+  efSearch=128                              0.035   1.0000   1.0000   0.9985   0.0000
+  efSearch=256                              0.055   1.0000   1.0000   0.9997   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  HNSW + Scalar Quantizer  (HNSW16_SQ8)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training scalar quantizer … done (0.04s)
+  ▸ Adding 1,430,933 vectors … done (5.68s)
+
+  Memory
+    Index size (estimated)  :     524.0 MB   (384 bytes/vector)
+    Process RSS delta       : +   404.2 MB   (current RSS: 5.8 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  efSearch=16                               0.133   0.7900   0.8680   0.6694   0.0208
+  efSearch=32                               0.124   0.8000   0.8940   0.8301   0.0005
+  efSearch=64                               0.127   0.8100   0.9000   0.9254   0.0000
+  efSearch=128                              0.129   0.8200   0.9110   0.9608   0.0000
+  efSearch=256                              0.145   0.8200   0.9120   0.9661   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  IVF Flat  (IVF4784,Flat)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training IVF (4,784 centroids, 306,176 vectors) … done (45.22s)
+  ▸ Adding 1,430,933 vectors … done (20.97s)
+
+  Memory
+    Index size (estimated)  :     709.6 MB   (520 bytes/vector)
+    Process RSS delta       : +   196.1 MB   (current RSS: 5.6 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  nprobe=1                                  0.037   0.7000   0.6460   0.5596   0.0050
+  nprobe=4                                  0.024   0.9400   0.9350   0.8878   0.0000
+  nprobe=16                                 0.071   1.0000   0.9930   0.9827   0.0000
+  nprobe=64                                 0.259   1.0000   1.0000   0.9988   0.0000
+  nprobe=256                                0.967   1.0000   1.0000   0.9999   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  IVF Flat + HNSW Quantizer  (IVF4784_HNSW32,Flat)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training IVF+HNSW quantizer (4,784 centroids, 306,176 vectors) … done (40.14s)
+  ▸ Adding 1,430,933 vectors … done (0.99s)
+
+  Memory
+    Index size (estimated)  :     709.6 MB   (520 bytes/vector)
+    Process RSS delta       : +   170.8 MB   (current RSS: 5.6 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  nprobe=1  (quantizer efSearch=64)         0.067   0.7000   0.6460   0.5595   0.0057
+  nprobe=4  (quantizer efSearch=64)         0.064   0.9400   0.9350   0.8873   0.0000
+  nprobe=16  (quantizer efSearch=64)        0.087   1.0000   0.9930   0.9824   0.0000
+  nprobe=64  (quantizer efSearch=64)        0.252   1.0000   1.0000   0.9987   0.0000
+  nprobe=256  (quantizer efSearch=64)       0.901   1.0000   1.0000   0.9998   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  OPQ + IVF/HNSW + PQ fast-scan  (OPQ128_128,IVF4784_HNSW32,PQ128x4fsr)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training OPQ+IVF/HNSW+PQ (4,784 centroids, 306,176 vectors) … done (113.10s)
+  ▸ Adding 1,430,933 vectors … done (2.33s)
+
+  Memory
+    Index size (estimated)  :     106.5 MB   (78 bytes/vector)
+    Process RSS delta       : +   193.5 MB   (current RSS: 5.6 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  nprobe=1  (efSearch=64)                   0.008   0.4100   0.5320   0.5277   0.0054
+  nprobe=4  (efSearch=64)                   0.028   0.5200   0.7140   0.8071   0.0000
+  nprobe=16  (efSearch=64)                  0.013   0.5400   0.7440   0.8723   0.0000
+  nprobe=64  (efSearch=64)                  0.032   0.5300   0.7460   0.8809   0.0000
+  nprobe=256  (efSearch=64)                 0.102   0.5300   0.7390   0.8735   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  Memory Summary
+─────────────────────────────────────────────────────────────────────────────────────
+  Index                                Size    bytes/vec   vs raw f32
+  ──────────────────────────── ──────────── ──────────── ────────────
+  (raw float32 baseline)           698.7 MB          512        1.00x
+  hnsw                               1.4 GB         1024        2.00x
+  hnsw_sq                          524.0 MB          384        0.75x
+  ivf                              709.6 MB          520        1.02x
+  ivf_hnsw_quantizer               709.6 MB          520        1.02x
+  opq_ivfhnsw_pq                   106.5 MB           78        0.15x
+
+═════════════════════════════════════════════════════════════════════════════════════
+  LABEL
+
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  Data Loading
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Reading ..magic_falcon/embedding_label.parquet … done (0.69s)
+  ▸ Filtering with outs/index/filter/sim/index_filter_label.npy … done (0.04s)
+    767,525 → 27,301 (3.6%)
+  ▸ Extracting embedding matrix … done (0.01s)
+  ▸ L2-normalizing (cosine space) … done (0.01s)
+  ▸ Sampling 100 query vectors … done (0.04s)
+  ▸ Computing ground truth (brute-force FlatIP, k=100, chunked) … done (0.08s)
+
+  Dataset
+    Base vectors :       27,201  ×  128d
+    Queries      :          100
+    RSS after load:      4.8 GB
+
+  Auto-params
+    nlist            :        659
+    ivf_train_size   :     27,201
+    pq_train_size    :     27,201
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  HNSW Flat  (HNSW32)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Adding 27,201 vectors … done (0.27s)
+
+  Memory
+    Index size (estimated)  :      20.3 MB   (784 bytes/vector)
+    Process RSS delta       : +    64.0 MB   (current RSS: 4.8 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  efSearch=16                               0.404   0.9900   0.9940   0.8937   0.0036
+  efSearch=32                               0.487   0.9900   0.9980   0.9676   0.0009
+  efSearch=64                               0.407   0.9900   0.9990   0.9943   0.0000
+  efSearch=128                              0.432   1.0000   1.0000   0.9985   0.0000
+  efSearch=256                              0.303   1.0000   1.0000   0.9997   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  HNSW + Scalar Quantizer  (HNSW16_SQ8)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training scalar quantizer … done (0.00s)
+  ▸ Adding 27,201 vectors … done (0.13s)
+
+  Memory
+    Index size (estimated)  :       7.1 MB   (272 bytes/vector)
+    Process RSS delta       : +    28.3 MB   (current RSS: 4.8 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  efSearch=16                               0.101   0.9500   0.9620   0.6344   0.0956
+  efSearch=32                               0.124   0.9600   0.9760   0.8269   0.0089
+  efSearch=64                               0.124   0.9600   0.9780   0.9655   0.0000
+  efSearch=128                              0.125   0.9600   0.9790   0.9914   0.0000
+  efSearch=256                              0.128   0.9600   0.9790   0.9937   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  IVF Flat  (IVF659,Flat)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training IVF (659 centroids, 27,201 vectors) … done (0.61s)
+  ▸ Adding 27,201 vectors … done (0.06s)
+
+  Memory
+    Index size (estimated)  :      13.8 MB   (533 bytes/vector)
+    Process RSS delta       : +    63.9 MB   (current RSS: 4.8 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  nprobe=1                                  0.007   0.7200   0.6350   0.3269   0.5286
+  nprobe=4                                  0.005   0.9800   0.9260   0.7423   0.0071
+  nprobe=16                                 0.021   0.9900   0.9940   0.9547   0.0000
+  nprobe=64                                 0.014   1.0000   1.0000   0.9982   0.0000
+  nprobe=256                                0.028   1.0000   1.0000   1.0000   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  IVF Flat + HNSW Quantizer  (IVF659_HNSW32,Flat)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training IVF+HNSW quantizer (659 centroids, 27,201 vectors) … done (0.50s)
+  ▸ Adding 27,201 vectors … done (0.02s)
+
+  Memory
+    Index size (estimated)  :      14.0 MB   (539 bytes/vector)
+    Process RSS delta       : +    66.7 MB   (current RSS: 4.8 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  nprobe=1  (quantizer efSearch=64)         0.007   0.7200   0.6350   0.3269   0.5284
+  nprobe=4  (quantizer efSearch=64)         0.006   0.9800   0.9260   0.7423   0.0071
+  nprobe=16  (quantizer efSearch=64)        0.009   0.9900   0.9940   0.9547   0.0000
+  nprobe=64  (quantizer efSearch=64)        0.015   1.0000   1.0000   0.9981   0.0000
+  nprobe=256  (quantizer efSearch=64)       0.027   1.0000   1.0000   1.0000   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  OPQ + IVF/HNSW + PQ fast-scan  (OPQ128_128,IVF659_HNSW32,PQ128x4fsr)
+─────────────────────────────────────────────────────────────────────────────────────
+  ▸ Training OPQ+IVF/HNSW+PQ (659 centroids, 27,201 vectors) … done (36.47s)
+  ▸ Adding 27,201 vectors … done (0.04s)
+
+  Memory
+    Index size (estimated)  :       3.1 MB   (119 bytes/vector)
+    Process RSS delta       : +    72.8 MB   (current RSS: 4.8 GB)
+
+  Parameters                             ms/query      R@1     R@10    R@100  missing
+  ──────────────────────────────────── ────────── ──────── ──────── ──────── ────────
+  nprobe=1  (efSearch=64)                   0.055   0.5400   0.6010   0.3269   0.5288
+  nprobe=4  (efSearch=64)                   0.005   0.6900   0.8420   0.7384   0.0071
+  nprobe=16  (efSearch=64)                  0.043   0.7000   0.8950   0.9317   0.0000
+  nprobe=64  (efSearch=64)                  0.078   0.7000   0.9000   0.9599   0.0000
+  nprobe=256  (efSearch=64)                 0.043   0.7000   0.9000   0.9604   0.0000
+
+─────────────────────────────────────────────────────────────────────────────────────
+  ◆  Memory Summary
+─────────────────────────────────────────────────────────────────────────────────────
+  Index                                Size    bytes/vec   vs raw f32
+  ──────────────────────────── ──────────── ──────────── ────────────
+  (raw float32 baseline)            13.3 MB          512        1.00x
+  hnsw                              20.3 MB          784        1.53x
+  hnsw_sq                            7.1 MB          272        0.53x
+  ivf                               13.8 MB          533        1.04x
+  ivf_hnsw_quantizer                14.0 MB          539        1.05x
+  opq_ivfhnsw_pq                     3.1 MB          119        0.23x
+
+─────────────────────────────────────────────────────────────────────────────────────
+  Total wall time: 871.0s
+─────────────────────────────────────────────────────────────────────────────────────
