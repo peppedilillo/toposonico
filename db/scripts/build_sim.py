@@ -8,20 +8,24 @@ Usage:
     uv run python scripts/build_sim.py --manifest path/to/manifest.toml
     uv run python scripts/build_sim.py --overwrite
 """
+
 import argparse
 import os
 import time
 
 import numpy as np
 
-from src.sim import (
-    track_spec, album_spec, artist_spec, label_spec,
-    load_filtered_embeddings, train_index, save_index,
-)
-from src.utils import (
-    read_manifest, get_index_filter_sim_paths, get_index_faiss_paths,
-    ENTITY_KEYS as EKEYS,
-)
+from src.sim import album_spec
+from src.sim import artist_spec
+from src.sim import label_spec
+from src.sim import load_filtered_embeddings
+from src.sim import save_index
+from src.sim import track_spec
+from src.sim import train_index
+from src.utils import ENTITY_KEYS as EKEYS
+from src.utils import get_index_faiss_paths
+from src.utils import get_index_filter_sim_paths
+from src.utils import read_manifest
 
 
 def build_entity(spec, embedding_path, rowid_col, out_path):

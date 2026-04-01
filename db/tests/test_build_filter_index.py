@@ -1,13 +1,15 @@
 import importlib.util
-import sys
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
 
 from src import filters as f
-from src.utils import ENTITY_KEYS as EKEYS, EntityIndex, EntityPaths, EntityTable
-
+from src.utils import ENTITY_KEYS as EKEYS
+from src.utils import EntityIndex
+from src.utils import EntityPaths
+from src.utils import EntityTable
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "build_filter_index.py"

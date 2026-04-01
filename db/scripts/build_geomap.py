@@ -22,15 +22,16 @@ from typing import Sequence
 
 import pandas as pd
 
-from src.utils import get_geo_paths, read_manifest
 from src.utils import ENTITY_KEYS as EKEYS
+from src.utils import get_geo_paths
+from src.utils import read_manifest
 
 
 def umap2geo(
     umap_frames: Sequence[tuple[pd.DataFrame, str]],
     max_lon: float = 22.5,
     max_lat: float = 22.5,
-    padding: float = 1.,
+    padding: float = 1.0,
 ) -> list[pd.DataFrame]:
     """Map UMAP coordinates to fake lon/lat using a shared bounding box.
 
@@ -113,17 +114,20 @@ def main():
     manifest = read_manifest(args.manifest)
     umap = manifest["umap"]
     geo_paths = get_geo_paths()
-    hwidth = args.width / 2.
+    hwidth = args.width / 2.0
 
     umap_frames = [
-        (pd.read_parquet(umap.track,  columns=[EKEYS.track,  "umap_x", "umap_y"]), EKEYS.track),
+        (pd.read_parquet(umap.track, columns=[EKEYS.track, "umap_x", "umap_y"]), EKEYS.track),
         (pd.read_parquet(umap.artist, columns=[EKEYS.artist, "umap_x", "umap_y"]), EKEYS.artist),
-        (pd.read_parquet(umap.album,  columns=[EKEYS.album,  "umap_x", "umap_y"]), EKEYS.album),
-        (pd.read_parquet(umap.label,  columns=[EKEYS.label,  "umap_x", "umap_y"]), EKEYS.label),
+        (pd.read_parquet(umap.album, columns=[EKEYS.album, "umap_x", "umap_y"]), EKEYS.album),
+        (pd.read_parquet(umap.label, columns=[EKEYS.label, "umap_x", "umap_y"]), EKEYS.label),
     ]
 
     track_geo, artist_geo, album_geo, label_geo = umap2geo(
-        umap_frames, max_lon=hwidth, max_lat=hwidth, padding=args.padding,
+        umap_frames,
+        max_lon=hwidth,
+        max_lat=hwidth,
+        padding=args.padding,
     )
 
     track_geo.to_parquet(geo_paths.track, index=False)

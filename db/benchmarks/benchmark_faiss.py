@@ -31,25 +31,32 @@ from pathlib import Path
 import sys
 import time
 
-import numpy as np
 import faiss
+import numpy as np
 import pandas as pd
 
-from src.utils import ENTITIES, ENTITY_KEYS, get_index_filter_sim_paths, read_manifest
+from src.utils import ENTITIES
+from src.utils import ENTITY_KEYS
+from src.utils import get_index_filter_sim_paths
+from src.utils import read_manifest
 
 K = 100
 SEED = 666
 
 ALL_BENCHMARKS = [
-    "hnsw", "hnsw_sq", "ivf", "ivf_hnsw_quantizer", "opq_ivfhnsw_pq",
+    "hnsw",
+    "hnsw_sq",
+    "ivf",
+    "ivf_hnsw_quantizer",
+    "opq_ivfhnsw_pq",
 ]
 
-BOLD  = "\033[1m"
+BOLD = "\033[1m"
 DIM_C = "\033[2m"
-CYAN  = "\033[36m"
+CYAN = "\033[36m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
-RED   = "\033[31m"
+RED = "\033[31m"
 RESET = "\033[0m"
 
 HLINE = f"{DIM_C}{'─' * 85}{RESET}"
@@ -59,22 +66,22 @@ def compute_params(n: int, dim: int) -> dict:
     """Derive build and sweep parameters from dataset shape."""
     nlist = int(np.clip(4 * np.sqrt(n), 256, 16384))
 
-    ivf_train_size    = min(n, 64 * nlist)
-    pq_train_size     = min(n, max(64 * nlist, 50_000))
+    ivf_train_size = min(n, 64 * nlist)
+    pq_train_size = min(n, max(64 * nlist, 50_000))
 
-    M_pq    = 128
-    d_opq   = 128
+    M_pq = 128
+    d_opq = 128
 
     return {
         "nlist": nlist,
         "dim": dim,
         "n": n,
-        "ivf_train_size":    ivf_train_size,
-        "pq_train_size":     pq_train_size,
-        "M_pq":   M_pq,
+        "ivf_train_size": ivf_train_size,
+        "pq_train_size": pq_train_size,
+        "M_pq": M_pq,
         "d_opq": d_opq,
-        "ef_search_values":         (16, 32, 64, 128, 256),
-        "nprobe_values":            (1, 4, 16, 64, 256),
+        "ef_search_values": (16, 32, 64, 128, 256),
+        "nprobe_values": (1, 4, 16, 64, 256),
     }
 
 
@@ -89,6 +96,8 @@ def subsample_training(xb: np.ndarray, max_size: int, seed: int = SEED) -> np.nd
 
 
 _LIBC = None
+
+
 def _get_libc():
     global _LIBC
     if _LIBC is None:
@@ -166,6 +175,7 @@ def get_rss_bytes() -> int:
     except FileNotFoundError:
         pass
     import resource
+
     ru = resource.getrusage(resource.RUSAGE_SELF)
     if sys.platform == "darwin":
         return ru.ru_maxrss
@@ -180,11 +190,14 @@ def print_memory(index, rss_before: int) -> int:
     per_vec = idx_bytes / max(index.ntotal, 1)
 
     print(f"\n  {BOLD}Memory{RESET}")
-    print(f"    Index size (estimated)  : {CYAN}{format_bytes(idx_bytes):>12}{RESET}"
-          f"   ({per_vec:.0f} bytes/vector)")
+    print(
+        f"    Index size (estimated)  : {CYAN}{format_bytes(idx_bytes):>12}{RESET}" f"   ({per_vec:.0f} bytes/vector)"
+    )
     sign = "+" if rss_delta >= 0 else ""
-    print(f"    Process RSS delta       : {CYAN}{sign}{format_bytes(rss_delta):>11}{RESET}"
-          f"   (current RSS: {format_bytes(rss_after)})")
+    print(
+        f"    Process RSS delta       : {CYAN}{sign}{format_bytes(rss_delta):>11}{RESET}"
+        f"   (current RSS: {format_bytes(rss_after)})"
+    )
     return idx_bytes
 
 
@@ -233,15 +246,14 @@ def evaluate(index, xq: np.ndarray, gt: np.ndarray, k: int, label: str) -> None:
     ms_per_q = elapsed * 1000.0 / nq
     missing = (I == -1).sum() / float(k * nq)
 
-    r1  = (I[:, :1]   == gt[:, :1]).sum()   / float(nq)
-    r10 = sum(len(set(I[i, :10])  & set(gt[i, :10]))  for i in range(nq)) / (nq * min(k, 10))
+    r1 = (I[:, :1] == gt[:, :1]).sum() / float(nq)
+    r10 = sum(len(set(I[i, :10]) & set(gt[i, :10])) for i in range(nq)) / (nq * min(k, 10))
     r100 = sum(len(set(I[i, :100]) & set(gt[i, :100])) for i in range(nq)) / (nq * min(k, 100))
 
     print_result(label, ms_per_q, r1, r10, r100, missing)
 
 
-def compute_groundtruth_chunked(xb: np.ndarray, xq: np.ndarray, k: int,
-                                 chunk_size: int = 500_000) -> np.ndarray:
+def compute_groundtruth_chunked(xb: np.ndarray, xq: np.ndarray, k: int, chunk_size: int = 500_000) -> np.ndarray:
     """Compute exact k-NN ground truth in database chunks to avoid OOM."""
     nq, dim = xq.shape
     n = xb.shape[0]
@@ -269,8 +281,9 @@ def compute_groundtruth_chunked(xb: np.ndarray, xq: np.ndarray, k: int,
     return all_I
 
 
-def load_filtered_data(embedding_path: str | Path, filter_index_path: str | Path,
-                       rowid_col: str, n_query: int, k: int, seed: int = SEED):
+def load_filtered_data(
+    embedding_path: str | Path, filter_index_path: str | Path, rowid_col: str, n_query: int, k: int, seed: int = SEED
+):
     """Load an embedding parquet, filter to surviving rowids, prepare benchmark data."""
     header("Data Loading")
 
@@ -337,7 +350,9 @@ def bench_hnsw(xb, xq, gt, k, params):
     index = faiss.index_factory(dim, "HNSW32", faiss.METRIC_INNER_PRODUCT)
 
     step(f"Adding {n:,} vectors")
-    t = time.time(); index.add(xb); done(time.time() - t)
+    t = time.time()
+    index.add(xb)
+    done(time.time() - t)
 
     idx_bytes = print_memory(index, rss0)
     print_table_header()
@@ -345,7 +360,8 @@ def bench_hnsw(xb, xq, gt, k, params):
         index.hnsw.efSearch = ef
         evaluate(index, xq, gt, k, f"efSearch={ef}")
 
-    del index; free_memory()
+    del index
+    free_memory()
     return idx_bytes
 
 
@@ -358,10 +374,14 @@ def bench_hnsw_sq(xb, xq, gt, k, params):
     index = faiss.index_factory(dim, "HNSW16_SQ8", faiss.METRIC_INNER_PRODUCT)
 
     step("Training scalar quantizer")
-    t = time.time(); index.train(xb); done(time.time() - t)
+    t = time.time()
+    index.train(xb)
+    done(time.time() - t)
 
     step(f"Adding {n:,} vectors")
-    t = time.time(); index.add(xb); done(time.time() - t)
+    t = time.time()
+    index.add(xb)
+    done(time.time() - t)
 
     idx_bytes = print_memory(index, rss0)
     print_table_header()
@@ -369,7 +389,8 @@ def bench_hnsw_sq(xb, xq, gt, k, params):
         index.hnsw.efSearch = ef
         evaluate(index, xq, gt, k, f"efSearch={ef}")
 
-    del index; free_memory()
+    del index
+    free_memory()
     return idx_bytes
 
 
@@ -385,11 +406,15 @@ def bench_ivf(xb, xq, gt, k, params):
 
     xt = subsample_training(xb, params["ivf_train_size"])
     step(f"Training IVF ({nlist:,} centroids, {len(xt):,} vectors)")
-    t = time.time(); index.train(xt); done(time.time() - t)
+    t = time.time()
+    index.train(xt)
+    done(time.time() - t)
     del xt
 
     step(f"Adding {n:,} vectors")
-    t = time.time(); index.add(xb); done(time.time() - t)
+    t = time.time()
+    index.add(xb)
+    done(time.time() - t)
 
     idx_bytes = print_memory(index, rss0)
     print_table_header()
@@ -397,7 +422,8 @@ def bench_ivf(xb, xq, gt, k, params):
         index.nprobe = nprobe
         evaluate(index, xq, gt, k, f"nprobe={nprobe}")
 
-    del index; free_memory()
+    del index
+    free_memory()
     return idx_bytes
 
 
@@ -413,11 +439,15 @@ def bench_ivf_hnsw_quantizer(xb, xq, gt, k, params):
 
     xt = subsample_training(xb, params["ivf_train_size"])
     step(f"Training IVF+HNSW quantizer ({nlist:,} centroids, {len(xt):,} vectors)")
-    t = time.time(); index.train(xt); done(time.time() - t)
+    t = time.time()
+    index.train(xt)
+    done(time.time() - t)
     del xt
 
     step(f"Adding {n:,} vectors")
-    t = time.time(); index.add(xb); done(time.time() - t)
+    t = time.time()
+    index.add(xb)
+    done(time.time() - t)
 
     idx_bytes = print_memory(index, rss0)
     quantizer = faiss.downcast_index(index.quantizer)
@@ -428,15 +458,16 @@ def bench_ivf_hnsw_quantizer(xb, xq, gt, k, params):
         index.nprobe = nprobe
         evaluate(index, xq, gt, k, f"nprobe={nprobe}  (quantizer efSearch={efSearch})")
 
-    del index; free_memory()
+    del index
+    free_memory()
     return idx_bytes
 
 
 def bench_opq_ivfhnsw_pq(xb, xq, gt, k, params):
     nlist = params["nlist"]
-    M_pq  = params["M_pq"]
+    M_pq = params["M_pq"]
     d_opq = params["d_opq"]
-    dim   = params["dim"]
+    dim = params["dim"]
     factory = f"OPQ{M_pq}_{d_opq},IVF{nlist}_HNSW32,PQ{M_pq}x4fsr"
     header(f"OPQ + IVF/HNSW + PQ fast-scan  ({factory})")
     n = xb.shape[0]
@@ -447,34 +478,39 @@ def bench_opq_ivfhnsw_pq(xb, xq, gt, k, params):
 
     xt = subsample_training(xb, params["pq_train_size"])
     step(f"Training OPQ+IVF/HNSW+PQ ({nlist:,} centroids, {len(xt):,} vectors)")
-    t = time.time(); index.train(xt); done(time.time() - t)
+    t = time.time()
+    index.train(xt)
+    done(time.time() - t)
     del xt
 
     step(f"Adding {n:,} vectors")
-    t = time.time(); index.add(xb); done(time.time() - t)
+    t = time.time()
+    index.add(xb)
+    done(time.time() - t)
 
     idx_bytes = print_memory(index, rss0)
     ivf = faiss.extract_index_ivf(index)
     quantizer = faiss.downcast_index(ivf.quantizer)
-    efSearch=64
+    efSearch = 64
     quantizer.hnsw.efSearch = efSearch
     print_table_header()
     for nprobe in params["nprobe_values"]:
         ivf.nprobe = nprobe
         evaluate(index, xq, gt, k, f"nprobe={nprobe}  (efSearch={efSearch})")
 
-    del index; free_memory()
+    del index
+    free_memory()
     return idx_bytes
 
 
 def run_benchmarks(xb, xq, gt, k, params, benchmark_names):
     """Run selected benchmarks and return (name, idx_bytes) pairs."""
     dispatch = {
-        "hnsw":                lambda: bench_hnsw(xb, xq, gt, k, params),
-        "hnsw_sq":             lambda: bench_hnsw_sq(xb, xq, gt, k, params),
-        "ivf":                 lambda: bench_ivf(xb, xq, gt, k, params),
-        "ivf_hnsw_quantizer":  lambda: bench_ivf_hnsw_quantizer(xb, xq, gt, k, params),
-        "opq_ivfhnsw_pq":       lambda: bench_opq_ivfhnsw_pq(xb, xq, gt, k, params),
+        "hnsw": lambda: bench_hnsw(xb, xq, gt, k, params),
+        "hnsw_sq": lambda: bench_hnsw_sq(xb, xq, gt, k, params),
+        "ivf": lambda: bench_ivf(xb, xq, gt, k, params),
+        "ivf_hnsw_quantizer": lambda: bench_ivf_hnsw_quantizer(xb, xq, gt, k, params),
+        "opq_ivfhnsw_pq": lambda: bench_opq_ivfhnsw_pq(xb, xq, gt, k, params),
     }
     mem_stats: list[tuple[str, int]] = []
     for name in benchmark_names:
@@ -488,8 +524,7 @@ def print_memory_summary(mem_stats, n_base, dim):
     header("Memory Summary")
     print(f"  {'Index':<28} {'Size':>12} {'bytes/vec':>12} {'vs raw f32':>12}")
     print(f"  {'─' * 28} {'─' * 12} {'─' * 12} {'─' * 12}")
-    print(f"  {'(raw float32 baseline)':<28} {format_bytes(raw_bytes):>12}"
-          f" {dim * 4:>12.0f} {'1.00x':>12}")
+    print(f"  {'(raw float32 baseline)':<28} {format_bytes(raw_bytes):>12}" f" {dim * 4:>12.0f} {'1.00x':>12}")
     for name, nbytes in mem_stats:
         per_vec = nbytes / max(n_base, 1)
         ratio = nbytes / raw_bytes
@@ -515,13 +550,15 @@ def main():
         metavar="ENTITY",
         help=f"Entities to benchmark (default: all). Choices: {', '.join(ENTITIES)}",
     )
-    parser.add_argument("--n-query", type=int, default=1000,
-                        help="Query vectors sampled from base (default: 1000)")
-    parser.add_argument("benchmarks", nargs="*", default=ALL_BENCHMARKS,
-                        metavar="benchmark",
-                        help=f"Subset to run (default: all). Choices: {', '.join(ALL_BENCHMARKS)}")
-    parser.add_argument("--raw", action="store_true",
-                        help="Disable ANSI escape code formatting")
+    parser.add_argument("--n-query", type=int, default=1000, help="Query vectors sampled from base (default: 1000)")
+    parser.add_argument(
+        "benchmarks",
+        nargs="*",
+        default=ALL_BENCHMARKS,
+        metavar="benchmark",
+        help=f"Subset to run (default: all). Choices: {', '.join(ALL_BENCHMARKS)}",
+    )
+    parser.add_argument("--raw", action="store_true", help="Disable ANSI escape code formatting")
     args = parser.parse_args()
 
     if args.raw:

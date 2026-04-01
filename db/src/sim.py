@@ -6,13 +6,13 @@ Each entity gets a different index type based on its scale:
 - artist: IVF with HNSW quantizer, flat vectors
 - label : IVF with flat quantizer, flat vectors
 """
+
 from dataclasses import dataclass
 from pathlib import Path
 
 import faiss
 import numpy as np
 import pandas as pd
-
 
 EMBEDDING_DIM = 128
 SEED = 666
@@ -38,6 +38,7 @@ def subsample_training(xb: np.ndarray, max_size: int) -> np.ndarray:
 @dataclass
 class SimIndexSpec:
     """Specification for a single entity's FAISS similarity index."""
+
     entity: str
     factory_string: str
     filter_index: np.ndarray

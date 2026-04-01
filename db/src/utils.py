@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
-from typing import NamedTuple
 import tomllib
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -110,9 +110,7 @@ def check_manifest(
             all_paths.extend(val.values())
     missing = [p for p in all_paths if not p.is_file()]
     if missing:
-        raise ValueError(
-            "Manifest paths not found:\n" + "\n".join(f"  {p}" for p in missing)
-        )
+        raise ValueError("Manifest paths not found:\n" + "\n".join(f"  {p}" for p in missing))
 
 
 def get_geo_paths() -> EntityPaths:
@@ -153,6 +151,7 @@ def get_index_faiss_paths() -> EntityPaths:
         p = Path(v)
         p.parent.mkdir(parents=True, exist_ok=True)
         return p
+
     return EntityPaths(
         track=_path("SICK_INDEX_FAISS_TRACK"),
         artist=_path("SICK_INDEX_FAISS_ARTIST"),

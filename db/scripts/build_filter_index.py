@@ -2,6 +2,7 @@
 Builds "concentric" indexes for tracks to include in db and similarity indexes.
 Contract: a track in a similarity index should always be in db index too.
 """
+
 import argparse
 import os
 from pathlib import Path
@@ -10,9 +11,15 @@ import numpy as np
 import pandas as pd
 
 from src import filters as f
-from src.utils import read_manifest, get_index_filter_sim_paths, get_index_filter_db_paths, EntityPaths, EntityTable, EntityIndex, _get_config_int, _get_config_float
+from src.utils import _get_config_float
+from src.utils import _get_config_int
 from src.utils import ENTITY_KEYS as EKEYS
-
+from src.utils import EntityIndex
+from src.utils import EntityPaths
+from src.utils import EntityTable
+from src.utils import get_index_filter_db_paths
+from src.utils import get_index_filter_sim_paths
+from src.utils import read_manifest
 
 INDEX_FILTER_DB_LABEL_MIN_NARTIST = _get_config_int("SICK_INDEX_FILTER_DB_LABEL_MIN_NARTIST")
 INDEX_FILTER_DB_ARTIST_MIN_NTRACK = _get_config_int("SICK_INDEX_FILTER_DB_ARTIST_MIN_NTRACK")
@@ -53,19 +60,27 @@ def build_indexes(manifest_path: Path | str):
 
     print("Building DB filter indexes...")
     lookups = f.filter_cascade(
-        lookups.track, lambda df: f.filter_track(df, INDEX_FILTER_DB_TRACK_MIN_LOGCOUNT),
-        lookups.album, lambda df: f.filter_album(df, INDEX_FILTER_DB_ALBUM_MIN_TOTAL_TRACKS),
-        lookups.artist, lambda df: f.filter_artist(df, INDEX_FILTER_DB_ARTIST_MIN_NTRACK),
-        lookups.label, lambda df: f.filter_label(df, INDEX_FILTER_DB_LABEL_MIN_NARTIST),
+        lookups.track,
+        lambda df: f.filter_track(df, INDEX_FILTER_DB_TRACK_MIN_LOGCOUNT),
+        lookups.album,
+        lambda df: f.filter_album(df, INDEX_FILTER_DB_ALBUM_MIN_TOTAL_TRACKS),
+        lookups.artist,
+        lambda df: f.filter_artist(df, INDEX_FILTER_DB_ARTIST_MIN_NTRACK),
+        lookups.label,
+        lambda df: f.filter_label(df, INDEX_FILTER_DB_LABEL_MIN_NARTIST),
     )
     indexes_db = lookup2index(lookups)
 
     print("Building SIM filter indexes...")
     lookups = f.filter_separate(
-        lookups.track, lambda df: f.filter_track(df, INDEX_FILTER_TRACK_MIN_LOGCOUNT),
-        lookups.album, lambda x: x,
-        lookups.artist, lambda x: x,
-        lookups.label, lambda x: x,
+        lookups.track,
+        lambda df: f.filter_track(df, INDEX_FILTER_TRACK_MIN_LOGCOUNT),
+        lookups.album,
+        lambda x: x,
+        lookups.artist,
+        lambda x: x,
+        lookups.label,
+        lambda x: x,
     )
     indexes_sim = lookup2index(lookups)
 
