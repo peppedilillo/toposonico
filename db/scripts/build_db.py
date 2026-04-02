@@ -1,0 +1,668 @@
+#!/usr/bin/env python3
+"""Build the SQLite database from parquet inputs.
+
+Loads lookup parquets (via manifest), geo parquets, and DB filter indices to
+produce a single SQLite DB with:
+- Denormalized entity metadata for map navigation and search
+- Per-entity embedding tables (L2-normalized BLOBs) for FAISS queries
+- Ranked representative children for hierarchy navigation
+
+All entity metadata comes from the ml lookups — no source Spotify DB needed.
+
+Usage:
+    source config.env && uv run python scripts/build_db.py [options]
+
+Examples:
+    source config.env && uv run python scripts/build_db.py
+    uv run python scripts/build_db.py --manifest ml/outs/manifest.toml --db outs/sick.db
+"""
+
+import argparse
+import os
+import re
+import sqlite3
+import time
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pyarrow.parquet as pq
+
+from src.utils import ENTITY_KEYS as EKEYS
+from src.utils import EntityPaths
+from src.utils import get_geo_paths
+from src.utils import get_index_filter_db_paths
+from src.utils import read_manifest
+
+
+BATCH_SIZE = 500_000
+REPRESENTATIVE_COUNT = 5
+
+DDL = """
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous  = NORMAL;
+
+CREATE TABLE tracks (
+    track_rowid      INTEGER PRIMARY KEY,
+    track_name       TEXT    NOT NULL,
+    track_popularity INTEGER,
+    logcount         REAL    NOT NULL,
+    release_date     TEXT,
+    id_isrc          TEXT,
+    lon              REAL    NOT NULL,
+    lat              REAL    NOT NULL,
+    artist_rowid     INTEGER NOT NULL,
+    artist_name      TEXT,
+    artist_lon       REAL,
+    artist_lat       REAL,
+    album_rowid      INTEGER NOT NULL,
+    album_name       TEXT,
+    album_lon        REAL,
+    album_lat        REAL,
+    label_rowid      INTEGER,
+    label            TEXT,
+    label_lon        REAL,
+    label_lat        REAL
+);
+
+CREATE TABLE albums (
+    album_rowid              INTEGER PRIMARY KEY,
+    album_canonical_rowid    INTEGER NOT NULL,
+    album_name               TEXT    NOT NULL,
+    album_name_norm          TEXT    NOT NULL,
+    logcount                 REAL    NOT NULL,
+    lon                      REAL    NOT NULL,
+    lat                      REAL    NOT NULL,
+    artist_rowid             INTEGER NOT NULL,
+    artist_name              TEXT,
+    artist_lon               REAL,
+    artist_lat               REAL,
+    album_type               TEXT,
+    label                    TEXT,
+    total_tracks             INTEGER,
+    release_date             TEXT,
+    release_date_precision   TEXT,
+    label_rowid              INTEGER,
+    label_lon                REAL,
+    label_lat                REAL
+);
+
+CREATE TABLE artists (
+    artist_rowid  INTEGER PRIMARY KEY,
+    artist_name   TEXT    NOT NULL,
+    artist_genre  TEXT,
+    logcount      REAL    NOT NULL,
+    ntrack        INTEGER,
+    nalbum        INTEGER,
+    lon           REAL    NOT NULL,
+    lat           REAL    NOT NULL
+);
+
+CREATE TABLE labels (
+    label_rowid  INTEGER PRIMARY KEY,
+    label        TEXT    NOT NULL UNIQUE,
+    logcount     REAL    NOT NULL,
+    ntrack       INTEGER,
+    nalbum       INTEGER,
+    nartist      INTEGER,
+    lon          REAL    NOT NULL,
+    lat          REAL    NOT NULL
+);
+
+CREATE TABLE track_embedding (
+    track_rowid INTEGER PRIMARY KEY,
+    embedding   BLOB    NOT NULL
+);
+
+CREATE TABLE album_embedding (
+    album_rowid INTEGER PRIMARY KEY,
+    embedding   BLOB    NOT NULL
+);
+
+CREATE TABLE artist_embedding (
+    artist_rowid INTEGER PRIMARY KEY,
+    embedding    BLOB    NOT NULL
+);
+
+CREATE TABLE label_embedding (
+    label_rowid INTEGER PRIMARY KEY,
+    embedding   BLOB    NOT NULL
+);
+
+CREATE TABLE album_repr_tracks (
+    album_rowid INTEGER NOT NULL,
+    rank        INTEGER NOT NULL,
+    track_rowid INTEGER NOT NULL,
+    score       REAL    NOT NULL,
+    PRIMARY KEY (album_rowid, rank)
+);
+
+CREATE TABLE artist_repr_albums (
+    artist_rowid INTEGER NOT NULL,
+    rank         INTEGER NOT NULL,
+    album_rowid  INTEGER NOT NULL,
+    score        REAL    NOT NULL,
+    PRIMARY KEY (artist_rowid, rank)
+);
+
+CREATE TABLE label_repr_artists (
+    label_rowid  INTEGER NOT NULL,
+    rank         INTEGER NOT NULL,
+    artist_rowid INTEGER NOT NULL,
+    score        REAL    NOT NULL,
+    PRIMARY KEY (label_rowid, rank)
+);
+"""
+
+POST_DDL = """
+CREATE INDEX idx_tracks_artist ON tracks(artist_rowid);
+CREATE INDEX idx_tracks_album  ON tracks(album_rowid);
+CREATE INDEX idx_tracks_label  ON tracks(label_rowid);
+CREATE INDEX idx_albums_artist ON albums(artist_rowid);
+"""
+
+
+ALBUM_TITLE_VARIANT_MARKERS = ("remaster", "edition", "version", "deluxe", "expanded")
+
+
+def normalize_album_title(name: str) -> str:
+    """Strip a small set of trailing edition markers from album titles."""
+    s = " ".join(name.split())
+    match = re.search(r"\s*\(([^()]*)\)\s*$", s)
+    if not match:
+        return s
+    marker = match.group(1).lower()
+    if any(token in marker for token in ALBUM_TITLE_VARIANT_MARKERS):
+        return s[: match.start()].rstrip()
+    return s
+
+
+def get_album_canonical_updates(albums: pd.DataFrame) -> pd.DataFrame:
+    """Return canonical album assignments for an albums DataFrame.
+
+    Albums are grouped by artist, album type, and normalized title. Within each
+    group, rows whose original title already matches the normalized title are
+    preferred over suffixed variants; remaining ties fall back to the smallest
+    album_rowid for deterministic canonical selection.
+    """
+    albums = albums.copy()
+    albums["album_type_norm"] = albums["album_type"].fillna("")
+    albums["is_title_variant"] = albums["album_name_norm"] != albums["album_name"]
+    canonical = (
+        albums.sort_values(
+            [
+                "artist_rowid",
+                "album_type_norm",
+                "album_name_norm",
+                "is_title_variant",
+                "album_rowid",
+            ],
+            ascending=[True, True, True, True, True],
+        )
+        .drop_duplicates(
+            ["artist_rowid", "album_type_norm", "album_name_norm"],
+            keep="first",
+        )[["artist_rowid", "album_type_norm", "album_name_norm", "album_rowid"]]
+        .rename(columns={"album_rowid": "album_canonical_rowid"})
+    )
+    return albums.merge(
+        canonical,
+        on=["artist_rowid", "album_type_norm", "album_name_norm"],
+        how="left",
+    )[["album_canonical_rowid", "album_rowid"]]
+
+
+def canonicalize_albums(conn: sqlite3.Connection) -> None:
+    """Assign each album row to a canonical album row within its duplicate group."""
+    albums = pd.read_sql(
+        """
+        SELECT
+            album_rowid,
+            artist_rowid,
+            album_type,
+            album_name,
+            album_name_norm
+        FROM albums
+        """,
+        conn,
+    )
+    updates = get_album_canonical_updates(albums)
+    conn.executemany(
+        "UPDATE albums SET album_canonical_rowid = ? WHERE album_rowid = ?",
+        list(updates.itertuples(index=False, name=None)),
+    )
+
+
+def build_labels(
+    conn: sqlite3.Connection,
+    lookup: pd.DataFrame,
+    geo: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build the labels table. Returns geo for downstream denormalization."""
+    df = lookup.merge(geo, on=EKEYS.label)
+    df[[
+        EKEYS.label, "label", "logcount",
+        "ntrack", "nalbum", "nartist",
+        "lon", "lat",
+    ]].to_sql("labels", conn, if_exists="append", index=False)
+    print(f"  [labels]  {len(df):,} rows")
+    return geo
+
+
+def build_artists(
+    conn: sqlite3.Connection,
+    lookup: pd.DataFrame,
+    geo: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build the artists table. Returns geo for downstream denormalization."""
+    df = lookup.merge(geo, on=EKEYS.artist)
+    df[[
+        EKEYS.artist, "artist_name", "artist_genre", "logcount",
+        "ntrack", "nalbum",
+        "lon", "lat",
+    ]].to_sql("artists", conn, if_exists="append", index=False)
+    print(f"  [artists] {len(df):,} rows")
+    return geo
+
+
+def build_albums(
+    conn: sqlite3.Connection,
+    lookup: pd.DataFrame,
+    geo: pd.DataFrame,
+    artist_geo: pd.DataFrame,
+    label_geo: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build the albums table. Returns geo for downstream denormalization."""
+    df = lookup.merge(geo, on=EKEYS.album)
+    df = df.merge(
+        artist_geo.rename(columns={"lon": "artist_lon", "lat": "artist_lat"}),
+        on=EKEYS.artist,
+        how="left",
+    )
+    df = df.merge(
+        label_geo.rename(columns={"lon": "label_lon", "lat": "label_lat"}),
+        on=EKEYS.label,
+        how="left",
+    )
+    df["album_name_norm"] = df["album_name"].map(normalize_album_title)
+    df["album_canonical_rowid"] = df[EKEYS.album]
+
+    df[[
+        EKEYS.album, "album_canonical_rowid", "album_name", "album_name_norm",
+        "logcount", "lon", "lat",
+        EKEYS.artist, "artist_name", "artist_lon", "artist_lat",
+        "album_type", "label", "total_tracks",
+        "release_date", "release_date_precision",
+        EKEYS.label, "label_lon", "label_lat",
+    ]].to_sql("albums", conn, if_exists="append", index=False)
+    print(f"  [albums]  {len(df):,} rows")
+    return geo
+
+
+def build_tracks(
+    conn: sqlite3.Connection,
+    lookup_path: Path,
+    track_geo: pd.DataFrame,
+    artist_geo: pd.DataFrame,
+    album_geo: pd.DataFrame,
+    label_geo: pd.DataFrame,
+    batch_size: int,
+) -> None:
+    """Build the tracks table, streaming the lookup parquet in batches."""
+    artist_geo_r = artist_geo.rename(columns={"lon": "artist_lon", "lat": "artist_lat"})
+    album_geo_r = album_geo.rename(columns={"lon": "album_lon", "lat": "album_lat"})
+    label_geo_r = label_geo.rename(columns={"lon": "label_lon", "lat": "label_lat"})
+
+    out_cols = [
+        EKEYS.track, "track_name", "track_popularity", "logcount", "release_date", "id_isrc", "lon", "lat",
+        EKEYS.artist, "artist_name", "artist_lon", "artist_lat",
+        EKEYS.album, "album_name", "album_lon", "album_lat",
+        EKEYS.label, "label", "label_lon", "label_lat",
+    ]
+
+    pf = pq.ParquetFile(lookup_path)
+    total = 0
+    t0 = time.time()
+
+    for batch in pf.iter_batches(batch_size=batch_size):
+        df = (
+            batch.to_pandas()
+            .merge(track_geo, on=EKEYS.track, how="inner")
+            .merge(artist_geo_r, on=EKEYS.artist, how="left")
+            .merge(album_geo_r, on=EKEYS.album, how="left")
+            .merge(label_geo_r, on=EKEYS.label, how="left")
+        )
+        df["label"] = df["label"].replace("", None)
+        df[out_cols].to_sql("tracks", conn, if_exists="append", index=False)
+
+        total += len(df)
+        rate = total / (time.time() - t0)
+        print(f"  [tracks]  {total:>9,}  ({rate:,.0f} rows/s)", end="\r")
+
+    print(f"\n  [tracks]  {total:,} rows  ({time.time()-t0:.1f}s)")
+
+
+def build_album_repr_tracks(conn: sqlite3.Connection, limit: int) -> None:
+    """Store each album's top tracks by logcount."""
+    t0 = time.time()
+    conn.execute("DELETE FROM album_repr_tracks")
+    conn.execute(
+        """
+        INSERT INTO album_repr_tracks (album_rowid, rank, track_rowid, score)
+        WITH ranked AS (
+            SELECT
+                album_rowid,
+                track_rowid,
+                logcount AS score,
+                ROW_NUMBER() OVER (
+                    PARTITION BY album_rowid
+                    ORDER BY logcount DESC, track_rowid ASC
+                ) AS rn
+            FROM tracks
+        )
+        SELECT album_rowid, rn - 1, track_rowid, score
+        FROM ranked
+        WHERE rn <= ?
+        """,
+        (limit,),
+    )
+    total = conn.execute("SELECT COUNT(*) FROM album_repr_tracks").fetchone()[0]
+    print(f"  [album_repr_tracks]  {total:,} rows  ({time.time() - t0:.1f}s)")
+
+
+def build_artist_repr_albums(conn: sqlite3.Connection, limit: int) -> None:
+    """Store representative albums for each artist.
+
+    Scored by median child-track logcount. Prefers full albums over EPs over
+    other release types. Only canonical albums participate.
+    """
+    t0 = time.time()
+    conn.execute("DELETE FROM artist_repr_albums")
+    conn.execute(
+        """
+        INSERT INTO artist_repr_albums (artist_rowid, rank, album_rowid, score)
+        WITH track_ranks AS (
+            SELECT
+                album_rowid,
+                logcount,
+                ROW_NUMBER() OVER (
+                    PARTITION BY album_rowid
+                    ORDER BY logcount
+                ) AS rn,
+                COUNT(*) OVER (
+                    PARTITION BY album_rowid
+                ) AS cnt
+            FROM tracks
+        ),
+        album_track_stats AS (
+            SELECT
+                album_rowid,
+                logcount AS median_track_logcount
+            FROM track_ranks
+            WHERE rn = (cnt + 1) / 2
+        ),
+        album_candidates AS (
+            SELECT
+                a.artist_rowid,
+                a.album_rowid,
+                ats.median_track_logcount AS score,
+                a.logcount AS album_logcount,
+                CASE LOWER(COALESCE(a.album_type, ''))
+                    WHEN 'album' THEN 0
+                    WHEN 'ep' THEN 1
+                    ELSE 2
+                END AS type_priority
+            FROM albums a
+            JOIN album_track_stats ats ON ats.album_rowid = a.album_rowid
+            WHERE a.album_rowid = a.album_canonical_rowid
+        ),
+        artist_type_choice AS (
+            SELECT artist_rowid, MIN(type_priority) AS chosen_priority
+            FROM album_candidates
+            GROUP BY artist_rowid
+        ),
+        ranked AS (
+            SELECT
+                c.artist_rowid,
+                c.album_rowid,
+                c.score,
+                ROW_NUMBER() OVER (
+                    PARTITION BY c.artist_rowid
+                    ORDER BY
+                        c.score DESC,
+                        c.album_logcount DESC,
+                        c.album_rowid ASC
+                ) AS rn
+            FROM album_candidates c
+            JOIN artist_type_choice t
+                ON t.artist_rowid = c.artist_rowid
+               AND t.chosen_priority = c.type_priority
+        )
+        SELECT artist_rowid, rn - 1, album_rowid, score
+        FROM ranked
+        WHERE rn <= ?
+        """,
+        (limit,),
+    )
+    total = conn.execute("SELECT COUNT(*) FROM artist_repr_albums").fetchone()[0]
+    print(f"  [artist_repr_albums] {total:,} rows  ({time.time() - t0:.1f}s)")
+
+
+def build_label_repr_artists(conn: sqlite3.Connection, limit: int) -> None:
+    """Store representative artists for each label.
+
+    Scored as sum(logcount) / sqrt(track_count) within the label, which softens
+    catalog-size bias. Ties broken by album breadth, strongest single track, rowid.
+    """
+    t0 = time.time()
+    conn.execute("DELETE FROM label_repr_artists")
+    conn.execute(
+        """
+        INSERT INTO label_repr_artists (label_rowid, rank, artist_rowid, score)
+        WITH label_artist_stats AS (
+            SELECT
+                label_rowid,
+                artist_rowid,
+                SUM(logcount) / SQRT(COUNT(*)) AS score,
+                COUNT(*) AS track_count,
+                COUNT(DISTINCT album_rowid) AS album_count,
+                MAX(logcount) AS best_track
+            FROM tracks
+            WHERE label_rowid IS NOT NULL
+            GROUP BY label_rowid, artist_rowid
+        ),
+        ranked AS (
+            SELECT
+                label_rowid,
+                artist_rowid,
+                ROW_NUMBER() OVER (
+                    PARTITION BY label_rowid
+                    ORDER BY
+                        score DESC,
+                        album_count DESC,
+                        best_track DESC,
+                        artist_rowid ASC
+                ) AS rn,
+                score
+            FROM label_artist_stats
+        )
+        SELECT label_rowid, rn - 1, artist_rowid, score
+        FROM ranked
+        WHERE rn <= ?
+        """,
+        (limit,),
+    )
+    total = conn.execute("SELECT COUNT(*) FROM label_repr_artists").fetchone()[0]
+    print(f"  [label_repr_artists] {total:,} rows  ({time.time() - t0:.1f}s)")
+
+
+def build_representatives(conn: sqlite3.Connection, limit: int) -> None:
+    """Build all ranked representative-child tables for downward navigation."""
+    build_album_repr_tracks(conn, limit)
+    build_artist_repr_albums(conn, limit)
+    build_label_repr_artists(conn, limit)
+    conn.commit()
+
+
+def build_embedding(
+    conn: sqlite3.Connection,
+    embedding_path: Path,
+    filter_path: Path,
+    key_col: str,
+    table_name: str,
+    batch_size: int,
+) -> None:
+    """Load one entity's embedding parquet, filter to DB index, L2-normalize, write BLOBs."""
+    filter_set = set(np.load(filter_path).tolist())
+    pf = pq.ParquetFile(embedding_path)
+    total = 0
+    t0 = time.time()
+
+    for batch in pf.iter_batches(batch_size=batch_size):
+        df = batch.to_pandas()
+        df = df[df[key_col].isin(filter_set)]
+        if df.empty:
+            continue
+        rowids = df[key_col].to_numpy()
+        matrix = np.ascontiguousarray(
+            df.filter(regex=r"^e\d+$").to_numpy(dtype=np.float32)
+        )
+        norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+        np.maximum(norms, 1e-12, out=norms)
+        matrix /= norms
+
+        rows = [(int(rid), emb.tobytes()) for rid, emb in zip(rowids, matrix)]
+        conn.executemany(f"INSERT INTO {table_name} VALUES (?, ?)", rows)
+
+        total += len(rows)
+        elapsed = time.time() - t0
+        rate = total / elapsed if elapsed > 0 else 0
+        print(f"  [{table_name}] {total:>9,}  ({rate:,.0f} rows/s)", end="\r")
+
+    elapsed = time.time() - t0
+    print(f"\n  [{table_name}] {total:,} rows  ({elapsed:.1f}s)")
+
+
+def build_embeddings(
+    conn: sqlite3.Connection,
+    embedding_paths: EntityPaths,
+    filter_paths: EntityPaths,
+    batch_size: int,
+) -> None:
+    """Build all four embedding tables."""
+    for entity, emb_path, filt_path, key_col in (
+        ("track", embedding_paths.track, filter_paths.track, EKEYS.track),
+        ("album", embedding_paths.album, filter_paths.album, EKEYS.album),
+        ("artist", embedding_paths.artist, filter_paths.artist, EKEYS.artist),
+        ("label", embedding_paths.label, filter_paths.label, EKEYS.label),
+    ):
+        build_embedding(conn, emb_path, filt_path, key_col, f"{entity}_embedding", batch_size)
+    conn.commit()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Build SQLite DB from lookup, geo, and embedding parquets",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--manifest",
+        default=os.environ.get("SICK_MANIFEST"),
+        help="Path to ml manifest TOML. $SICK_MANIFEST",
+    )
+    parser.add_argument(
+        "--db",
+        default=os.environ.get("SICK_DB"),
+        help="Output SQLite path. $SICK_DB",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=BATCH_SIZE,
+        help=f"Rows per write batch (default: {BATCH_SIZE:,})",
+    )
+    args = parser.parse_args()
+
+    if args.manifest is None:
+        raise ValueError("--manifest / $SICK_MANIFEST not set")
+    if args.db is None:
+        raise ValueError("--db / $SICK_DB not set")
+
+    manifest = read_manifest(args.manifest, required_sections=("embedding", "lookup"))
+    lookup_paths = manifest["lookup"]
+    embedding_paths = manifest["embedding"]
+
+    geo_paths = get_geo_paths()
+    filter_paths = get_index_filter_db_paths()
+
+    db_path = Path(args.db)
+    if db_path.exists():
+        db_path.unlink()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    print(f"DB             : {db_path}")
+    print(f"Lookup track   : {lookup_paths.track}")
+    print(f"Lookup artist  : {lookup_paths.artist}")
+    print(f"Lookup album   : {lookup_paths.album}")
+    print(f"Lookup label   : {lookup_paths.label}")
+    print()
+
+    t_total = time.time()
+    conn = sqlite3.connect(db_path)
+    conn.executescript(DDL)
+
+    print("Loading lookups...")
+    label_lookup = pd.read_parquet(lookup_paths.label)
+    artist_lookup = pd.read_parquet(lookup_paths.artist)
+    album_lookup = pd.read_parquet(lookup_paths.album)
+    print(
+        f"  labels={len(label_lookup):,}"
+        f"  artists={len(artist_lookup):,}"
+        f"  albums={len(album_lookup):,}"
+    )
+
+    print("Loading geo...")
+    track_geo = pd.read_parquet(geo_paths.track)
+    artist_geo = pd.read_parquet(geo_paths.artist)
+    album_geo = pd.read_parquet(geo_paths.album)
+    label_geo = pd.read_parquet(geo_paths.label)
+    print(
+        f"  tracks={len(track_geo):,}"
+        f"  artists={len(artist_geo):,}"
+        f"  albums={len(album_geo):,}"
+        f"  labels={len(label_geo):,}"
+    )
+    print()
+
+    print("Building entity tables...")
+    label_geo = build_labels(conn, label_lookup, label_geo)
+    artist_geo = build_artists(conn, artist_lookup, artist_geo)
+    album_geo = build_albums(conn, album_lookup, album_geo, artist_geo, label_geo)
+    canonicalize_albums(conn)
+    conn.commit()
+
+    build_tracks(
+        conn, lookup_paths.track,
+        track_geo, artist_geo, album_geo, label_geo,
+        args.batch_size,
+    )
+    conn.commit()
+
+    print("\nCreating indexes...")
+    conn.executescript(POST_DDL)
+    conn.commit()
+
+    print(f"\nBuilding representative children (top {REPRESENTATIVE_COUNT})...")
+    build_representatives(conn, REPRESENTATIVE_COUNT)
+
+    print("\nBuilding embedding tables...")
+    build_embeddings(conn, embedding_paths, filter_paths, args.batch_size)
+
+    conn.close()
+
+    size_mb = db_path.stat().st_size / 1024 / 1024
+    print(f"\nDone in {time.time()-t_total:.1f}s  —  {db_path}  ({size_mb:,.0f} MB)")
+
+
+if __name__ == "__main__":
+    main()

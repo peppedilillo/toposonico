@@ -86,3 +86,59 @@ def test_filter_separate_only_filters_requested_level():
     pd.testing.assert_frame_equal(filtered.album, lookups.album)
     pd.testing.assert_frame_equal(filtered.artist, lookups.artist)
     pd.testing.assert_frame_equal(filtered.label, lookups.label)
+
+
+def test_filter_track_keeps_highest_logcount_for_valid_isrc_duplicates():
+    tracks = pd.DataFrame(
+        {
+            EKEYS.track: [101, 102, 103],
+            "id_isrc": ["dup", "dup", "unique"],
+            "logcount": [1.0, 3.0, 2.0],
+        }
+    )
+
+    filtered = f.filter_track(tracks, 0.0)
+
+    np.testing.assert_array_equal(filtered[EKEYS.track], np.array([102, 103]))
+
+
+def test_filter_track_preserves_rows_with_nan_isrc():
+    tracks = pd.DataFrame(
+        {
+            EKEYS.track: [101, 102, 103],
+            "id_isrc": [np.nan, np.nan, "valid"],
+            "logcount": [1.0, 3.0, 2.0],
+        }
+    )
+
+    filtered = f.filter_track(tracks, 0.0)
+
+    np.testing.assert_array_equal(filtered[EKEYS.track], np.array([101, 102, 103]))
+
+
+def test_filter_track_preserves_rows_with_empty_or_whitespace_isrc():
+    tracks = pd.DataFrame(
+        {
+            EKEYS.track: [101, 102, 103],
+            "id_isrc": ["", "   ", "valid"],
+            "logcount": [1.0, 3.0, 2.0],
+        }
+    )
+
+    filtered = f.filter_track(tracks, 0.0)
+
+    np.testing.assert_array_equal(filtered[EKEYS.track], np.array([101, 102, 103]))
+
+
+def test_filter_track_mixed_valid_and_invalid_isrc_behavior():
+    tracks = pd.DataFrame(
+        {
+            EKEYS.track: [101, 102, 103, 104, 105],
+            "id_isrc": ["dup", "dup", np.nan, "", "unique"],
+            "logcount": [1.0, 4.0, 2.0, 3.0, 5.0],
+        }
+    )
+
+    filtered = f.filter_track(tracks, 0.0)
+
+    np.testing.assert_array_equal(filtered[EKEYS.track], np.array([102, 103, 104, 105]))

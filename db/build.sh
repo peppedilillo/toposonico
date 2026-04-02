@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Build the db pipeline: geo → [optional sim] → db
+# Build the db pipeline: filter → geo → [optional sim] → db
 #
 # Usage:
 #   source config.env && bash build.sh
 #   bash build.sh                 # auto-sources config.env if SICK_OUT_DIR is unset
-#   bash build.sh --with-sim      # build persisted similarity artifacts too
-#   bash build.sh --from-db       # skip geomap, run optional sim + db only
-
+#   bash build.sh --from-geo      # skip filter, run from geo onward
+#   bash build.sh --from-sim      # skip filter + geo, run from sim onward
+#   bash build.sh --from-db       # skip filter + geo + sim, run from db onward
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,17 +22,24 @@ if [[ -z "${SICK_OUT_DIR:-}" ]]; then
     fi
 fi
 
+RUN_FILTER=1
 RUN_GEO=1
-RUN_SIM=0
+RUN_SIM=1
 RUN_DB=1
 
 for arg in "$@"; do
     case "$arg" in
-        --from-db)
+        --from-geo)
+            RUN_FILTER=0
+            ;;
+        --from-sim)
+            RUN_FILTER=0
             RUN_GEO=0
             ;;
-        --with-sim)
-            RUN_SIM=1
+        --from-db)
+            RUN_SIM=0
+            RUN_FILTER=0
+            RUN_GEO=0
             ;;
         *)
             echo "Error: unknown argument: $arg"
@@ -43,7 +50,7 @@ done
 
 required_vars=(SICK_MANIFEST SICK_DB)
 if [[ $RUN_SIM -eq 1 ]]; then
-    required_vars+=(SICK_SIM_DIR)
+    required_vars+=(SICK_INDEX_FAISS_TRACK SICK_INDEX_FAISS_ALBUM SICK_INDEX_FAISS_ARTIST SICK_INDEX_FAISS_LABEL)
 fi
 
 missing=()
@@ -56,30 +63,41 @@ if [[ ${#missing[@]} -gt 0 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-if [[ $RUN_GEO -eq 1 ]]; then
-    echo "=== Step 1: build_geomap ==="
-    uv run python "$SCRIPT_DIR/scripts/build_geomap.py"
+if [[ $RUN_FILTER -eq 1 ]]; then
+    echo "=== Step 1: build_filter_index ==="
+    uv run python "$SCRIPT_DIR/scripts/build_filter_index.py"
 else
     echo "=== Step 1: skipped ==="
 fi
 
 # ---------------------------------------------------------------------------
-if [[ $RUN_SIM -eq 1 ]]; then
+if [[ $RUN_GEO -eq 1 ]]; then
     echo ""
-    echo "=== Step 2: build_sim ==="
-    uv run python "$SCRIPT_DIR/scripts/build_sim.py" --overwrite
+    echo "=== Step 2: build_geomap ==="
+    uv run python "$SCRIPT_DIR/scripts/build_geomap.py"
 else
     echo ""
     echo "=== Step 2: skipped ==="
 fi
 
-if [[ $RUN_DB -eq 1 ]]; then
+# ---------------------------------------------------------------------------
+if [[ $RUN_SIM -eq 1 ]]; then
     echo ""
-    echo "=== Step 3: build_db ==="
-    uv run python "$SCRIPT_DIR/scripts/build_db.py"
+    echo "=== Step 3: build_sim ==="
+    uv run python "$SCRIPT_DIR/scripts/build_sim.py"
 else
     echo ""
     echo "=== Step 3: skipped ==="
+fi
+
+# ---------------------------------------------------------------------------
+if [[ $RUN_DB -eq 1 ]]; then
+    echo ""
+    echo "=== Step 4: build_db ==="
+    uv run python "$SCRIPT_DIR/scripts/build_db.py"
+else
+    echo ""
+    echo "=== Step 4: skipped ==="
 fi
 
 echo ""

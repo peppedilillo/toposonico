@@ -23,9 +23,20 @@ def filter_album(lookup_album: pd.DataFrame, min_total_tracks: int) -> pd.DataFr
 
 def filter_track(lookup_track: pd.DataFrame, min_logcount: float) -> pd.DataFrame:
     """Filter tracks under playlist appearances threshold."""
-    return (
-        lookup_track.sort_values("logcount", ascending=False)
+    # without selecting tracks with valid `id_isrc` first, we would end up
+    # dropping all but one tracks with empty or nan id_isrc.
+    has_valid_isrc = (
+        lookup_track["id_isrc"].notna()
+        & lookup_track["id_isrc"].astype(str).str.strip().ne("")
+    )
+    with_isrc = (
+        lookup_track[has_valid_isrc]
+        .sort_values("logcount", ascending=False)
         .drop_duplicates("id_isrc", keep="first")
+    )
+    without_isrc = lookup_track[~has_valid_isrc]
+    return (
+        pd.concat([with_isrc, without_isrc], ignore_index=True)
         .sort_values("track_rowid")
         .query("logcount >= @min_logcount")
         .reset_index(drop=True)
