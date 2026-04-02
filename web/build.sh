@@ -51,10 +51,9 @@ echo "=== Building tiles ==="
 echo "Output: $TILES_DIR"
 
 tippecanoe -e "$TILES_DIR" \
-    -z12 -Z3 -pS -rg -g 1 -d 8 \
+    --full-detail=7 --low-detail=7 \
+    --maximum-zoom=13 --minimum-zoom=5 --drop-rate=1.8 \
     --drop-densest-as-needed \
-    --extend-zooms-if-still-dropping \
-    --order-descending-by=logcount \
     --read-parallel --force \
     --named-layer=tracks:"$SICK_JSON_TRACK" \
     --named-layer=albums:"$SICK_JSON_ALBUM" \

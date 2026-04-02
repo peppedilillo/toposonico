@@ -108,7 +108,7 @@ function App() {
           source: 'tiles',
           'source-layer': sourceLayer,
           paint: {
-            'circle-radius': ['coalesce', ['get', 'logcount'], radius],
+            'circle-radius': ['max', ['get', 'logcount'], 1.5],
             'circle-color': color,
             'circle-opacity': opacity,
           },
@@ -135,7 +135,7 @@ function App() {
     <div className="relative h-screen w-screen overflow-hidden bg-black text-white">
       <div ref={containerRef} className="h-full w-full"/>
       <div
-        className="pointer-events-none absolute top-3 right-3 rounded-md bg-black/70 px-3 py-2 font-mono text-xs text-zinc-300">
+        className="pointer-events-none absolute top-3 right-3 rounded-md px-3 py-2 font-mono text-xs text-zinc-300">
         z {zoom.toFixed(2)} x {cursor.x.toFixed(4)} y {cursor.y.toFixed(4)}
       </div>
     </div>

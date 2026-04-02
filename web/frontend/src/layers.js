@@ -7,7 +7,7 @@ const LAYERS = [
     rowidProp: 'track_rowid',
     radius: 1.0,
     color: colors.track,
-    opacity: 0.7,
+    opacity: 0.5,
   },
   {
     id: 'albums',
@@ -23,7 +23,7 @@ const LAYERS = [
     rowidProp: 'artist_rowid',
     radius: 1.0,
     color: colors.artist,
-    opacity: 0.7,
+    opacity: 0.8,
   },
   {
     id: 'labels',
@@ -31,7 +31,7 @@ const LAYERS = [
     rowidProp: 'label_rowid',
     radius: 1.0,
     color: colors.label,
-    opacity: 0.7,
+    opacity: 0.8,
   },
 ]
 
