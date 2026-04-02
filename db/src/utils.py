@@ -131,3 +131,20 @@ def get_index_faiss_paths() -> EntityPaths:
         album=_path("SICK_INDEX_FAISS_ALBUM"),
         label=_path("SICK_INDEX_FAISS_LABEL"),
     )
+
+
+def get_geojson_paths() -> EntityPaths:
+    def _path(var: str) -> Path:
+        v = os.environ.get(var)
+        if v is None:
+            raise ValueError(f"${var} not set")
+        p = Path(v)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+
+    return EntityPaths(
+        track=_path("SICK_GEOJSON_TRACK"),
+        artist=_path("SICK_GEOJSON_ARTIST"),
+        album=_path("SICK_GEOJSON_ALBUM"),
+        label=_path("SICK_GEOJSON_LABEL"),
+    )

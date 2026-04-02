@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Build the db pipeline: geo → db → sim
+# Build the db pipeline: geo → db → sim → geojson
 #
 # Usage:
 #   source config.env && bash build.sh
 #   bash build.sh                 # auto-sources config.env if SICK_OUT_DIR is unset
 #   bash build.sh --from-db       # skip geo, run from db onward
 #   bash build.sh --from-sim      # skip geo + db, run sim only
+#   bash build.sh --from-json     # skip geo + db + sim, run geojson only
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,6 +25,7 @@ fi
 RUN_GEO=1
 RUN_DB=1
 RUN_SIM=1
+RUN_JSON=1
 
 for arg in "$@"; do
     case "$arg" in
@@ -33,6 +35,11 @@ for arg in "$@"; do
         --from-sim)
             RUN_GEO=0
             RUN_DB=0
+            ;;
+        --from-json)
+            RUN_GEO=0
+            RUN_DB=0
+            RUN_SIM=0
             ;;
         *)
             echo "Error: unknown argument: $arg"
@@ -44,6 +51,9 @@ done
 required_vars=(SICK_MANIFEST SICK_DB)
 if [[ $RUN_SIM -eq 1 ]]; then
     required_vars+=(SICK_INDEX_FAISS_TRACK SICK_INDEX_FAISS_ALBUM SICK_INDEX_FAISS_ARTIST SICK_INDEX_FAISS_LABEL)
+fi
+if [[ $RUN_JSON -eq 1 ]]; then
+    required_vars+=(SICK_GEOJSON_TRACK SICK_GEOJSON_ALBUM SICK_GEOJSON_ARTIST SICK_GEOJSON_LABEL)
 fi
 
 missing=()
@@ -81,6 +91,16 @@ if [[ $RUN_SIM -eq 1 ]]; then
 else
     echo ""
     echo "=== Step 3: skipped ==="
+fi
+
+# ---------------------------------------------------------------------------
+if [[ $RUN_JSON -eq 1 ]]; then
+    echo ""
+    echo "=== Step 4: build_geojson ==="
+    uv run python "$SCRIPT_DIR/scripts/build_geojson.py"
+else
+    echo ""
+    echo "=== Step 4: skipped ==="
 fi
 
 echo ""

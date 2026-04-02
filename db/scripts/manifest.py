@@ -19,6 +19,10 @@ faiss_track = ""
 faiss_album = ""
 faiss_artist = ""
 faiss_label = ""
+json_track = ""
+json_album = ""
+json_artist = ""
+json_label = ""
 """
 )
 
