@@ -12,8 +12,7 @@ import torch
 
 def _write_tracks_db(path: Path) -> None:
     conn = sqlite3.connect(path)
-    conn.executescript(
-        """
+    conn.executescript("""
         CREATE TABLE artists (
             rowid INTEGER PRIMARY KEY,
             name TEXT NOT NULL
@@ -46,8 +45,7 @@ def _write_tracks_db(path: Path) -> None:
             artist_rowid INTEGER NOT NULL,
             genre TEXT NOT NULL
         );
-        """
-    )
+        """)
     conn.executemany(
         "INSERT INTO artists(rowid, name) VALUES (?, ?)",
         [(1, "Artist One"), (2, "Artist Two")],

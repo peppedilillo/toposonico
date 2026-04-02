@@ -70,15 +70,13 @@ def assign_label_rowids(labels: pd.Series) -> dict[str, int]:
 def create_temp_vocab_table(conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME) -> None:
     """Create (or replace) a temporary vocab table for the join query."""
     conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-    conn.execute(
-        f"""
+    conn.execute(f"""
         CREATE TEMP TABLE {table_name} (
             track_rowid     INTEGER PRIMARY KEY,
             track_id        INTEGER NOT NULL,
             playlist_count  INTEGER NOT NULL
         )
-        """
-    )
+        """)
     conn.execute(f"CREATE INDEX {table_name}_track_rowid_idx ON {table_name}(track_rowid)")
 
 

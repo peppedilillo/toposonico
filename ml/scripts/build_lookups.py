@@ -81,13 +81,11 @@ def get_connection(database_path: Path) -> sqlite3.Connection:
 def create_temp_track_table(conn: sqlite3.Connection, table_name: str = TEMP_TABLE_NAME) -> None:
     """Create (or replace) a temporary track-rowid table for the metadata join."""
     conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-    conn.execute(
-        f"""
+    conn.execute(f"""
         CREATE TEMP TABLE {table_name} (
             track_rowid INTEGER PRIMARY KEY
         )
-        """
-    )
+        """)
 
 
 def load_temp_track_table(
