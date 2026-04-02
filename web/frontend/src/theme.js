@@ -5,9 +5,9 @@ const palette = {
   gray: '#7e7d7d',
   white: '#ffffff',
   green: '#3bda28',
-  cyan: '#00ffbe',
-  cream: '#f8edb0',
-  violet: '#ca53fa',
+  cyan: '#1eb7bc',
+  cream: '#af9221',
+  violet: '#8f45ae',
 }
 
 const colors = {

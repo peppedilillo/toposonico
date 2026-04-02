@@ -55,7 +55,6 @@ tippecanoe -e "$TILES_DIR" \
     --drop-densest-as-needed \
     --extend-zooms-if-still-dropping \
     --order-descending-by=logcount \
-    --exclude=logcount \
     --read-parallel --force \
     --named-layer=tracks:"$SICK_JSON_TRACK" \
     --named-layer=albums:"$SICK_JSON_ALBUM" \

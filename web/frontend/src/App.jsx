@@ -76,10 +76,10 @@ function App() {
       style: STYLE,
       center: [lon, lat],
       zoom: z,
-      minZoom: 3,
+      minZoom: 5,
       maxBounds: [
-        [-60, -60],
-        [60, 60],
+        [-25, -25],
+        [25, 25],
       ],
       attributionControl: false,
       scrollZoom: {around: 'center'},
@@ -108,7 +108,7 @@ function App() {
           source: 'tiles',
           'source-layer': sourceLayer,
           paint: {
-            'circle-radius': radius,
+            'circle-radius': ['coalesce', ['get', 'logcount'], radius],
             'circle-color': color,
             'circle-opacity': opacity,
           },
