@@ -13,7 +13,7 @@ MANIFEST = (
 """
     f"#                                        {datetime.now().isoformat()}"
     """
-# use absolute paths and keep the quotes. track_db refers to the `track_clean.db` SQlite db used as source.
+# note: use absolute paths and keep the quotes.
 sick_db = ""
 faiss_track = ""
 faiss_album = ""
