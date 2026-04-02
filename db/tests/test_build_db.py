@@ -461,6 +461,15 @@ def test_build_embedding_stores_normalized_blobs(db, tmp_path):
 
 def test_album_repr_tracks_ranks_by_logcount(db, tmp_path):
     _build_full_db(db, tmp_path)
+    compute_searchable_recable(
+        db,
+        searchable_track_min_logcount=2.0,
+        searchable_album_min_total_tracks=2,
+        searchable_artist_min_ntrack=10,
+        searchable_label_min_nartist=10,
+        recable_track_min_logcount=3.0,
+    )
+    db.commit()
     build_album_repr_tracks(db, limit=2)
 
     rows = db.execute(

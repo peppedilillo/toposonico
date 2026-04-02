@@ -112,6 +112,8 @@ def train_index(spec: SimIndexSpec, xb: np.ndarray) -> faiss.Index:
     index = faiss.index_factory(spec.d, spec.factory_string, faiss.METRIC_INNER_PRODUCT)
     train_n = ivf_train_size(spec.n, spec.nlist)
     xt = subsample_training(xb, train_n)
+    # TODO: if `xt` is smaller than nlist (clipped to 256) the next line may fail.
+    #       guardrails must be added at some point against this behaviour.
     index.train(xt)
     index = faiss.IndexIDMap2(index)
     index.add_with_ids(xb, spec.rowids)

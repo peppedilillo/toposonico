@@ -63,7 +63,7 @@ CREATE TABLE tracks (
     album_name            TEXT,
     album_lon             REAL,
     album_lat             REAL,
-    label_rowid           INTEGER,
+    label_rowid           INTEGER NOT NULL,
     label                 TEXT,
     label_lon             REAL,
     label_lat             REAL
@@ -88,7 +88,7 @@ CREATE TABLE albums (
     total_tracks             INTEGER,
     release_date             TEXT,
     release_date_precision   TEXT,
-    label_rowid              INTEGER,
+    label_rowid              INTEGER NOT NULL,
     label_lon                REAL,
     label_lat                REAL
 );
@@ -468,7 +468,8 @@ def build_album_repr_tracks(conn: sqlite3.Connection, limit: int) -> None:
                     PARTITION BY album_rowid
                     ORDER BY logcount DESC, track_rowid ASC
                 ) AS rn
-            FROM tracks
+            FROM tracks 
+            WHERE searchable = 1 
         )
         SELECT album_rowid, rn - 1, track_rowid, score
         FROM ranked
@@ -503,6 +504,7 @@ def build_artist_repr_albums(conn: sqlite3.Connection, limit: int) -> None:
                     PARTITION BY album_rowid
                 ) AS cnt
             FROM tracks
+            WHERE searchable = 1 
         ),
         album_track_stats AS (
             SELECT
@@ -578,7 +580,7 @@ def build_label_repr_artists(conn: sqlite3.Connection, limit: int) -> None:
                 COUNT(DISTINCT album_rowid) AS album_count,
                 MAX(logcount) AS best_track
             FROM tracks
-            WHERE label_rowid IS NOT NULL
+            WHERE searchable = 1 
             GROUP BY label_rowid, artist_rowid
         ),
         ranked AS (
