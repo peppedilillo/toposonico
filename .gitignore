@@ -21,4 +21,8 @@ notebooks/experiments/data
 notebooks/___*
 
 # LLM
+**/.codex
+**/.claude
 CLAUDE.md
+AGENTS.md
+codex.md
