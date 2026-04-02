@@ -3,11 +3,71 @@ services:
     image: getmeili/meilisearch:latest
     ports:
       - "7700:7700"
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-SUPERSECRETKEY}
+      MEILI_ENV: development
     volumes:
       - meilisearch_data:/meili_data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://127.0.0.1:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  backend:
+    image: ghcr.io/astral-sh/uv:python3.13-bookworm
+    working_dir: /workspace/web/backend
+    command:
+      - sh
+      - -lc
+      - uv sync && uv run fastapi dev src/main.py --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
     environment:
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
-      - MEILI_ENV=development
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-SUPERSECRETKEY}
+      MEILI_INDEX_NAME: ${MEILI_INDEX_NAME:-entities}
+      MEILI_URL: http://meilisearch:7700
+      SICK_MANIFEST: ${SICK_MANIFEST:-}
+    volumes:
+      - ..:/workspace
+      - backend_venv:/workspace/web/backend/.venv
+    depends_on:
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://127.0.0.1:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  frontend:
+    image: node:22-bookworm
+    working_dir: /workspace/web/frontend
+    command:
+      - sh
+      - -lc
+      - |
+        if [ ! -f package.json ]; then
+          echo "web/frontend is not scaffolded yet; frontend container is idle."
+          tail -f /dev/null
+        fi
+        npm install
+        npm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - "5173:5173"
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ..:/workspace
+      - frontend_node_modules:/workspace/web/frontend/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   meilisearch_data:
+  backend_venv:
+  frontend_node_modules:
