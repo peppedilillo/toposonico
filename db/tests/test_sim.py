@@ -23,32 +23,32 @@ def _write_embedding_parquet(tmp_path: Path, rowids: list[int]) -> Path:
 
 
 def test_spec_builders_return_expected_entities_and_factories():
-    filter_index = np.array([101, 102, 103], dtype=np.int64)
+    rowids = np.array([101, 102, 103], dtype=np.int64)
 
-    track = sim.track_spec(filter_index)
-    album = sim.album_spec(filter_index)
-    artist = sim.artist_spec(filter_index)
-    label = sim.label_spec(filter_index)
+    track = sim.track_spec(rowids)
+    album = sim.album_spec(rowids)
+    artist = sim.artist_spec(rowids)
+    label = sim.label_spec(rowids)
 
     assert track.entity == "track"
     assert track.factory_string.startswith("OPQ128_128,IVF")
     assert track.factory_string.endswith("_HNSW32,PQ128x4fsr")
-    np.testing.assert_array_equal(track.filter_index, filter_index)
+    np.testing.assert_array_equal(track.rowids, rowids)
 
     assert album.entity == "album"
     assert album.factory_string.startswith("OPQ128_128,IVF")
     assert album.factory_string.endswith("_HNSW32,PQ128x4fsr")
-    np.testing.assert_array_equal(album.filter_index, filter_index)
+    np.testing.assert_array_equal(album.rowids, rowids)
 
     assert artist.entity == "artist"
     assert artist.factory_string.startswith("IVF")
     assert artist.factory_string.endswith("_HNSW32,Flat")
-    np.testing.assert_array_equal(artist.filter_index, filter_index)
+    np.testing.assert_array_equal(artist.rowids, rowids)
 
     assert label.entity == "label"
     assert label.factory_string.startswith("IVF")
     assert label.factory_string.endswith(",Flat")
-    np.testing.assert_array_equal(label.filter_index, filter_index)
+    np.testing.assert_array_equal(label.rowids, rowids)
 
     assert track.d == sim.EMBEDDING_DIM
     assert track.n == 3
@@ -78,7 +78,7 @@ def test_load_filtered_embeddings_filters_reorders_and_normalizes(tmp_path):
     spec = sim.SimIndexSpec(
         entity="track",
         factory_string="Flat",
-        filter_index=np.array([30, 10], dtype=np.int64),
+        rowids=np.array([30, 10], dtype=np.int64),
     )
 
     matrix = sim.load_filtered_embeddings(path, spec, "track_rowid")
@@ -102,7 +102,7 @@ def test_train_index_returns_searchable_id_map(monkeypatch):
     distances, ids = index.search(xb, 1)
 
     assert distances.shape == (4, 1)
-    np.testing.assert_array_equal(ids[:, 0], spec.filter_index)
+    np.testing.assert_array_equal(ids[:, 0], spec.rowids)
 
 
 def test_save_and_load_index_round_trip(tmp_path, monkeypatch):
@@ -119,4 +119,4 @@ def test_save_and_load_index_round_trip(tmp_path, monkeypatch):
     assert loaded.ntotal == index.ntotal
     assert loaded.d == index.d
     _, ids = loaded.search(xb, 1)
-    np.testing.assert_array_equal(ids[:, 0], spec.filter_index)
+    np.testing.assert_array_equal(ids[:, 0], spec.rowids)

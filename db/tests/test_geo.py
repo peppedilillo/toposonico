@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scripts.build_geomap import read_and_filter, umap2geo
+from scripts.build_geomap import read_umaps, umap2geo
 from src.utils import ENTITY_KEYS as EKEYS
 from src.utils import EntityPaths, EntityTable
 
@@ -46,22 +46,6 @@ def _write_umap_parquets(tmp_path: Path, table: EntityTable) -> EntityPaths:
     return EntityPaths(**paths)
 
 
-def _write_filter_indices(tmp_path: Path, table: EntityTable) -> EntityPaths:
-    """Write .npy filter arrays containing all rowids from each entity frame."""
-    paths = {}
-    for entity, key_col in (
-        ("track", EKEYS.track),
-        ("artist", EKEYS.artist),
-        ("album", EKEYS.album),
-        ("label", EKEYS.label),
-    ):
-        p = tmp_path / f"filter_{entity}.npy"
-        rowids = getattr(table, entity)[key_col].to_numpy(dtype=np.int64)
-        np.save(p, rowids)
-        paths[entity] = p
-    return EntityPaths(**paths)
-
-
 def test_umap2geo_lon_lat_within_declared_range():
     table = _umap_table()
     result = umap2geo(table, max_lon=10.0, max_lat=10.0, padding=0.0)
@@ -73,8 +57,6 @@ def test_umap2geo_lon_lat_within_declared_range():
 
 
 def test_umap2geo_extreme_points_reach_bounds():
-    # track has the global x/y extremes (0 and 1); with no padding they should
-    # land exactly at ±max
     table = _umap_table()
     result = umap2geo(table, max_lon=10.0, max_lat=10.0, padding=0.0)
 
@@ -86,9 +68,6 @@ def test_umap2geo_extreme_points_reach_bounds():
 
 
 def test_umap2geo_shared_bbox_keeps_entities_aligned():
-    # track lives in [0, 1]; artist lives in [5, 6] — without shared bbox they
-    # would fill the same lon/lat range.  With a shared bbox artist is in the
-    # right half of the map and track is in the left half.
     table = _umap_table(
         track_xy=[(0.0, 0.5), (1.0, 0.5)],
         artist_xy=[(5.0, 0.5), (6.0, 0.5)],
@@ -103,8 +82,6 @@ def test_umap2geo_shared_bbox_keeps_entities_aligned():
 
 
 def test_umap2geo_padding_moves_extremes_inward():
-    # Without padding, the extreme track points hit ±max exactly.
-    # With padding > 0 the bbox grows, so those same points map to interior values.
     table = _umap_table()
     no_pad = umap2geo(table, max_lon=10.0, max_lat=10.0, padding=0.0)
     padded = umap2geo(table, max_lon=10.0, max_lat=10.0, padding=0.5)
@@ -114,8 +91,6 @@ def test_umap2geo_padding_moves_extremes_inward():
 
 
 def test_umap2geo_negative_max_lon_flips_x_axis():
-    # Two track points at x=0 and x=1.  Positive max_lon → left-to-right order.
-    # Negative max_lon → reversed order (same as main() passes -hwidth).
     table = _umap_table(track_xy=[(0.0, 0.5), (1.0, 0.5)])
     pos = umap2geo(table, max_lon=+10.0, max_lat=10.0, padding=0.0)
     neg = umap2geo(table, max_lon=-10.0, max_lat=10.0, padding=0.0)
@@ -151,40 +126,12 @@ def test_umap2geo_preserves_key_column_values():
     np.testing.assert_array_equal(result.artist[EKEYS.artist], table.artist[EKEYS.artist])
 
 
-def test_read_and_filter_restricts_rows_to_filter_index(tmp_path):
-    table = _umap_table(track_xy=[(float(i), float(i)) for i in range(5)])
-    # Manually override track rowids so we can filter a specific subset
-    table.track[EKEYS.track] = [10, 20, 30, 40, 50]
-    umaps = _write_umap_parquets(tmp_path, table)
-
-    # Filter: keep only track rowids 20 and 40
-    filter_dir = tmp_path / "filters"
-    filter_dir.mkdir()
-    filter_track = filter_dir / "filter_track.npy"
-    np.save(filter_track, np.array([20, 40], dtype=np.int64))
-
-    # Other entities: keep all
-    full_filters = _write_filter_indices(tmp_path, table)
-    filters = EntityPaths(
-        track=filter_track,
-        artist=full_filters.artist,
-        album=full_filters.album,
-        label=full_filters.label,
-    )
-
-    result = read_and_filter(umaps, filters)
-
-    assert len(result.track) == 2
-    np.testing.assert_array_equal(sorted(result.track[EKEYS.track]), [20, 40])
-
-
-def test_read_and_filter_preserves_umap_values(tmp_path):
+def test_read_umaps_preserves_umap_values(tmp_path):
     table = _umap_table(track_xy=[(1.0, 2.0), (3.0, 4.0)])
     table.track[EKEYS.track] = [100, 200]
     umaps = _write_umap_parquets(tmp_path, table)
-    filters = _write_filter_indices(tmp_path, table)
 
-    result = read_and_filter(umaps, filters)
+    result = read_umaps(umaps)
 
     row = result.track.set_index(EKEYS.track).loc[100]
     assert row["umap_x"] == pytest.approx(1.0)

@@ -3,7 +3,6 @@ from pathlib import Path
 import tomllib
 from typing import NamedTuple
 
-import numpy as np
 import pandas as pd
 
 ENTITIES = ("track", "artist", "album", "label")
@@ -14,13 +13,6 @@ class EntityPaths(NamedTuple):
     artist: Path
     album: Path
     label: Path
-
-
-class EntityIndex(NamedTuple):
-    track: np.ndarray
-    artist: np.ndarray
-    album: np.ndarray
-    label: np.ndarray
 
 
 class EntityTable(NamedTuple):
@@ -122,25 +114,6 @@ def get_geo_paths() -> EntityPaths:
     d.mkdir(parents=True, exist_ok=True)
     return EntityPaths(**{e: d / f"geo_{e}.parquet" for e in ENTITIES})
 
-
-def get_index_filter_db_paths() -> EntityPaths:
-    """Return per-entity filter index paths."""
-    outdir = os.environ.get("SICK_OUT_DIR")
-    if outdir is None:
-        raise ValueError("$SICK_OUT_DIR not set")
-    d = Path(outdir) / "index" / "filter" / "db"
-    d.mkdir(parents=True, exist_ok=True)
-    return EntityPaths(**{e: d / f"index_filter_{e}.npy" for e in ENTITIES})
-
-
-def get_index_filter_sim_paths() -> EntityPaths:
-    """Return per-entity filter index paths rooted at $SICK_INDEX_FILTER_DIR."""
-    outdir = os.environ.get("SICK_OUT_DIR")
-    if outdir is None:
-        raise ValueError("$SICK_OUT_DIR not set")
-    d = Path(outdir) / "index" / "filter" / "sim"
-    d.mkdir(parents=True, exist_ok=True)
-    return EntityPaths(**{e: d / f"index_filter_{e}.npy" for e in ENTITIES})
 
 
 def get_index_faiss_paths() -> EntityPaths:

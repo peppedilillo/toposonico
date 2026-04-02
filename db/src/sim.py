@@ -41,55 +41,55 @@ class SimIndexSpec:
 
     entity: str
     factory_string: str
-    filter_index: np.ndarray
+    rowids: np.ndarray
     d: int = EMBEDDING_DIM
 
     @property
     def n(self) -> int:
-        return len(self.filter_index)
+        return len(self.rowids)
 
     @property
     def nlist(self) -> int:
         return ivf_compute_nlist(self.n)
 
 
-def track_spec(filter_index: np.ndarray) -> SimIndexSpec:
+def track_spec(rowids: np.ndarray) -> SimIndexSpec:
     """Track index: OPQ + IVF/HNSW quantizer + PQ fast-scan."""
-    nlist = ivf_compute_nlist(len(filter_index))
+    nlist = ivf_compute_nlist(len(rowids))
     return SimIndexSpec(
         entity="track",
         factory_string=f"OPQ128_128,IVF{nlist}_HNSW32,PQ128x4fsr",
-        filter_index=filter_index,
+        rowids=rowids,
     )
 
 
-def album_spec(filter_index: np.ndarray) -> SimIndexSpec:
+def album_spec(rowids: np.ndarray) -> SimIndexSpec:
     """Album index: OPQ + IVF/HNSW quantizer + PQ fast-scan."""
-    nlist = ivf_compute_nlist(len(filter_index))
+    nlist = ivf_compute_nlist(len(rowids))
     return SimIndexSpec(
         entity="album",
         factory_string=f"OPQ128_128,IVF{nlist}_HNSW32,PQ128x4fsr",
-        filter_index=filter_index,
+        rowids=rowids,
     )
 
 
-def artist_spec(filter_index: np.ndarray) -> SimIndexSpec:
+def artist_spec(rowids: np.ndarray) -> SimIndexSpec:
     """Artist index: IVF with HNSW quantizer, flat vectors (no compression)."""
-    nlist = ivf_compute_nlist(len(filter_index))
+    nlist = ivf_compute_nlist(len(rowids))
     return SimIndexSpec(
         entity="artist",
         factory_string=f"IVF{nlist}_HNSW32,Flat",
-        filter_index=filter_index,
+        rowids=rowids,
     )
 
 
-def label_spec(filter_index: np.ndarray) -> SimIndexSpec:
+def label_spec(rowids: np.ndarray) -> SimIndexSpec:
     """Label index: IVF with flat quantizer, flat vectors."""
-    nlist = ivf_compute_nlist(len(filter_index))
+    nlist = ivf_compute_nlist(len(rowids))
     return SimIndexSpec(
         entity="label",
         factory_string=f"IVF{nlist},Flat",
-        filter_index=filter_index,
+        rowids=rowids,
     )
 
 
@@ -100,8 +100,8 @@ def load_filtered_embeddings(
 ) -> np.ndarray:
     """Load embeddings, filter to spec's index, L2-normalize. Returns (n, d) float32."""
     df = pd.read_parquet(embedding_path)
-    df = df[df[rowid_col].isin(spec.filter_index)]
-    df = df.set_index(rowid_col).loc[spec.filter_index].reset_index()
+    df = df[df[rowid_col].isin(spec.rowids)]
+    df = df.set_index(rowid_col).loc[spec.rowids].reset_index()
     matrix = np.ascontiguousarray(df.filter(regex=r"^e\d+$").values, dtype=np.float32)
     faiss.normalize_L2(matrix)
     return matrix
@@ -114,7 +114,7 @@ def train_index(spec: SimIndexSpec, xb: np.ndarray) -> faiss.Index:
     xt = subsample_training(xb, train_n)
     index.train(xt)
     index = faiss.IndexIDMap2(index)
-    index.add_with_ids(xb, spec.filter_index)
+    index.add_with_ids(xb, spec.rowids)
     return index
 
 

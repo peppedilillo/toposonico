@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Build the SQLite database from parquet inputs.
 
-Loads lookup parquets (via manifest), geo parquets, and DB filter indices to
+Loads lookup parquets (via manifest), geo parquets, and embedding parquets to
 produce a single SQLite DB with:
-- Denormalized entity metadata for map navigation and search
+- Denormalized entity metadata with canonical IDs for dedup and navigation
+- Per-entity searchable/recable flags for downstream index construction
 - Per-entity embedding tables (L2-normalized BLOBs) for FAISS queries
 - Ranked representative children for hierarchy navigation
 
@@ -30,39 +31,42 @@ import pyarrow.parquet as pq
 
 from src.utils import ENTITY_KEYS as EKEYS
 from src.utils import EntityPaths
+from src.utils import _get_config_float
+from src.utils import _get_config_int
 from src.utils import get_geo_paths
-from src.utils import get_index_filter_db_paths
 from src.utils import read_manifest
 
 
 BATCH_SIZE = 500_000
-REPRESENTATIVE_COUNT = 5
 
 DDL = """
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous  = NORMAL;
 
 CREATE TABLE tracks (
-    track_rowid      INTEGER PRIMARY KEY,
-    track_name       TEXT    NOT NULL,
-    track_popularity INTEGER,
-    logcount         REAL    NOT NULL,
-    release_date     TEXT,
-    id_isrc          TEXT,
-    lon              REAL    NOT NULL,
-    lat              REAL    NOT NULL,
-    artist_rowid     INTEGER NOT NULL,
-    artist_name      TEXT,
-    artist_lon       REAL,
-    artist_lat       REAL,
-    album_rowid      INTEGER NOT NULL,
-    album_name       TEXT,
-    album_lon        REAL,
-    album_lat        REAL,
-    label_rowid      INTEGER,
-    label            TEXT,
-    label_lon        REAL,
-    label_lat        REAL
+    track_rowid           INTEGER PRIMARY KEY,
+    track_canonical_rowid INTEGER NOT NULL,
+    track_name            TEXT    NOT NULL,
+    track_popularity      INTEGER,
+    logcount              REAL    NOT NULL,
+    release_date          TEXT,
+    id_isrc               TEXT,
+    searchable            INTEGER NOT NULL DEFAULT 0,
+    recable               INTEGER NOT NULL DEFAULT 0,
+    lon                   REAL    NOT NULL,
+    lat                   REAL    NOT NULL,
+    artist_rowid          INTEGER NOT NULL,
+    artist_name           TEXT,
+    artist_lon            REAL,
+    artist_lat            REAL,
+    album_rowid           INTEGER NOT NULL,
+    album_name            TEXT,
+    album_lon             REAL,
+    album_lat             REAL,
+    label_rowid           INTEGER,
+    label                 TEXT,
+    label_lon             REAL,
+    label_lat             REAL
 );
 
 CREATE TABLE albums (
@@ -71,6 +75,8 @@ CREATE TABLE albums (
     album_name               TEXT    NOT NULL,
     album_name_norm          TEXT    NOT NULL,
     logcount                 REAL    NOT NULL,
+    searchable               INTEGER NOT NULL DEFAULT 0,
+    recable                  INTEGER NOT NULL DEFAULT 0,
     lon                      REAL    NOT NULL,
     lat                      REAL    NOT NULL,
     artist_rowid             INTEGER NOT NULL,
@@ -88,25 +94,31 @@ CREATE TABLE albums (
 );
 
 CREATE TABLE artists (
-    artist_rowid  INTEGER PRIMARY KEY,
-    artist_name   TEXT    NOT NULL,
-    artist_genre  TEXT,
-    logcount      REAL    NOT NULL,
-    ntrack        INTEGER,
-    nalbum        INTEGER,
-    lon           REAL    NOT NULL,
-    lat           REAL    NOT NULL
+    artist_rowid           INTEGER PRIMARY KEY,
+    artist_canonical_rowid INTEGER NOT NULL,
+    artist_name            TEXT    NOT NULL,
+    artist_genre           TEXT,
+    logcount               REAL    NOT NULL,
+    ntrack                 INTEGER,
+    nalbum                 INTEGER,
+    searchable             INTEGER NOT NULL DEFAULT 0,
+    recable                INTEGER NOT NULL DEFAULT 0,
+    lon                    REAL    NOT NULL,
+    lat                    REAL    NOT NULL
 );
 
 CREATE TABLE labels (
-    label_rowid  INTEGER PRIMARY KEY,
-    label        TEXT    NOT NULL UNIQUE,
-    logcount     REAL    NOT NULL,
-    ntrack       INTEGER,
-    nalbum       INTEGER,
-    nartist      INTEGER,
-    lon          REAL    NOT NULL,
-    lat          REAL    NOT NULL
+    label_rowid           INTEGER PRIMARY KEY,
+    label_canonical_rowid INTEGER NOT NULL,
+    label                 TEXT    NOT NULL UNIQUE,
+    logcount              REAL    NOT NULL,
+    ntrack                INTEGER,
+    nalbum                INTEGER,
+    nartist               INTEGER,
+    searchable            INTEGER NOT NULL DEFAULT 0,
+    recable               INTEGER NOT NULL DEFAULT 0,
+    lon                   REAL    NOT NULL,
+    lat                   REAL    NOT NULL
 );
 
 CREATE TABLE track_embedding (
@@ -181,23 +193,21 @@ def get_album_canonical_updates(albums: pd.DataFrame) -> pd.DataFrame:
     """Return canonical album assignments for an albums DataFrame.
 
     Albums are grouped by artist, album type, and normalized title. Within each
-    group, rows whose original title already matches the normalized title are
-    preferred over suffixed variants; remaining ties fall back to the smallest
-    album_rowid for deterministic canonical selection.
+    group, the canonical entry is the one with the highest logcount; ties are
+    broken by the smallest album_rowid for deterministic selection.
     """
     albums = albums.copy()
     albums["album_type_norm"] = albums["album_type"].fillna("")
-    albums["is_title_variant"] = albums["album_name_norm"] != albums["album_name"]
     canonical = (
         albums.sort_values(
             [
                 "artist_rowid",
                 "album_type_norm",
                 "album_name_norm",
-                "is_title_variant",
+                "logcount",
                 "album_rowid",
             ],
-            ascending=[True, True, True, True, True],
+            ascending=[True, True, True, False, True],
         )
         .drop_duplicates(
             ["artist_rowid", "album_type_norm", "album_name_norm"],
@@ -221,7 +231,8 @@ def canonicalize_albums(conn: sqlite3.Connection) -> None:
             artist_rowid,
             album_type,
             album_name,
-            album_name_norm
+            album_name_norm,
+            logcount
         FROM albums
         """,
         conn,
@@ -233,6 +244,100 @@ def canonicalize_albums(conn: sqlite3.Connection) -> None:
     )
 
 
+def get_track_canonical_updates(tracks: pd.DataFrame) -> pd.DataFrame:
+    """Return canonical track assignments for a tracks DataFrame.
+
+    Tracks are grouped by id_isrc. Tracks with NULL/empty/whitespace ISRC are
+    self-canonical. Among tracks sharing a valid ISRC, the one with the highest
+    logcount is canonical; ties are broken by the smallest track_rowid.
+    """
+    tracks = tracks.copy()
+    has_valid_isrc = (
+        tracks["id_isrc"].notna()
+        & tracks["id_isrc"].astype(str).str.strip().ne("")
+    )
+    self_canonical = tracks[~has_valid_isrc][["track_rowid"]].copy()
+    self_canonical["track_canonical_rowid"] = self_canonical["track_rowid"]
+    self_canonical = self_canonical[["track_canonical_rowid", "track_rowid"]]
+
+    dupes = tracks[has_valid_isrc].copy()
+    canonical = (
+        dupes.sort_values(
+            ["id_isrc", "logcount", "track_rowid"],
+            ascending=[True, False, True],
+        )
+        .drop_duplicates("id_isrc", keep="first")[["id_isrc", "track_rowid"]]
+        .rename(columns={"track_rowid": "track_canonical_rowid"})
+    )
+    dupes = dupes.merge(canonical, on="id_isrc", how="left")[
+        ["track_canonical_rowid", "track_rowid"]
+    ]
+    return pd.concat([self_canonical, dupes], ignore_index=True)
+
+
+def canonicalize_tracks(conn: sqlite3.Connection) -> None:
+    """Assign each track row to a canonical track row based on ISRC grouping."""
+    tracks = pd.read_sql(
+        "SELECT track_rowid, id_isrc, logcount FROM tracks",
+        conn,
+    )
+    updates = get_track_canonical_updates(tracks)
+    conn.executemany(
+        "UPDATE tracks SET track_canonical_rowid = ? WHERE track_rowid = ?",
+        list(updates.itertuples(index=False, name=None)),
+    )
+
+
+def compute_searchable_recable(
+    conn: sqlite3.Connection,
+    searchable_track_min_logcount: float,
+    searchable_album_min_total_tracks: int,
+    searchable_artist_min_ntrack: int,
+    searchable_label_min_nartist: int,
+    recable_track_min_logcount: float,
+) -> None:
+    """Set searchable and recable flags on all entity tables.
+
+    An entity is searchable if it is self-canonical and meets per-entity
+    threshold criteria. An entity is recable if it is searchable (and for
+    tracks, meets an additional logcount threshold).
+    """
+    conn.execute(
+        "UPDATE tracks SET searchable = 1 "
+        "WHERE track_canonical_rowid = track_rowid AND logcount >= ?",
+        (searchable_track_min_logcount,),
+    )
+    conn.execute(
+        "UPDATE albums SET searchable = 1 "
+        "WHERE album_canonical_rowid = album_rowid AND total_tracks >= ?",
+        (searchable_album_min_total_tracks,),
+    )
+    conn.execute(
+        "UPDATE artists SET searchable = 1 "
+        "WHERE artist_canonical_rowid = artist_rowid AND ntrack >= ?",
+        (searchable_artist_min_ntrack,),
+    )
+    conn.execute(
+        "UPDATE labels SET searchable = 1 "
+        "WHERE label_canonical_rowid = label_rowid AND nartist >= ?",
+        (searchable_label_min_nartist,),
+    )
+
+    conn.execute(
+        "UPDATE tracks SET recable = 1 WHERE searchable = 1 AND logcount >= ?",
+        (recable_track_min_logcount,),
+    )
+    conn.execute("UPDATE albums SET recable = 1 WHERE searchable = 1")
+    conn.execute("UPDATE artists SET recable = 1 WHERE searchable = 1")
+    conn.execute("UPDATE labels SET recable = 1 WHERE searchable = 1")
+
+    for table in ("tracks", "albums", "artists", "labels"):
+        total, searchable, recable = conn.execute(
+            f"SELECT COUNT(*), SUM(searchable), SUM(recable) FROM {table}"
+        ).fetchone()
+        print(f"  [{table}] total={total:,}  searchable={searchable:,}  recable={recable:,}")
+
+
 def build_labels(
     conn: sqlite3.Connection,
     lookup: pd.DataFrame,
@@ -240,8 +345,9 @@ def build_labels(
 ) -> pd.DataFrame:
     """Build the labels table. Returns geo for downstream denormalization."""
     df = lookup.merge(geo, on=EKEYS.label)
+    df["label_canonical_rowid"] = df[EKEYS.label]
     df[[
-        EKEYS.label, "label", "logcount",
+        EKEYS.label, "label_canonical_rowid", "label", "logcount",
         "ntrack", "nalbum", "nartist",
         "lon", "lat",
     ]].to_sql("labels", conn, if_exists="append", index=False)
@@ -256,8 +362,9 @@ def build_artists(
 ) -> pd.DataFrame:
     """Build the artists table. Returns geo for downstream denormalization."""
     df = lookup.merge(geo, on=EKEYS.artist)
+    df["artist_canonical_rowid"] = df[EKEYS.artist]
     df[[
-        EKEYS.artist, "artist_name", "artist_genre", "logcount",
+        EKEYS.artist, "artist_canonical_rowid", "artist_name", "artist_genre", "logcount",
         "ntrack", "nalbum",
         "lon", "lat",
     ]].to_sql("artists", conn, if_exists="append", index=False)
@@ -314,7 +421,9 @@ def build_tracks(
     label_geo_r = label_geo.rename(columns={"lon": "label_lon", "lat": "label_lat"})
 
     out_cols = [
-        EKEYS.track, "track_name", "track_popularity", "logcount", "release_date", "id_isrc", "lon", "lat",
+        EKEYS.track, "track_canonical_rowid",
+        "track_name", "track_popularity", "logcount", "release_date", "id_isrc",
+        "lon", "lat",
         EKEYS.artist, "artist_name", "artist_lon", "artist_lat",
         EKEYS.album, "album_name", "album_lon", "album_lat",
         EKEYS.label, "label", "label_lon", "label_lat",
@@ -333,6 +442,7 @@ def build_tracks(
             .merge(label_geo_r, on=EKEYS.label, how="left")
         )
         df["label"] = df["label"].replace("", None)
+        df["track_canonical_rowid"] = df[EKEYS.track]
         df[out_cols].to_sql("tracks", conn, if_exists="append", index=False)
 
         total += len(df)
@@ -507,20 +617,17 @@ def build_representatives(conn: sqlite3.Connection, limit: int) -> None:
 def build_embedding(
     conn: sqlite3.Connection,
     embedding_path: Path,
-    filter_path: Path,
     key_col: str,
     table_name: str,
     batch_size: int,
 ) -> None:
-    """Load one entity's embedding parquet, filter to DB index, L2-normalize, write BLOBs."""
-    filter_set = set(np.load(filter_path).tolist())
+    """Load one entity's embedding parquet, L2-normalize, write BLOBs."""
     pf = pq.ParquetFile(embedding_path)
     total = 0
     t0 = time.time()
 
     for batch in pf.iter_batches(batch_size=batch_size):
         df = batch.to_pandas()
-        df = df[df[key_col].isin(filter_set)]
         if df.empty:
             continue
         rowids = df[key_col].to_numpy()
@@ -546,17 +653,16 @@ def build_embedding(
 def build_embeddings(
     conn: sqlite3.Connection,
     embedding_paths: EntityPaths,
-    filter_paths: EntityPaths,
     batch_size: int,
 ) -> None:
     """Build all four embedding tables."""
-    for entity, emb_path, filt_path, key_col in (
-        ("track", embedding_paths.track, filter_paths.track, EKEYS.track),
-        ("album", embedding_paths.album, filter_paths.album, EKEYS.album),
-        ("artist", embedding_paths.artist, filter_paths.artist, EKEYS.artist),
-        ("label", embedding_paths.label, filter_paths.label, EKEYS.label),
+    for entity, emb_path, key_col in (
+        ("track", embedding_paths.track, EKEYS.track),
+        ("album", embedding_paths.album, EKEYS.album),
+        ("artist", embedding_paths.artist, EKEYS.artist),
+        ("label", embedding_paths.label, EKEYS.label),
     ):
-        build_embedding(conn, emb_path, filt_path, key_col, f"{entity}_embedding", batch_size)
+        build_embedding(conn, emb_path, key_col, f"{entity}_embedding", batch_size)
     conn.commit()
 
 
@@ -593,7 +699,14 @@ def main():
     embedding_paths = manifest["embedding"]
 
     geo_paths = get_geo_paths()
-    filter_paths = get_index_filter_db_paths()
+
+    searchable_track_min_logcount = _get_config_float("SICK_SEARCHABLE_TRACK_MIN_LOGCOUNT")
+    searchable_album_min_total_tracks = _get_config_int("SICK_SEARCHABLE_ALBUM_MIN_TOTAL_TRACKS")
+    searchable_artist_min_ntrack = _get_config_int("SICK_SEARCHABLE_ARTIST_MIN_NTRACK")
+    searchable_label_min_nartist = _get_config_int("SICK_SEARCHABLE_LABEL_MIN_NARTIST")
+    recable_track_min_logcount = _get_config_float("SICK_RECABLE_TRACK_MIN_LOGCOUNT")
+    representative_count = _get_config_int("SICK_REPRESENTATIVE_N")
+
 
     db_path = Path(args.db)
     if db_path.exists():
@@ -646,17 +759,29 @@ def main():
         track_geo, artist_geo, album_geo, label_geo,
         args.batch_size,
     )
+    canonicalize_tracks(conn)
+    conn.commit()
+
+    print("\nComputing searchable/recable flags...")
+    compute_searchable_recable(
+        conn,
+        searchable_track_min_logcount,
+        searchable_album_min_total_tracks,
+        searchable_artist_min_ntrack,
+        searchable_label_min_nartist,
+        recable_track_min_logcount,
+    )
     conn.commit()
 
     print("\nCreating indexes...")
     conn.executescript(POST_DDL)
     conn.commit()
 
-    print(f"\nBuilding representative children (top {REPRESENTATIVE_COUNT})...")
-    build_representatives(conn, REPRESENTATIVE_COUNT)
+    print(f"\nBuilding representative children (top {representative_count})...")
+    build_representatives(conn, representative_count)
 
     print("\nBuilding embedding tables...")
-    build_embeddings(conn, embedding_paths, filter_paths, args.batch_size)
+    build_embeddings(conn, embedding_paths, args.batch_size)
 
     conn.close()
 

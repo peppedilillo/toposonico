@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Build the db pipeline: filter → geo → [optional sim] → db
+# Build the db pipeline: geo → db → sim
 #
 # Usage:
 #   source config.env && bash build.sh
 #   bash build.sh                 # auto-sources config.env if SICK_OUT_DIR is unset
-#   bash build.sh --from-geo      # skip filter, run from geo onward
-#   bash build.sh --from-sim      # skip filter + geo, run from sim onward
-#   bash build.sh --from-db       # skip filter + geo + sim, run from db onward
+#   bash build.sh --from-db       # skip geo, run from db onward
+#   bash build.sh --from-sim      # skip geo + db, run sim only
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,24 +21,18 @@ if [[ -z "${SICK_OUT_DIR:-}" ]]; then
     fi
 fi
 
-RUN_FILTER=1
 RUN_GEO=1
-RUN_SIM=1
 RUN_DB=1
+RUN_SIM=1
 
 for arg in "$@"; do
     case "$arg" in
-        --from-geo)
-            RUN_FILTER=0
+        --from-db)
+            RUN_GEO=0
             ;;
         --from-sim)
-            RUN_FILTER=0
             RUN_GEO=0
-            ;;
-        --from-db)
-            RUN_SIM=0
-            RUN_FILTER=0
-            RUN_GEO=0
+            RUN_DB=0
             ;;
         *)
             echo "Error: unknown argument: $arg"
@@ -63,18 +56,18 @@ if [[ ${#missing[@]} -gt 0 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-if [[ $RUN_FILTER -eq 1 ]]; then
-    echo "=== Step 1: build_filter_index ==="
-    uv run python "$SCRIPT_DIR/scripts/build_filter_index.py"
+if [[ $RUN_GEO -eq 1 ]]; then
+    echo "=== Step 1: build_geomap ==="
+    uv run python "$SCRIPT_DIR/scripts/build_geomap.py"
 else
     echo "=== Step 1: skipped ==="
 fi
 
 # ---------------------------------------------------------------------------
-if [[ $RUN_GEO -eq 1 ]]; then
+if [[ $RUN_DB -eq 1 ]]; then
     echo ""
-    echo "=== Step 2: build_geomap ==="
-    uv run python "$SCRIPT_DIR/scripts/build_geomap.py"
+    echo "=== Step 2: build_db ==="
+    uv run python "$SCRIPT_DIR/scripts/build_db.py"
 else
     echo ""
     echo "=== Step 2: skipped ==="
@@ -88,16 +81,6 @@ if [[ $RUN_SIM -eq 1 ]]; then
 else
     echo ""
     echo "=== Step 3: skipped ==="
-fi
-
-# ---------------------------------------------------------------------------
-if [[ $RUN_DB -eq 1 ]]; then
-    echo ""
-    echo "=== Step 4: build_db ==="
-    uv run python "$SCRIPT_DIR/scripts/build_db.py"
-else
-    echo ""
-    echo "=== Step 4: skipped ==="
 fi
 
 echo ""

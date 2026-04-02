@@ -2,17 +2,17 @@
 """
 FAISS Index Benchmark
 =====================
-Benchmarks HNSW, HNSW+SQ, IVF Flat, IVF Flat with HNSW quantizer,
-and OPQ+IVF/HNSW+PQ fast-scan on filtered entity embeddings.
+Benchmarks IVF Flat, IVF Flat with HNSW quantizer, and OPQ+IVF/HNSW+PQ
+fast-scan on recable entity embeddings.
 
-Reads embedding paths from a manifest TOML and filter indexes (.npy)
-from a directory.  Iterates over selected entities, filtering each
-embedding table to the surviving rowids before benchmarking.
+Reads embedding paths from a manifest TOML and recable rowids from the DB.
+Iterates over selected entities, filtering each embedding table to the
+recable rowids before benchmarking.
 
 All indexes are built via faiss.index_factory.  Build-time parameters
-(nlist, training set size, …) are derived automatically from the dataset
-shape.  Search-time parameters (efSearch, nprobe) are swept so you can
-evaluate the speed/recall trade-off.
+(nlist, training set size, ...) are derived automatically from the dataset
+shape.  Search-time parameters (nprobe) are swept so you can evaluate the
+speed/recall trade-off.
 
 Usage:
     source config.env && python benchmark_faiss.py [--entities track label] [--n-query N] [benchmark ...]
@@ -20,7 +20,7 @@ Usage:
 Examples:
     python benchmark_faiss.py
     python benchmark_faiss.py --entities label --n-query 100 ivf
-    python benchmark_faiss.py --entities track artist --n-query 2000 hnsw ivf
+    python benchmark_faiss.py --entities track artist --n-query 2000 ivf opq_ivfhnsw_pq
 """
 
 import argparse
@@ -28,6 +28,7 @@ import ctypes
 import gc
 import os
 from pathlib import Path
+import sqlite3
 import sys
 import time
 
@@ -37,15 +38,12 @@ import pandas as pd
 
 from src.utils import ENTITIES
 from src.utils import ENTITY_KEYS
-from src.utils import get_index_filter_sim_paths
 from src.utils import read_manifest
 
 K = 100
 SEED = 666
 
 ALL_BENCHMARKS = [
-    "hnsw",
-    "hnsw_sq",
     "ivf",
     "ivf_hnsw_quantizer",
     "opq_ivfhnsw_pq",
@@ -80,7 +78,6 @@ def compute_params(n: int, dim: int) -> dict:
         "pq_train_size": pq_train_size,
         "M_pq": M_pq,
         "d_opq": d_opq,
-        "ef_search_values": (16, 32, 64, 128, 256),
         "nprobe_values": (1, 4, 16, 64, 256),
     }
 
@@ -140,18 +137,6 @@ def get_index_size(index) -> int:
         refine_bytes = ntotal * dim * 4
         base_bytes = get_index_size(index.base_index) if index.base_index.ntotal > 0 else 0
         estimated = refine_bytes + base_bytes
-
-    elif isinstance(index, faiss.IndexHNSWFlat):
-        M = index.hnsw.cum_nneighbor_per_level.at(1)
-        vec_bytes = ntotal * dim * 4
-        graph_bytes = ntotal * 2 * M * 4
-        estimated = vec_bytes + graph_bytes
-
-    elif isinstance(index, faiss.IndexHNSWSQ):
-        M = index.hnsw.cum_nneighbor_per_level.at(1)
-        vec_bytes = ntotal * dim * 1
-        graph_bytes = ntotal * 2 * M * 4
-        estimated = vec_bytes + graph_bytes
 
     elif isinstance(index, faiss.IndexIVFFlat):
         vec_bytes = ntotal * dim * 4
@@ -282,9 +267,9 @@ def compute_groundtruth_chunked(xb: np.ndarray, xq: np.ndarray, k: int, chunk_si
 
 
 def load_filtered_data(
-    embedding_path: str | Path, filter_index_path: str | Path, rowid_col: str, n_query: int, k: int, seed: int = SEED
+    embedding_path: str | Path, rowids: np.ndarray, rowid_col: str, n_query: int, k: int, seed: int = SEED
 ):
-    """Load an embedding parquet, filter to surviving rowids, prepare benchmark data."""
+    """Load an embedding parquet, filter to recable rowids, prepare benchmark data."""
     header("Data Loading")
 
     step(f"Reading {embedding_path}")
@@ -293,10 +278,9 @@ def load_filtered_data(
     n_raw = len(df)
     done(time.time() - t)
 
-    step(f"Filtering with {filter_index_path}")
+    step(f"Filtering to {len(rowids):,} recable rowids")
     t = time.time()
-    filter_idx = np.load(filter_index_path)
-    df = df[df[rowid_col].isin(filter_idx)]
+    df = df[df[rowid_col].isin(rowids)]
     n_filtered = len(df)
     done(time.time() - t)
     print(f"  {DIM_C}  {n_raw:,} → {n_filtered:,} ({100 * n_filtered / n_raw:.1f}%){RESET}")
@@ -339,59 +323,6 @@ def load_filtered_data(
     print(f"    RSS after load: {CYAN}{format_bytes(get_rss_bytes()):>11}{RESET}")
 
     return xb, xq, gt
-
-
-def bench_hnsw(xb, xq, gt, k, params):
-    header("HNSW Flat  (HNSW32)")
-    n, dim = xb.shape
-
-    free_memory()
-    rss0 = get_rss_bytes()
-    index = faiss.index_factory(dim, "HNSW32", faiss.METRIC_INNER_PRODUCT)
-
-    step(f"Adding {n:,} vectors")
-    t = time.time()
-    index.add(xb)
-    done(time.time() - t)
-
-    idx_bytes = print_memory(index, rss0)
-    print_table_header()
-    for ef in params["ef_search_values"]:
-        index.hnsw.efSearch = ef
-        evaluate(index, xq, gt, k, f"efSearch={ef}")
-
-    del index
-    free_memory()
-    return idx_bytes
-
-
-def bench_hnsw_sq(xb, xq, gt, k, params):
-    header("HNSW + Scalar Quantizer  (HNSW16_SQ8)")
-    n, dim = xb.shape
-
-    free_memory()
-    rss0 = get_rss_bytes()
-    index = faiss.index_factory(dim, "HNSW16_SQ8", faiss.METRIC_INNER_PRODUCT)
-
-    step("Training scalar quantizer")
-    t = time.time()
-    index.train(xb)
-    done(time.time() - t)
-
-    step(f"Adding {n:,} vectors")
-    t = time.time()
-    index.add(xb)
-    done(time.time() - t)
-
-    idx_bytes = print_memory(index, rss0)
-    print_table_header()
-    for ef in params["ef_search_values"]:
-        index.hnsw.efSearch = ef
-        evaluate(index, xq, gt, k, f"efSearch={ef}")
-
-    del index
-    free_memory()
-    return idx_bytes
 
 
 def bench_ivf(xb, xq, gt, k, params):
@@ -506,8 +437,6 @@ def bench_opq_ivfhnsw_pq(xb, xq, gt, k, params):
 def run_benchmarks(xb, xq, gt, k, params, benchmark_names):
     """Run selected benchmarks and return (name, idx_bytes) pairs."""
     dispatch = {
-        "hnsw": lambda: bench_hnsw(xb, xq, gt, k, params),
-        "hnsw_sq": lambda: bench_hnsw_sq(xb, xq, gt, k, params),
         "ivf": lambda: bench_ivf(xb, xq, gt, k, params),
         "ivf_hnsw_quantizer": lambda: bench_ivf_hnsw_quantizer(xb, xq, gt, k, params),
         "opq_ivfhnsw_pq": lambda: bench_opq_ivfhnsw_pq(xb, xq, gt, k, params),
@@ -533,7 +462,7 @@ def print_memory_summary(mem_stats, n_base, dim):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Benchmark FAISS index types on filtered entity embeddings.",
+        description="Benchmark FAISS index types on recable entity embeddings.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -541,6 +470,12 @@ def main():
         default=os.environ.get("SICK_MANIFEST"),
         metavar="PATH",
         help="Path to ml manifest TOML. $SICK_MANIFEST",
+    )
+    parser.add_argument(
+        "--db",
+        default=os.environ.get("SICK_DB"),
+        metavar="PATH",
+        help="Path to sick.db. $SICK_DB",
     )
     parser.add_argument(
         "--entities",
@@ -568,6 +503,8 @@ def main():
 
     if args.manifest is None:
         parser.error("--manifest / $SICK_MANIFEST not set")
+    if args.db is None:
+        parser.error("--db / $SICK_DB not set")
 
     unknown = set(args.benchmarks) - set(ALL_BENCHMARKS)
     if unknown:
@@ -575,14 +512,28 @@ def main():
 
     manifest = read_manifest(args.manifest)
     embedding_paths = manifest["embedding"]
-    filter_paths = get_index_filter_sim_paths()
+
+    conn = sqlite3.connect(args.db)
+    entity_rowids = {}
+    for entity, key_col in (
+        ("track", ENTITY_KEYS.track),
+        ("artist", ENTITY_KEYS.artist),
+        ("album", ENTITY_KEYS.album),
+        ("label", ENTITY_KEYS.label),
+    ):
+        rows = conn.execute(
+            f"SELECT {key_col} FROM {entity}s WHERE recable = 1 ORDER BY {key_col}"
+        ).fetchall()
+        entity_rowids[entity] = np.array([r[0] for r in rows], dtype=np.int64)
+    conn.close()
+
     entity_specs = tuple(
         spec
         for spec in (
-            ("track", embedding_paths.track, filter_paths.track, ENTITY_KEYS.track),
-            ("artist", embedding_paths.artist, filter_paths.artist, ENTITY_KEYS.artist),
-            ("album", embedding_paths.album, filter_paths.album, ENTITY_KEYS.album),
-            ("label", embedding_paths.label, filter_paths.label, ENTITY_KEYS.label),
+            ("track", embedding_paths.track, entity_rowids["track"], ENTITY_KEYS.track),
+            ("artist", embedding_paths.artist, entity_rowids["artist"], ENTITY_KEYS.artist),
+            ("album", embedding_paths.album, entity_rowids["album"], ENTITY_KEYS.album),
+            ("label", embedding_paths.label, entity_rowids["label"], ENTITY_KEYS.label),
         )
         if spec[0] in args.entities
     )
@@ -593,12 +544,12 @@ def main():
     print(f"  manifest: {args.manifest}")
 
     total_t0 = time.time()
-    for entity, emb_path, idx_path, rowid_col in entity_specs:
+    for entity, emb_path, rowids, rowid_col in entity_specs:
         print(f"\n{'═' * 85}")
         print(f"  {BOLD}{entity.upper()}{RESET}")
         print()
 
-        xb, xq, gt = load_filtered_data(emb_path, idx_path, rowid_col, args.n_query, K, SEED)
+        xb, xq, gt = load_filtered_data(emb_path, rowids, rowid_col, args.n_query, K, SEED)
         n_base, dim = xb.shape
         params = compute_params(n_base, dim)
 

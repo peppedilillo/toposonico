@@ -1,9 +1,8 @@
 """Compute joint lon/lat coordinates for all entity types from UMAP projections.
 
-Reads UMAP parquets from the ml manifest, applies per-entity filter indices (built by
-build_index.py) to restrict to the DB-visible subset, then computes a single global
-bounding box across all four entity types (with padding) and writes per-entity
-geo-parquets containing only the key column + lon + lat.
+Reads UMAP parquets from the ml manifest, computes a single global bounding box
+across all four entity types (with padding), and writes per-entity geo-parquets
+containing only the key column + lon + lat.
 
 Always run with all 4 entities together to keep coordinates spatially aligned.
 All four UMAP parquets must come from the same UMAP fit — mixing parquets from
@@ -26,11 +25,10 @@ import numpy as np
 import pandas as pd
 
 from src.utils import ENTITY_KEYS as EKEYS
-from src.utils import get_geo_paths
-from src.utils import read_manifest
-from src.utils import get_index_filter_db_paths
 from src.utils import EntityPaths
 from src.utils import EntityTable
+from src.utils import get_geo_paths
+from src.utils import read_manifest
 
 
 def umap2geo(
@@ -89,21 +87,13 @@ def umap2geo(
     return EntityTable(*results)
 
 
-def read_and_filter(umaps: EntityPaths, filters: EntityPaths) -> EntityTable:
-    """Load UMAP parquets and restrict each entity to the rows listed in its filter index.
-
-    Args:
-        umaps: per-entity paths to UMAP parquets (must contain umap_x, umap_y, key column).
-        filters: per-entity paths to .npy arrays of key values to keep (the DB-visible subset).
-
-    Returns:
-        EntityTable of filtered DataFrames.
-    """
+def read_umaps(umaps: EntityPaths) -> EntityTable:
+    """Load UMAP parquets for all four entity types."""
     return EntityTable(
-        track=pd.read_parquet(umaps.track).set_index(EKEYS.track).loc[np.load(filters.track)].reset_index(),
-        artist=pd.read_parquet(umaps.artist).set_index(EKEYS.artist).loc[np.load(filters.artist)].reset_index(),
-        album=pd.read_parquet(umaps.album).set_index(EKEYS.album).loc[np.load(filters.album)].reset_index(),
-        label=pd.read_parquet(umaps.label).set_index(EKEYS.label).loc[np.load(filters.label)].reset_index(),
+        track=pd.read_parquet(umaps.track),
+        artist=pd.read_parquet(umaps.artist),
+        album=pd.read_parquet(umaps.album),
+        label=pd.read_parquet(umaps.label),
     )
 
 
@@ -145,9 +135,8 @@ def main():
     geo_paths = get_geo_paths()
     manifest = read_manifest(args.manifest)
     umap = manifest["umap"]
-    filters = get_index_filter_db_paths()
 
-    geo = umap2geo(read_and_filter(umap, filters), -hwidth, +hwidth, args.padding)
+    geo = umap2geo(read_umaps(umap), -hwidth, +hwidth, args.padding)
 
     geo.track.to_parquet(geo_paths.track, index=False)
     print(f"{'track':8s}  {len(geo.track):>9,} rows  →  {geo_paths.track}")
