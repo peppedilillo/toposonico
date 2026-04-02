@@ -4,9 +4,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scripts.build_geomap import read_umaps, umap2geo
+from scripts.build_geomap import read_umaps
+from scripts.build_geomap import umap2geo
 from src.utils import ENTITY_KEYS as EKEYS
-from src.utils import EntityPaths, EntityTable
+from src.utils import EntityPaths
+from src.utils import EntityTable
 
 
 def _umap_table(
@@ -20,6 +22,7 @@ def _umap_table(
     Defaults place one point per entity at the four corners of the unit square,
     so the global bbox is [0, 1] × [0, 1] with no padding.
     """
+
     def frame(key_col, rowids, xys):
         xs, ys = zip(*xys)
         return pd.DataFrame({key_col: rowids, "umap_x": list(xs), "umap_y": list(ys)})

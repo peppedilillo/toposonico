@@ -521,9 +521,7 @@ def main():
         ("album", ENTITY_KEYS.album),
         ("label", ENTITY_KEYS.label),
     ):
-        rows = conn.execute(
-            f"SELECT {key_col} FROM {entity}s WHERE recable = 1 ORDER BY {key_col}"
-        ).fetchall()
+        rows = conn.execute(f"SELECT {key_col} FROM {entity}s WHERE recable = 1 ORDER BY {key_col}").fetchall()
         entity_rowids[entity] = np.array([r[0] for r in rows], dtype=np.int64)
     conn.close()
 

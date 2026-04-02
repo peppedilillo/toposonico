@@ -8,8 +8,7 @@ from scripts.build_geojson import build_entity
 def test_build_entity_writes_ndjson_features(tmp_path):
     conn = sqlite3.connect(":memory:")
     conn.executescript(DDL)
-    conn.execute(
-        """
+    conn.execute("""
         INSERT INTO tracks (
             track_rowid, track_canonical_rowid, track_name, track_popularity,
             logcount, release_date, id_isrc, searchable, recable, lon, lat,
@@ -23,8 +22,7 @@ def test_build_entity_writes_ndjson_features(tmp_path):
             201, 'Album', 7.0, 70.0,
             1, 'Label', 1.0, 10.0
         )
-        """
-    )
+        """)
     conn.commit()
 
     track_out = tmp_path / "track.ndjson"

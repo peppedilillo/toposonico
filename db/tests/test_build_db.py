@@ -4,21 +4,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scripts.build_db import (
-    DDL,
-    build_album_repr_tracks,
-    build_albums,
-    build_artists,
-    build_embedding,
-    build_labels,
-    build_tracks,
-    canonicalize_albums,
-    canonicalize_tracks,
-    compute_searchable_recable,
-    get_album_canonical_updates,
-    get_track_canonical_updates,
-    normalize_album_title,
-)
+from scripts.build_db import build_album_repr_tracks
+from scripts.build_db import build_albums
+from scripts.build_db import build_artists
+from scripts.build_db import build_embedding
+from scripts.build_db import build_labels
+from scripts.build_db import build_tracks
+from scripts.build_db import canonicalize_albums
+from scripts.build_db import canonicalize_tracks
+from scripts.build_db import compute_searchable_recable
+from scripts.build_db import DDL
+from scripts.build_db import get_album_canonical_updates
+from scripts.build_db import get_track_canonical_updates
+from scripts.build_db import normalize_album_title
 from src.utils import ENTITY_KEYS as EKEYS
 
 
@@ -46,9 +44,7 @@ def _label_lookup():
 
 
 def _label_geo():
-    return pd.DataFrame(
-        {EKEYS.label: [1, 2], "lon": [1.0, 2.0], "lat": [10.0, 20.0]}
-    )
+    return pd.DataFrame({EKEYS.label: [1, 2], "lon": [1.0, 2.0], "lat": [10.0, 20.0]})
 
 
 def _artist_lookup():
@@ -65,9 +61,7 @@ def _artist_lookup():
 
 
 def _artist_geo():
-    return pd.DataFrame(
-        {EKEYS.artist: [101, 102], "lon": [5.0, 6.0], "lat": [50.0, 60.0]}
-    )
+    return pd.DataFrame({EKEYS.artist: [101, 102], "lon": [5.0, 6.0], "lat": [50.0, 60.0]})
 
 
 def _album_lookup():
@@ -151,15 +145,11 @@ def _build_full_db(db, tmp_path: Path):
     """Populate all entity tables so repr queries have data to work with."""
     label_geo = build_labels(db, _label_lookup(), _label_geo())
     artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
-    album_geo = build_albums(
-        db, _album_lookup(), _album_geo(), artist_geo, label_geo
-    )
+    album_geo = build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
     canonicalize_albums(db)
     db.commit()
     lookup_path = _write_track_parquet(tmp_path)
-    build_tracks(
-        db, lookup_path, _track_geo(), artist_geo, album_geo, label_geo, batch_size=100
-    )
+    build_tracks(db, lookup_path, _track_geo(), artist_geo, album_geo, label_geo, batch_size=100)
     canonicalize_tracks(db)
     db.commit()
 
@@ -285,9 +275,7 @@ def test_build_artists_writes_genre_and_counts(db):
 
 
 def test_build_albums_denormalizes_artist_and_label_geo(db):
-    build_albums(
-        db, _album_lookup(), _album_geo(), _artist_geo(), _label_geo()
-    )
+    build_albums(db, _album_lookup(), _album_geo(), _artist_geo(), _label_geo())
 
     rows = _rows_as_dicts(db, "SELECT * FROM albums WHERE album_rowid = 201")
     row = rows[0]
@@ -299,15 +287,11 @@ def test_build_albums_denormalizes_artist_and_label_geo(db):
 
 
 def test_canonicalize_albums_groups_remaster_variants(db):
-    build_albums(
-        db, _album_lookup(), _album_geo(), _artist_geo(), _label_geo()
-    )
+    build_albums(db, _album_lookup(), _album_geo(), _artist_geo(), _label_geo())
     canonicalize_albums(db)
     db.commit()
 
-    rows = _rows_as_dicts(
-        db, "SELECT album_rowid, album_canonical_rowid FROM albums ORDER BY album_rowid"
-    )
+    rows = _rows_as_dicts(db, "SELECT album_rowid, album_canonical_rowid FROM albums ORDER BY album_rowid")
     canonical = {r["album_rowid"]: r["album_canonical_rowid"] for r in rows}
     assert canonical[201] == canonical[202], "remaster should share canonical with original"
     assert canonical[203] == 203, "unrelated album should be self-canonical"
@@ -316,8 +300,12 @@ def test_canonicalize_albums_groups_remaster_variants(db):
 def test_build_tracks_denormalizes_geo_and_includes_isrc(db, tmp_path):
     lookup_path = _write_track_parquet(tmp_path)
     build_tracks(
-        db, lookup_path,
-        _track_geo(), _artist_geo(), _album_geo(), _label_geo(),
+        db,
+        lookup_path,
+        _track_geo(),
+        _artist_geo(),
+        _album_geo(),
+        _label_geo(),
         batch_size=100,
     )
 
@@ -333,12 +321,14 @@ def test_build_tracks_denormalizes_geo_and_includes_isrc(db, tmp_path):
 def test_build_tracks_filters_to_geo_subset(db, tmp_path):
     """Tracks absent from track_geo are excluded (implicit geo filter)."""
     lookup_path = _write_track_parquet(tmp_path)
-    partial_geo = pd.DataFrame(
-        {EKEYS.track: [1001, 1003], "lon": [0.1, 0.3], "lat": [1.1, 1.3]}
-    )
+    partial_geo = pd.DataFrame({EKEYS.track: [1001, 1003], "lon": [0.1, 0.3], "lat": [1.1, 1.3]})
     build_tracks(
-        db, lookup_path,
-        partial_geo, _artist_geo(), _album_geo(), _label_geo(),
+        db,
+        lookup_path,
+        partial_geo,
+        _artist_geo(),
+        _album_geo(),
+        _label_geo(),
         batch_size=100,
     )
 
@@ -354,8 +344,12 @@ def test_build_tracks_nullifies_empty_label(db, tmp_path):
     track.to_parquet(path)
 
     build_tracks(
-        db, path,
-        _track_geo(), _artist_geo(), _album_geo(), _label_geo(),
+        db,
+        path,
+        _track_geo(),
+        _artist_geo(),
+        _album_geo(),
+        _label_geo(),
         batch_size=100,
     )
 
@@ -389,10 +383,7 @@ def test_canonicalize_tracks_in_db(db, tmp_path):
     canonicalize_tracks(db)
     db.commit()
 
-    canonical = {
-        r[0]: r[1]
-        for r in db.execute("SELECT track_rowid, track_canonical_rowid FROM tracks").fetchall()
-    }
+    canonical = {r[0]: r[1] for r in db.execute("SELECT track_rowid, track_canonical_rowid FROM tracks").fetchall()}
     assert canonical[1] == 2, "lower logcount DUP should point to track 2"
     assert canonical[2] == 2, "highest logcount DUP should be self-canonical"
     assert canonical[3] == 3, "unique ISRC should be self-canonical"
@@ -411,10 +402,7 @@ def test_searchable_recable_flags(db, tmp_path):
     db.commit()
 
     track_flags = {
-        r[0]: (r[1], r[2])
-        for r in db.execute(
-            "SELECT track_rowid, searchable, recable FROM tracks"
-        ).fetchall()
+        r[0]: (r[1], r[2]) for r in db.execute("SELECT track_rowid, searchable, recable FROM tracks").fetchall()
     }
     assert track_flags[1001] == (1, 1), "logcount 3.1 >= both thresholds"
     assert track_flags[1003] == (1, 1), "logcount 3.5 >= both thresholds"
@@ -422,10 +410,7 @@ def test_searchable_recable_flags(db, tmp_path):
     assert track_flags[1004] == (0, 0), "logcount 1.9 < searchable threshold"
 
     label_flags = {
-        r[0]: (r[1], r[2])
-        for r in db.execute(
-            "SELECT label_rowid, searchable, recable FROM labels"
-        ).fetchall()
+        r[0]: (r[1], r[2]) for r in db.execute("SELECT label_rowid, searchable, recable FROM labels").fetchall()
     }
     assert label_flags[1] == (1, 1), "nartist 30 >= 10"
     assert label_flags[2] == (1, 1), "nartist 15 >= 10"
@@ -438,8 +423,7 @@ def test_build_embedding_stores_normalized_blobs(db, tmp_path):
     matrix = rng.standard_normal((3, dim)).astype(np.float32)
 
     emb_df = pd.concat(
-        [pd.DataFrame({EKEYS.track: rowids}),
-         pd.DataFrame(matrix, columns=[f"e{i}" for i in range(dim)])],
+        [pd.DataFrame({EKEYS.track: rowids}), pd.DataFrame(matrix, columns=[f"e{i}" for i in range(dim)])],
         axis=1,
     )
     emb_path = tmp_path / "embedding_track.parquet"
@@ -447,9 +431,7 @@ def test_build_embedding_stores_normalized_blobs(db, tmp_path):
 
     build_embedding(db, emb_path, EKEYS.track, "track_embedding", batch_size=100)
 
-    rows = db.execute(
-        "SELECT track_rowid, embedding FROM track_embedding ORDER BY track_rowid"
-    ).fetchall()
+    rows = db.execute("SELECT track_rowid, embedding FROM track_embedding ORDER BY track_rowid").fetchall()
     assert len(rows) == 3
     assert [r[0] for r in rows] == [1001, 1002, 1003]
 
@@ -473,8 +455,7 @@ def test_album_repr_tracks_ranks_by_logcount(db, tmp_path):
     build_album_repr_tracks(db, limit=2)
 
     rows = db.execute(
-        "SELECT track_rowid, score FROM album_repr_tracks"
-        " WHERE album_rowid = 201 ORDER BY rank"
+        "SELECT track_rowid, score FROM album_repr_tracks" " WHERE album_rowid = 201 ORDER BY rank"
     ).fetchall()
     assert len(rows) == 2
     assert rows[0][0] == 1001, "track 1001 (logcount=3.1) should rank first"

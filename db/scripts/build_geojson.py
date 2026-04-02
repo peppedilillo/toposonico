@@ -11,13 +11,12 @@ Usage:
 import argparse
 import json
 import os
+from pathlib import Path
 import sqlite3
 import time
-from pathlib import Path
 
 from src.utils import ENTITY_KEYS as EKEYS
 from src.utils import get_geojson_paths
-
 
 ENTITY_CONFIGS = (
     ("track", "tracks", EKEYS.track),
@@ -33,9 +32,7 @@ def build_entity(
     key_col: str,
     out_path: Path,
 ) -> None:
-    rows = conn.execute(
-        f"SELECT {key_col}, lon, lat, logcount FROM {table} ORDER BY {key_col}"
-    )
+    rows = conn.execute(f"SELECT {key_col}, lon, lat, logcount FROM {table} ORDER BY {key_col}")
     total = 0
     started_at = time.time()
 

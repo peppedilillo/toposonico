@@ -115,7 +115,6 @@ def get_geo_paths() -> EntityPaths:
     return EntityPaths(**{e: d / f"geo_{e}.parquet" for e in ENTITIES})
 
 
-
 def get_index_faiss_paths() -> EntityPaths:
     def _path(var: str) -> Path:
         v = os.environ.get(var)

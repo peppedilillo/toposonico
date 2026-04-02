@@ -30,9 +30,7 @@ from src.utils import read_manifest
 
 def query_recable_rowids(conn: sqlite3.Connection, table: str, key_col: str) -> np.ndarray:
     """Query recable entity rowids from the DB, returned as a sorted int64 array."""
-    rows = conn.execute(
-        f"SELECT {key_col} FROM {table} WHERE recable = 1 ORDER BY {key_col}"
-    ).fetchall()
+    rows = conn.execute(f"SELECT {key_col} FROM {table} WHERE recable = 1 ORDER BY {key_col}").fetchall()
     return np.array([r[0] for r in rows], dtype=np.int64)
 
 

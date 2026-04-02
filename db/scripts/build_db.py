@@ -20,22 +20,21 @@ Examples:
 
 import argparse
 import os
+from pathlib import Path
 import re
 import sqlite3
 import time
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from src.utils import ENTITY_KEYS as EKEYS
-from src.utils import EntityPaths
 from src.utils import _get_config_float
 from src.utils import _get_config_int
+from src.utils import ENTITY_KEYS as EKEYS
+from src.utils import EntityPaths
 from src.utils import get_geo_paths
 from src.utils import read_manifest
-
 
 BATCH_SIZE = 500_000
 
@@ -252,10 +251,7 @@ def get_track_canonical_updates(tracks: pd.DataFrame) -> pd.DataFrame:
     logcount is canonical; ties are broken by the smallest track_rowid.
     """
     tracks = tracks.copy()
-    has_valid_isrc = (
-        tracks["id_isrc"].notna()
-        & tracks["id_isrc"].astype(str).str.strip().ne("")
-    )
+    has_valid_isrc = tracks["id_isrc"].notna() & tracks["id_isrc"].astype(str).str.strip().ne("")
     self_canonical = tracks[~has_valid_isrc][["track_rowid"]].copy()
     self_canonical["track_canonical_rowid"] = self_canonical["track_rowid"]
     self_canonical = self_canonical[["track_canonical_rowid", "track_rowid"]]
@@ -269,9 +265,7 @@ def get_track_canonical_updates(tracks: pd.DataFrame) -> pd.DataFrame:
         .drop_duplicates("id_isrc", keep="first")[["id_isrc", "track_rowid"]]
         .rename(columns={"track_rowid": "track_canonical_rowid"})
     )
-    dupes = dupes.merge(canonical, on="id_isrc", how="left")[
-        ["track_canonical_rowid", "track_rowid"]
-    ]
+    dupes = dupes.merge(canonical, on="id_isrc", how="left")[["track_canonical_rowid", "track_rowid"]]
     return pd.concat([self_canonical, dupes], ignore_index=True)
 
 
@@ -303,23 +297,19 @@ def compute_searchable_recable(
     tracks, meets an additional logcount threshold).
     """
     conn.execute(
-        "UPDATE tracks SET searchable = 1 "
-        "WHERE track_canonical_rowid = track_rowid AND logcount >= ?",
+        "UPDATE tracks SET searchable = 1 " "WHERE track_canonical_rowid = track_rowid AND logcount >= ?",
         (searchable_track_min_logcount,),
     )
     conn.execute(
-        "UPDATE albums SET searchable = 1 "
-        "WHERE album_canonical_rowid = album_rowid AND total_tracks >= ?",
+        "UPDATE albums SET searchable = 1 " "WHERE album_canonical_rowid = album_rowid AND total_tracks >= ?",
         (searchable_album_min_total_tracks,),
     )
     conn.execute(
-        "UPDATE artists SET searchable = 1 "
-        "WHERE artist_canonical_rowid = artist_rowid AND ntrack >= ?",
+        "UPDATE artists SET searchable = 1 " "WHERE artist_canonical_rowid = artist_rowid AND ntrack >= ?",
         (searchable_artist_min_ntrack,),
     )
     conn.execute(
-        "UPDATE labels SET searchable = 1 "
-        "WHERE label_canonical_rowid = label_rowid AND nartist >= ?",
+        "UPDATE labels SET searchable = 1 " "WHERE label_canonical_rowid = label_rowid AND nartist >= ?",
         (searchable_label_min_nartist,),
     )
 
@@ -346,11 +336,19 @@ def build_labels(
     """Build the labels table. Returns geo for downstream denormalization."""
     df = lookup.merge(geo, on=EKEYS.label)
     df["label_canonical_rowid"] = df[EKEYS.label]
-    df[[
-        EKEYS.label, "label_canonical_rowid", "label", "logcount",
-        "ntrack", "nalbum", "nartist",
-        "lon", "lat",
-    ]].to_sql("labels", conn, if_exists="append", index=False)
+    df[
+        [
+            EKEYS.label,
+            "label_canonical_rowid",
+            "label",
+            "logcount",
+            "ntrack",
+            "nalbum",
+            "nartist",
+            "lon",
+            "lat",
+        ]
+    ].to_sql("labels", conn, if_exists="append", index=False)
     print(f"  [labels]  {len(df):,} rows")
     return geo
 
@@ -363,11 +361,19 @@ def build_artists(
     """Build the artists table. Returns geo for downstream denormalization."""
     df = lookup.merge(geo, on=EKEYS.artist)
     df["artist_canonical_rowid"] = df[EKEYS.artist]
-    df[[
-        EKEYS.artist, "artist_canonical_rowid", "artist_name", "artist_genre", "logcount",
-        "ntrack", "nalbum",
-        "lon", "lat",
-    ]].to_sql("artists", conn, if_exists="append", index=False)
+    df[
+        [
+            EKEYS.artist,
+            "artist_canonical_rowid",
+            "artist_name",
+            "artist_genre",
+            "logcount",
+            "ntrack",
+            "nalbum",
+            "lon",
+            "lat",
+        ]
+    ].to_sql("artists", conn, if_exists="append", index=False)
     print(f"  [artists] {len(df):,} rows")
     return geo
 
@@ -394,14 +400,29 @@ def build_albums(
     df["album_name_norm"] = df["album_name"].map(normalize_album_title)
     df["album_canonical_rowid"] = df[EKEYS.album]
 
-    df[[
-        EKEYS.album, "album_canonical_rowid", "album_name", "album_name_norm",
-        "logcount", "lon", "lat",
-        EKEYS.artist, "artist_name", "artist_lon", "artist_lat",
-        "album_type", "label", "total_tracks",
-        "release_date", "release_date_precision",
-        EKEYS.label, "label_lon", "label_lat",
-    ]].to_sql("albums", conn, if_exists="append", index=False)
+    df[
+        [
+            EKEYS.album,
+            "album_canonical_rowid",
+            "album_name",
+            "album_name_norm",
+            "logcount",
+            "lon",
+            "lat",
+            EKEYS.artist,
+            "artist_name",
+            "artist_lon",
+            "artist_lat",
+            "album_type",
+            "label",
+            "total_tracks",
+            "release_date",
+            "release_date_precision",
+            EKEYS.label,
+            "label_lon",
+            "label_lat",
+        ]
+    ].to_sql("albums", conn, if_exists="append", index=False)
     print(f"  [albums]  {len(df):,} rows")
     return geo
 
@@ -421,12 +442,27 @@ def build_tracks(
     label_geo_r = label_geo.rename(columns={"lon": "label_lon", "lat": "label_lat"})
 
     out_cols = [
-        EKEYS.track, "track_canonical_rowid",
-        "track_name", "track_popularity", "logcount", "release_date", "id_isrc",
-        "lon", "lat",
-        EKEYS.artist, "artist_name", "artist_lon", "artist_lat",
-        EKEYS.album, "album_name", "album_lon", "album_lat",
-        EKEYS.label, "label", "label_lon", "label_lat",
+        EKEYS.track,
+        "track_canonical_rowid",
+        "track_name",
+        "track_popularity",
+        "logcount",
+        "release_date",
+        "id_isrc",
+        "lon",
+        "lat",
+        EKEYS.artist,
+        "artist_name",
+        "artist_lon",
+        "artist_lat",
+        EKEYS.album,
+        "album_name",
+        "album_lon",
+        "album_lat",
+        EKEYS.label,
+        "label",
+        "label_lon",
+        "label_lat",
     ]
 
     pf = pq.ParquetFile(lookup_path)
@@ -633,9 +669,7 @@ def build_embedding(
         if df.empty:
             continue
         rowids = df[key_col].to_numpy()
-        matrix = np.ascontiguousarray(
-            df.filter(regex=r"^e\d+$").to_numpy(dtype=np.float32)
-        )
+        matrix = np.ascontiguousarray(df.filter(regex=r"^e\d+$").to_numpy(dtype=np.float32))
         norms = np.linalg.norm(matrix, axis=1, keepdims=True)
         np.maximum(norms, 1e-12, out=norms)
         matrix /= norms
@@ -709,7 +743,6 @@ def main():
     recable_track_min_logcount = _get_config_float("SICK_RECABLE_TRACK_MIN_LOGCOUNT")
     representative_count = _get_config_int("SICK_REPRESENTATIVE_N")
 
-
     db_path = Path(args.db)
     if db_path.exists():
         db_path.unlink()
@@ -730,11 +763,7 @@ def main():
     label_lookup = pd.read_parquet(lookup_paths.label)
     artist_lookup = pd.read_parquet(lookup_paths.artist)
     album_lookup = pd.read_parquet(lookup_paths.album)
-    print(
-        f"  labels={len(label_lookup):,}"
-        f"  artists={len(artist_lookup):,}"
-        f"  albums={len(album_lookup):,}"
-    )
+    print(f"  labels={len(label_lookup):,}" f"  artists={len(artist_lookup):,}" f"  albums={len(album_lookup):,}")
 
     print("Loading geo...")
     track_geo = pd.read_parquet(geo_paths.track)
@@ -757,8 +786,12 @@ def main():
     conn.commit()
 
     build_tracks(
-        conn, lookup_paths.track,
-        track_geo, artist_geo, album_geo, label_geo,
+        conn,
+        lookup_paths.track,
+        track_geo,
+        artist_geo,
+        album_geo,
+        label_geo,
         args.batch_size,
     )
     canonicalize_tracks(conn)
