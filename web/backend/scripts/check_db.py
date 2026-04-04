@@ -6,13 +6,15 @@ Usage:
     SICK_DB=path/to/sick.db uv run python scripts/check_db.py
     uv run python scripts/check_db.py --db path/to/sick.db
 """
-import argparse
-import sqlite3
-import os
-from typing import Any
-from functools import cache
 
-from src.utils import Entity, Table, Key, ENTITIES, entity_child, ALBUM, TABLES, ARTIST, LABEL
+import argparse
+import os
+import sqlite3
+from functools import cache
+from typing import Any
+
+from src.utils import (ALBUM, ARTIST, ENTITIES, LABEL, TABLES, Entity, Key,
+                       Table, entity_child)
 
 
 @cache
@@ -49,11 +51,11 @@ def main():
     if args.db is None:
         raise ValueError("--db / $SICK_DB not set")
 
-    BOLD  = "" if args.raw else "\033[1m"
+    BOLD = "" if args.raw else "\033[1m"
     GREEN = "" if args.raw else "\033[92m"
     RED = "" if args.raw else "\033[91m"
     RESET = "" if args.raw else "\033[0m"
-    DIM   = "" if args.raw else "\033[2m"
+    DIM = "" if args.raw else "\033[2m"
 
     print(f"\n{BOLD}sick db check{RESET}")
     print(f"{DIM}{args.db}{RESET}\n")
@@ -81,9 +83,9 @@ def main():
 
         print("repr inclusions")
         for entity, rpr in [
-            (ALBUM,  TABLES.album_repr_tracks),
+            (ALBUM, TABLES.album_repr_tracks),
             (ARTIST, TABLES.artist_repr_albums),
-            (LABEL,  TABLES.label_repr_artists),
+            (LABEL, TABLES.label_repr_artists),
         ]:
             check(conn, entity, rpr, entity.table)
             check(conn, entity, entity.table, rpr)

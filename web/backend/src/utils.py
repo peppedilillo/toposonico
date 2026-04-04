@@ -9,9 +9,11 @@ class Keys(NamedTuple):
     artist: Key = "artist_rowid"
     label: Key = "label_rowid"
 
+
 KEYS = Keys()
 
 Table = str
+
 
 class Tables(NamedTuple):
     track: Table = "tracks"
@@ -25,6 +27,7 @@ class Tables(NamedTuple):
     album_repr_tracks: Table = "album_repr_tracks"
     artist_repr_albums: Table = "artist_repr_albums"
     label_repr_artists: Table = "label_repr_artists"
+
 
 TABLES = Tables()
 
