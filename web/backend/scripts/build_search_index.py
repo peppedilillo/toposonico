@@ -3,6 +3,7 @@
 Indexes all four entity types (tracks, albums, artists, labels) from sick.db
 into a single Meilisearch index for full-text search.
 """
+
 import argparse
 import os
 import sqlite3
@@ -17,16 +18,24 @@ INDEX_SETTINGS = {
     "searchableAttributes": ["label", "artist_name", "album_name", "track_name"],
     "sortableAttributes": ["rank", "logcount"],
     "rankingRules": [
-        "words", "typo", "proximity", "rank:asc", "sort", "attribute", "exactness",
+        "words",
+        "typo",
+        "proximity",
+        "rank:asc",
+        "logcount:desc",
+        "sort",
+        "attribute",
+        "exactness",
     ],
 }
 
 
-def add_tracks(conn: sqlite3.Connection, index: Index, batch_size: int = 10_000,):
-    QUERY = (
-        f"SELECT {KEYS.track}, track_name, artist_name, logcount "
-        f"FROM {TABLES.track} WHERE searchable = 1"
-    )
+def add_tracks(
+    conn: sqlite3.Connection,
+    index: Index,
+    batch_size: int = 10_000,
+):
+    QUERY = f"SELECT {KEYS.track}, track_name, artist_name, logcount " f"FROM {TABLES.track} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -52,11 +61,12 @@ def add_tracks(conn: sqlite3.Connection, index: Index, batch_size: int = 10_000,
     print()
 
 
-def add_albums(conn: sqlite3.Connection, index: Index, batch_size: int = 10_000,):
-    QUERY = (
-        f"SELECT {KEYS.album}, album_name_norm, artist_name, logcount "
-        f"FROM {TABLES.album} WHERE searchable = 1"
-    )
+def add_albums(
+    conn: sqlite3.Connection,
+    index: Index,
+    batch_size: int = 10_000,
+):
+    QUERY = f"SELECT {KEYS.album}, album_name_norm, artist_name, logcount " f"FROM {TABLES.album} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -82,11 +92,12 @@ def add_albums(conn: sqlite3.Connection, index: Index, batch_size: int = 10_000,
     print("")
 
 
-def add_artists(conn: sqlite3.Connection, index: Index, batch_size: int = 10_000,):
-    QUERY = (
-        f"SELECT {KEYS.artist}, artist_name, logcount "
-        f"FROM {TABLES.artist} WHERE searchable = 1"
-    )
+def add_artists(
+    conn: sqlite3.Connection,
+    index: Index,
+    batch_size: int = 10_000,
+):
+    QUERY = f"SELECT {KEYS.artist}, artist_name, logcount " f"FROM {TABLES.artist} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -111,11 +122,12 @@ def add_artists(conn: sqlite3.Connection, index: Index, batch_size: int = 10_000
     print()
 
 
-def add_labels(conn: sqlite3.Connection, index: Index, batch_size: int = 10_000,):
-    QUERY = (
-        f"SELECT {KEYS.label}, label, logcount "
-        f"FROM {TABLES.label} WHERE searchable = 1"
-    )
+def add_labels(
+    conn: sqlite3.Connection,
+    index: Index,
+    batch_size: int = 10_000,
+):
+    QUERY = f"SELECT {KEYS.label}, label, logcount " f"FROM {TABLES.label} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -146,9 +158,13 @@ def main(argv: list[str] | None = None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--url", default=os.environ.get("MEILI_URL"), metavar="URL", help="Meilisearch URL. $MEILI_URL")
-    parser.add_argument("--uid", default=os.environ.get("MEILI_UID"), metavar="UID", help="Meilisearch index UID. $MEILI_UID")
-    parser.add_argument("--key", default=os.environ.get("MEILI_KEY"), metavar="KEY", help="Meilisearch API key. $MEILI_KEY")
-    parser.add_argument("--db",  default=os.environ.get("SICK_DB"),   metavar="PATH", help="Path to sick.db. $SICK_DB")
+    parser.add_argument(
+        "--uid", default=os.environ.get("MEILI_UID"), metavar="UID", help="Meilisearch index UID. $MEILI_UID"
+    )
+    parser.add_argument(
+        "--key", default=os.environ.get("MEILI_KEY"), metavar="KEY", help="Meilisearch API key. $MEILI_KEY"
+    )
+    parser.add_argument("--db", default=os.environ.get("SICK_DB"), metavar="PATH", help="Path to sick.db. $SICK_DB")
     args = parser.parse_args(argv)
 
     if args.url is None:

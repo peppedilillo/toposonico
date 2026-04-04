@@ -1,11 +1,4 @@
-"""Validate SQLite database structural guarantees.
-
-Checks ID set inclusions between entity tables, repr tables, and embedding tables.
-
-Usage:
-    SICK_DB=path/to/sick.db uv run python scripts/check_db.py
-    uv run python scripts/check_db.py --db path/to/sick.db
-"""
+"""Validate SQLite database structural guarantees."""
 
 import argparse
 import os
@@ -13,8 +6,7 @@ import sqlite3
 from functools import cache
 from typing import Any
 
-from src.utils import (ALBUM, ARTIST, ENTITIES, LABEL, TABLES, Entity, Key,
-                       Table, entity_child)
+from src.utils import ALBUM, ARTIST, ENTITIES, LABEL, TABLES, Entity, Key, Table, entity_child
 
 
 @cache
