@@ -1,5 +1,9 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "backend"
+name = "sick-backend"
 version = "0.1.0"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -10,3 +14,12 @@ dependencies = [
 
 [tool.fastapi]
 entrypoint = "src.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "black>=26.3.1",
+    "isort>=8.0.1",
+]
