@@ -24,6 +24,12 @@ def get_entity_ids(conn: sqlite3.Connection, key: Key, table: Table) -> list[Any
     return keys
 
 
+@cache
+def get_searchable_ids(conn: sqlite3.Connection, key: Key, table: Table) -> list[Any]:
+    cursor = conn.cursor()
+    return cursor.execute(f"SELECT {key} FROM {table} WHERE searchable = 1").fetchall()
+
+
 def table_id_set_inclusion(conn: sqlite3.Connection, entity: Entity, t1: Table, t2: Table) -> bool:
     t1_ids = get_entity_ids(conn, entity.key, t1)
     t2_ids = get_entity_ids(conn, entity.key, t2)
@@ -57,7 +63,7 @@ def main():
     RESET = "" if args.raw else "\033[0m"
     DIM = "" if args.raw else "\033[2m"
 
-    print(f"\n{BOLD}sick db check{RESET}")
+    print(f"{BOLD}sick db check{RESET}")
     print(f"{DIM}{args.db}{RESET}\n")
 
     failed = False
@@ -88,7 +94,18 @@ def main():
             (LABEL, TABLES.label_repr_artists),
         ]:
             check(conn, entity, rpr, entity.table)
+            # it's expected for these to fail, as only searchable entities can
+            # end up in a repr table.
             check(conn, entity, entity.table, rpr)
+
+        print("searchable repr coverage")
+        for entity in ENTITIES:
+            if entity.repr is None:
+                continue
+            searchable_ids = get_searchable_ids(conn, entity.key, entity.table)
+            repr_ids = get_entity_ids(conn, entity.key, entity.repr)
+            ok = set(searchable_ids).issubset(repr_ids)
+            report(f"{entity.table}[searchable].{entity.key} ⊆ {entity.repr}.{entity.key}", ok)
 
         print("embedding inclusions")
         for entity in ENTITIES:

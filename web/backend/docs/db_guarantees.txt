@@ -1,0 +1,34 @@
+sick db check
+/Users/peppedilillo/Progetti/sick/db/sick.db
+
+table inclusions
+  tracks.album_rowid ⊆ albums.album_rowid  ok
+  albums.album_rowid ⊆ tracks.album_rowid  ok
+  tracks.artist_rowid ⊆ artists.artist_rowid  ok
+  artists.artist_rowid ⊆ tracks.artist_rowid  ok
+  tracks.label_rowid ⊆ labels.label_rowid  ok
+  labels.label_rowid ⊆ tracks.label_rowid  ok
+  albums.artist_rowid ⊆ artists.artist_rowid  ok
+  artists.artist_rowid ⊆ albums.artist_rowid  failed
+  albums.label_rowid ⊆ labels.label_rowid  ok
+  labels.label_rowid ⊆ albums.label_rowid  ok
+repr inclusions
+  album_repr_tracks.album_rowid ⊆ albums.album_rowid  ok
+  albums.album_rowid ⊆ album_repr_tracks.album_rowid  failed
+  artist_repr_albums.artist_rowid ⊆ artists.artist_rowid  ok
+  artists.artist_rowid ⊆ artist_repr_albums.artist_rowid  failed
+  label_repr_artists.label_rowid ⊆ labels.label_rowid  ok
+  labels.label_rowid ⊆ label_repr_artists.label_rowid  failed
+searchable repr coverage
+  albums[searchable].album_rowid ⊆ album_repr_tracks.album_rowid  failed
+  artists[searchable].artist_rowid ⊆ artist_repr_albums.artist_rowid  failed
+  labels[searchable].label_rowid ⊆ label_repr_artists.label_rowid  failed
+embedding inclusions
+  track_embedding.track_rowid ⊆ tracks.track_rowid  ok
+  tracks.track_rowid ⊆ track_embedding.track_rowid  ok
+  album_embedding.album_rowid ⊆ albums.album_rowid  ok
+  albums.album_rowid ⊆ album_embedding.album_rowid  ok
+  artist_embedding.artist_rowid ⊆ artists.artist_rowid  ok
+  artists.artist_rowid ⊆ artist_embedding.artist_rowid  ok
+  label_embedding.label_rowid ⊆ labels.label_rowid  ok
+  labels.label_rowid ⊆ label_embedding.label_rowid  ok
