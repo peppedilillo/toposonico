@@ -29,7 +29,7 @@ class TrackHit(TypedDict):
 class AlbumHit(TypedDict):
     entity_type: str
     album_rowid: int
-    album_name: str
+    album_name_norm: str
     artist_name: str
     logcount: float
 
@@ -72,7 +72,7 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
             return AlbumHit(
                 entity_type=entity.name,
                 album_rowid=rowid,
-                album_name=hit["album_name"],
+                album_name_norm=hit["album_name_norm"],
                 artist_name=hit["artist_name"],
                 logcount=hit["logcount"],
             )
@@ -92,10 +92,12 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
             )
 
 
+SearchHit = TrackHit | AlbumHit | ArtistHit | LabelHit
+
 @router.get("/api/search")
 async def search(
     q: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=20),
-) -> list[TrackHit | AlbumHit | ArtistHit | LabelHit]:
+) -> list[SearchHit]:
     """Search for up to `limit` entities matching `q` query."""
     return [search_map(hit) for hit in meili_index.search(q, {"limit": limit})["hits"]]

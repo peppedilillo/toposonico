@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from fastapi import HTTPException
 
 from src.shared import sick_db
-from src.utils import AlbumEntity
+from src.utils import AlbumEntity, cols
 from src.utils import ArtistEntity
 from src.utils import LabelEntity
 from src.utils import NAME2ENTITY
@@ -36,7 +36,7 @@ class TrackInfo(TypedDict):
 
 class AlbumInfo(TypedDict):
     album_rowid: int
-    album_name: str
+    album_name_norm: str
     artist_rowid: int
     artist_name: str
     label_rowid: int
@@ -78,10 +78,6 @@ class LabelInfo(TypedDict):
 Info = TrackInfo | LabelInfo | AlbumInfo | ArtistInfo
 
 
-def _cols(info_cls: type) -> list[str]:
-    return list(info_cls.__annotations__)
-
-
 @router.get("/api/info")
 async def info(rowid: int, entity_name: str) -> Info:
     if entity_name not in NAME2ENTITY:
@@ -96,11 +92,11 @@ async def info(rowid: int, entity_name: str) -> Info:
             info_cls = ArtistInfo
         case LabelEntity():
             info_cls = LabelInfo
-    cols = _cols(info_cls)
+    keys = cols(info_cls)
     row = sick_db.execute(
-        f"SELECT {', '.join(cols)} FROM {entity.table} WHERE {entity.key} = ?",
+        f"SELECT {', '.join(keys)} FROM {entity.table} WHERE {entity.key} = ?",
         (rowid,),
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Row not found")
-    return info_cls(**dict(zip(cols, row)))
+    return info_cls(**dict(zip(keys, row)))

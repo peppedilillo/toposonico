@@ -38,7 +38,7 @@ def add_tracks(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {TRACK.key}, track_name, artist_name, logcount FROM {TRACK.table} WHERE searchable = 1"
+    QUERY = f"SELECT {TRACK.key}, track_name, artist_name, logcount, lon, lat FROM {TRACK.table} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -53,8 +53,10 @@ def add_tracks(
                 "artist_name": artist_name,
                 "logcount": logcount,
                 "rank": 3,
+                "lon": lon,
+                "lat": lat,
             }
-            for (rowid, track_name, artist_name, logcount) in batch
+            for (rowid, track_name, artist_name, logcount, lon, lat) in batch
         ]
         index.add_documents(docs, primary_key="id")
         total += len(batch)
@@ -69,7 +71,7 @@ def add_albums(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {ALBUM.key}, album_name_norm, artist_name, logcount FROM {ALBUM.table} WHERE searchable = 1"
+    QUERY = f"SELECT {ALBUM.key}, album_name_norm, artist_name, logcount, lon, lat FROM {ALBUM.table} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -80,12 +82,14 @@ def add_albums(
         docs = [
             {
                 "id": f"{ALBUM.name}_{rowid}",
-                "album_name": album_name_norm,
+                "album_name_norm": album_name_norm,
                 "artist_name": artist_name,
                 "logcount": logcount,
                 "rank": 2,
+                "lon": lon,
+                "lat": lat,
             }
-            for (rowid, album_name_norm, artist_name, logcount) in batch
+            for (rowid, album_name_norm, artist_name, logcount, lon, lat) in batch
         ]
         index.add_documents(docs, primary_key="id")
         total += len(batch)
@@ -100,7 +104,7 @@ def add_artists(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {ARTIST.key}, artist_name, logcount FROM {ARTIST.table} WHERE searchable = 1"
+    QUERY = f"SELECT {ARTIST.key}, artist_name, logcount, lon, lat FROM {ARTIST.table} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -114,8 +118,10 @@ def add_artists(
                 "artist_name": artist_name,
                 "logcount": logcount,
                 "rank": 1,
+                "lon": lon,
+                "lat": lat,
             }
-            for (rowid, artist_name, logcount) in batch
+            for (rowid, artist_name, logcount, lon, lat) in batch
         ]
         index.add_documents(docs, primary_key="id")
         total += len(batch)
@@ -130,7 +136,7 @@ def add_labels(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {LABEL.key}, label, logcount FROM {LABEL.table} WHERE searchable = 1"
+    QUERY = f"SELECT {LABEL.key}, label, logcount, lon, lat FROM {LABEL.table} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -144,8 +150,10 @@ def add_labels(
                 "label": label,
                 "logcount": logcount,
                 "rank": 0,
+                "lon": lon,
+                "lat": lat,
             }
-            for (rowid, label, logcount) in batch
+            for (rowid, label, logcount, lon, lat) in batch
         ]
         index.add_documents(docs, primary_key="id")
         total += len(batch)
