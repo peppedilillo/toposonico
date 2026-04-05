@@ -94,6 +94,7 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
 
 SearchHit = TrackHit | AlbumHit | ArtistHit | LabelHit
 
+
 @router.get("/api/search")
 async def search(
     q: str = Query(..., min_length=1),

@@ -1,8 +1,8 @@
 import os
 import sqlite3
 
-import meilisearch
 import faiss
+import meilisearch
 
 
 def get_config_str(var: str) -> str:

@@ -4,8 +4,9 @@ from fastapi import APIRouter
 from fastapi import HTTPException
 
 from src.shared import sick_db
-from src.utils import AlbumEntity, cols
+from src.utils import AlbumEntity
 from src.utils import ArtistEntity
+from src.utils import cols
 from src.utils import LabelEntity
 from src.utils import NAME2ENTITY
 from src.utils import TrackEntity

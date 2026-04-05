@@ -71,7 +71,9 @@ def add_albums(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {ALBUM.key}, album_name_norm, artist_name, logcount, lon, lat FROM {ALBUM.table} WHERE searchable = 1"
+    QUERY = (
+        f"SELECT {ALBUM.key}, album_name_norm, artist_name, logcount, lon, lat FROM {ALBUM.table} WHERE searchable = 1"
+    )
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()

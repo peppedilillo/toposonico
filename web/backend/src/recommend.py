@@ -1,12 +1,21 @@
 from typing import TypedDict
 
+from fastapi import APIRouter
+from fastapi import HTTPException
+from fastapi import Query
 import numpy as np
-from fastapi import APIRouter, HTTPException, Query
 
-from src.shared import (
-    faiss_album_index, faiss_artist_index, faiss_label_index, faiss_track_index, sick_db,
-)
-from src.utils import AlbumEntity, ArtistEntity, cols, LabelEntity, NAME2ENTITY, TrackEntity
+from src.shared import faiss_album_index
+from src.shared import faiss_artist_index
+from src.shared import faiss_label_index
+from src.shared import faiss_track_index
+from src.shared import sick_db
+from src.utils import AlbumEntity
+from src.utils import ArtistEntity
+from src.utils import cols
+from src.utils import LabelEntity
+from src.utils import NAME2ENTITY
+from src.utils import TrackEntity
 
 router = APIRouter()
 
@@ -73,15 +82,15 @@ async def recommend(
     ).fetchone()
 
     emb = np.frombuffer(row[0], dtype=np.float32).reshape(1, -1)
-    _, ids = index.search(emb, limit + 1) # noqa
+    _, ids = index.search(emb, limit + 1)  # noqa
     neighbor_ids = [int(i) for i in ids[0] if i != -1 and i != rowid][:limit]
     if not neighbor_ids:
         return []
 
-    rec_cols = cols(rec_cls) # noqa
+    rec_cols = cols(rec_cls)  # noqa
     placeholders = ", ".join("?" * len(neighbor_ids))
     rec_rows = sick_db.execute(
         f"SELECT {', '.join(rec_cols)} FROM {entity.table} WHERE {entity.key} IN ({placeholders})",
         neighbor_ids,
     ).fetchall()
-    return [rec_cls(**dict(zip(rec_cols, rec))) for rec in rec_rows] # noqa
+    return [rec_cls(**dict(zip(rec_cols, rec))) for rec in rec_rows]  # noqa
