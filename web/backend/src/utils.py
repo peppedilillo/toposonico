@@ -41,7 +41,7 @@ ARTIST = ArtistEntity("artist", "artist_rowid", "artists", "artist_embedding", "
 LABEL = LabelEntity("label", "label_rowid", "labels", "label_embedding", "label_repr_artists")
 
 ENTITIES = (TRACK, ALBUM, ARTIST, LABEL)
-KEY2ENTITY = {e.key: e for e in ENTITIES}
+NAME2ENTITY = {e.name: e for e in ENTITIES}
 
 
 def entity_child(entity: Entity) -> tuple[Entity, ...]:

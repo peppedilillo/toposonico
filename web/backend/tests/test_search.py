@@ -1,11 +1,11 @@
 import pytest
 
-from src.main import search_map, search_mid2eid
+from src.search import search_mid2eid, search_map
 
 
 def test_search_map_track():
     hit = {
-        "id": "track_rowid_1",
+        "id": "track_1",
         "track_name": "Blue in Green",
         "artist_name": "Miles Davis",
         "logcount": 4.7,
@@ -22,7 +22,7 @@ def test_search_map_track():
 
 def test_search_map_album():
     hit = {
-        "id": "album_rowid_2",
+        "id": "album_2",
         "album_name": "Kind of Blue",
         "artist_name": "Miles Davis",
         "logcount": 6.1,
@@ -39,7 +39,7 @@ def test_search_map_album():
 
 def test_search_map_artist():
     hit = {
-        "id": "artist_rowid_3",
+        "id": "artist_3",
         "artist_name": "Miles Davis",
         "logcount": 7.3,
     }
@@ -54,7 +54,7 @@ def test_search_map_artist():
 
 def test_search_map_label():
     hit = {
-        "id": "label_rowid_4",
+        "id": "label_4",
         "label": "Columbia",
         "logcount": 5.0,
     }

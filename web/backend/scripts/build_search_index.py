@@ -45,7 +45,7 @@ def add_tracks(
             break
         docs = [
             {
-                "id": f"{TRACK.key}_{rowid}",
+                "id": f"{TRACK.name}_{rowid}",
                 "track_name": track_name,
                 "artist_name": artist_name,
                 "logcount": logcount,
@@ -76,7 +76,7 @@ def add_albums(
             break
         docs = [
             {
-                "id": f"{ALBUM.key}_{rowid}",
+                "id": f"{ALBUM.name}_{rowid}",
                 "album_name": album_name_norm,
                 "artist_name": artist_name,
                 "logcount": logcount,
@@ -107,7 +107,7 @@ def add_artists(
             break
         docs = [
             {
-                "id": f"{ARTIST.key}_{rowid}",
+                "id": f"{ARTIST.name}_{rowid}",
                 "artist_name": artist_name,
                 "logcount": logcount,
                 "rank": 1,
@@ -137,7 +137,7 @@ def add_labels(
             break
         docs = [
             {
-                "id": f"{LABEL.key}_{rowid}",
+                "id": f"{LABEL.name}_{rowid}",
                 "label": label,
                 "logcount": logcount,
                 "rank": 0,
@@ -157,14 +157,14 @@ def main(argv: list[str] | None = None):
         description="Populate a Meilisearch index from the SQLite DB.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--url", default=os.environ.get("MEILI_URL"), metavar="URL", help="Meilisearch URL. $MEILI_URL")
+    parser.add_argument("--url", default=os.environ.get("MEILI_URL"), metavar="URL", help="Meilisearch URL. $MEILI_URL",)
     parser.add_argument(
-        "--uid", default=os.environ.get("MEILI_UID"), metavar="UID", help="Meilisearch index UID. $MEILI_UID"
+        "--uid", default=os.environ.get("MEILI_UID"), metavar="UID", help="Meilisearch index UID. $MEILI_UID",
     )
     parser.add_argument(
-        "--key", default=os.environ.get("MEILI_KEY"), metavar="KEY", help="Meilisearch API key. $MEILI_KEY"
+        "--key", default=os.environ.get("MEILI_KEY"), metavar="KEY", help="Meilisearch API key. $MEILI_KEY",
     )
-    parser.add_argument("--db", default=os.environ.get("SICK_DB"), metavar="PATH", help="Path to sick.db. $SICK_DB")
+    parser.add_argument("--db", default=os.environ.get("SICK_DB"), metavar="PATH", help="Path to sick.db. $SICK_DB",)
     args = parser.parse_args(argv)
 
     if args.url is None:
