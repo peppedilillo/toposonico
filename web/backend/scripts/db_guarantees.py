@@ -1,12 +1,17 @@
 """Validate SQLite database structural guarantees."""
 
 import argparse
+from functools import cache
 import os
 import sqlite3
-from functools import cache
 from typing import Any
 
-from src.utils import ALBUM, ARTIST, ENTITIES, LABEL, Entity, entity_child
+from src.utils import ALBUM
+from src.utils import ARTIST
+from src.utils import ENTITIES
+from src.utils import Entity
+from src.utils import entity_child
+from src.utils import LABEL
 
 
 @cache

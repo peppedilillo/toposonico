@@ -1,6 +1,7 @@
 import pytest
 
-from src.search import search_mid2eid, search_map
+from src.search import search_map
+from src.search import search_mid2eid
 
 
 def test_search_map_track():

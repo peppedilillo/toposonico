@@ -12,7 +12,10 @@ import time
 import meilisearch
 from meilisearch.index import Index
 
-from src.utils import ALBUM, ARTIST, LABEL, TRACK
+from src.utils import ALBUM
+from src.utils import ARTIST
+from src.utils import LABEL
+from src.utils import TRACK
 
 INDEX_SETTINGS = {
     "searchableAttributes": ["label", "artist_name", "album_name", "track_name"],
@@ -157,14 +160,30 @@ def main(argv: list[str] | None = None):
         description="Populate a Meilisearch index from the SQLite DB.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--url", default=os.environ.get("MEILI_URL"), metavar="URL", help="Meilisearch URL. $MEILI_URL",)
     parser.add_argument(
-        "--uid", default=os.environ.get("MEILI_UID"), metavar="UID", help="Meilisearch index UID. $MEILI_UID",
+        "--url",
+        default=os.environ.get("MEILI_URL"),
+        metavar="URL",
+        help="Meilisearch URL. $MEILI_URL",
     )
     parser.add_argument(
-        "--key", default=os.environ.get("MEILI_KEY"), metavar="KEY", help="Meilisearch API key. $MEILI_KEY",
+        "--uid",
+        default=os.environ.get("MEILI_UID"),
+        metavar="UID",
+        help="Meilisearch index UID. $MEILI_UID",
     )
-    parser.add_argument("--db", default=os.environ.get("SICK_DB"), metavar="PATH", help="Path to sick.db. $SICK_DB",)
+    parser.add_argument(
+        "--key",
+        default=os.environ.get("MEILI_KEY"),
+        metavar="KEY",
+        help="Meilisearch API key. $MEILI_KEY",
+    )
+    parser.add_argument(
+        "--db",
+        default=os.environ.get("SICK_DB"),
+        metavar="PATH",
+        help="Path to sick.db. $SICK_DB",
+    )
     args = parser.parse_args(argv)
 
     if args.url is None:

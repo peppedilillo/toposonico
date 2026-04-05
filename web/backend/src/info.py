@@ -1,10 +1,14 @@
 from typing import TypedDict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
+from fastapi import HTTPException
 
 from src.shared import sick_db
-from src.utils import NAME2ENTITY, TrackEntity, AlbumEntity, ArtistEntity, LabelEntity
-
+from src.utils import AlbumEntity
+from src.utils import ArtistEntity
+from src.utils import LabelEntity
+from src.utils import NAME2ENTITY
+from src.utils import TrackEntity
 
 router = APIRouter()
 
@@ -81,9 +85,7 @@ def _cols(info_cls: type) -> list[str]:
 @router.get("/api/info")
 async def info(rowid: int, entity_name: str) -> Info:
     if entity_name not in NAME2ENTITY:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Entity '{entity_name}' not supported.")
+        raise HTTPException(status_code=404, detail=f"Entity '{entity_name}' not supported.")
     entity = NAME2ENTITY[entity_name]
     match entity:
         case TrackEntity():

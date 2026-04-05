@@ -1,16 +1,21 @@
 import re
 from typing import TypedDict
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
+from fastapi import Query
 
 from src.shared import meili_index
-from src.utils import ENTITIES, Entity, NAME2ENTITY, TrackEntity, AlbumEntity, ArtistEntity, LabelEntity
+from src.utils import AlbumEntity
+from src.utils import ArtistEntity
+from src.utils import ENTITIES
+from src.utils import Entity
+from src.utils import LabelEntity
+from src.utils import NAME2ENTITY
+from src.utils import TrackEntity
 
 router = APIRouter()
 
-SEARCH_ID_RE = re.compile(
-    rf"^({'|'.join(re.escape(e.name) for e in ENTITIES)})_(\d+)$"
-)
+SEARCH_ID_RE = re.compile(rf"^({'|'.join(re.escape(e.name) for e in ENTITIES)})_(\d+)$")
 
 
 class TrackHit(TypedDict):
@@ -89,8 +94,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
 
 @router.get("/api/search")
 async def search(
-        q: str = Query(..., min_length=1),
-        limit: int = Query(10, ge=1, le=20),
+    q: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=20),
 ) -> list[TrackHit | AlbumHit | ArtistHit | LabelHit]:
     """Search for up to `limit` entities matching `q` query."""
     return [search_map(hit) for hit in meili_index.search(q, {"limit": limit})["hits"]]
