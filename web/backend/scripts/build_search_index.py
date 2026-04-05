@@ -12,7 +12,7 @@ import time
 import meilisearch
 from meilisearch.index import Index
 
-from src.utils import KEYS, TABLES
+from src.utils import ALBUM, ARTIST, LABEL, TRACK
 
 INDEX_SETTINGS = {
     "searchableAttributes": ["label", "artist_name", "album_name", "track_name"],
@@ -35,7 +35,7 @@ def add_tracks(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {KEYS.track}, track_name, artist_name, logcount " f"FROM {TABLES.track} WHERE searchable = 1"
+    QUERY = f"SELECT {TRACK.key}, track_name, artist_name, logcount FROM {TRACK.table} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -45,7 +45,7 @@ def add_tracks(
             break
         docs = [
             {
-                "id": f"{KEYS.track}_{rowid}",
+                "id": f"{TRACK.key}_{rowid}",
                 "track_name": track_name,
                 "artist_name": artist_name,
                 "logcount": logcount,
@@ -66,7 +66,7 @@ def add_albums(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {KEYS.album}, album_name_norm, artist_name, logcount " f"FROM {TABLES.album} WHERE searchable = 1"
+    QUERY = f"SELECT {ALBUM.key}, album_name_norm, artist_name, logcount FROM {ALBUM.table} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -76,7 +76,7 @@ def add_albums(
             break
         docs = [
             {
-                "id": f"{KEYS.album}_{rowid}",
+                "id": f"{ALBUM.key}_{rowid}",
                 "album_name": album_name_norm,
                 "artist_name": artist_name,
                 "logcount": logcount,
@@ -97,7 +97,7 @@ def add_artists(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {KEYS.artist}, artist_name, logcount " f"FROM {TABLES.artist} WHERE searchable = 1"
+    QUERY = f"SELECT {ARTIST.key}, artist_name, logcount FROM {ARTIST.table} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -107,7 +107,7 @@ def add_artists(
             break
         docs = [
             {
-                "id": f"{KEYS.artist}_{rowid}",
+                "id": f"{ARTIST.key}_{rowid}",
                 "artist_name": artist_name,
                 "logcount": logcount,
                 "rank": 1,
@@ -127,7 +127,7 @@ def add_labels(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {KEYS.label}, label, logcount " f"FROM {TABLES.label} WHERE searchable = 1"
+    QUERY = f"SELECT {LABEL.key}, label, logcount FROM {LABEL.table} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -137,7 +137,7 @@ def add_labels(
             break
         docs = [
             {
-                "id": f"{KEYS.label}_{rowid}",
+                "id": f"{LABEL.key}_{rowid}",
                 "label": label,
                 "logcount": logcount,
                 "rank": 0,

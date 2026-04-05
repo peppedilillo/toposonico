@@ -6,23 +6,23 @@ import sqlite3
 from functools import cache
 from typing import Any
 
-from src.utils import ALBUM, ARTIST, ENTITIES, LABEL, TABLES, Entity, Key, Table, entity_child
+from src.utils import ALBUM, ARTIST, ENTITIES, LABEL, Entity, entity_child
 
 
 @cache
-def get_entity_ids(conn: sqlite3.Connection, key: Key, table: Table) -> list[Any]:
+def get_entity_ids(conn: sqlite3.Connection, key: str, table: str) -> list[Any]:
     cursor = conn.cursor()
     keys = cursor.execute(f"SELECT {key} FROM {table}").fetchall()
     return keys
 
 
 @cache
-def get_searchable_ids(conn: sqlite3.Connection, key: Key, table: Table) -> list[Any]:
+def get_searchable_ids(conn: sqlite3.Connection, key: str, table: str) -> list[Any]:
     cursor = conn.cursor()
     return cursor.execute(f"SELECT {key} FROM {table} WHERE searchable = 1").fetchall()
 
 
-def table_id_set_inclusion(conn: sqlite3.Connection, entity: Entity, t1: Table, t2: Table) -> bool:
+def table_id_set_inclusion(conn: sqlite3.Connection, entity: Entity, t1: str, t2: str) -> bool:
     t1_ids = get_entity_ids(conn, entity.key, t1)
     t2_ids = get_entity_ids(conn, entity.key, t2)
     return set(t1_ids).issubset(t2_ids)
@@ -68,7 +68,7 @@ def main():
             print(f"  {label}  {RED}{BOLD}failed{RESET}")
             failed = True
 
-    def check(conn: sqlite3.Connection, entity: Entity, t1: Table, t2: Table) -> None:
+    def check(conn: sqlite3.Connection, entity: Entity, t1: str, t2: str) -> None:
         ok = table_id_set_inclusion(conn, entity, t1, t2)
         report(f"{t1}.{entity.key} ⊆ {t2}.{entity.key}", ok)
 
@@ -80,11 +80,9 @@ def main():
                 check(conn, child, child.table, entity.table)
 
         print("repr inclusions")
-        for entity, rpr in [
-            (ALBUM, TABLES.album_repr_tracks),
-            (ARTIST, TABLES.artist_repr_albums),
-            (LABEL, TABLES.label_repr_artists),
-        ]:
+        for entity in (ALBUM, ARTIST, LABEL):
+            rpr = entity.repr
+            assert rpr is not None
             check(conn, entity, rpr, entity.table)
             # it's expected for these to fail, as only searchable entities can
             # end up in a repr table.
