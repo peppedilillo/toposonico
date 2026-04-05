@@ -4,7 +4,7 @@ services:
     ports:
       - "7700:7700"
     environment:
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-SUPERSECRETKEY}
+      MEILI_KEY: ${MEILI_KEY}
       MEILI_ENV: development
     volumes:
       - meilisearch_data:/meili_data
@@ -25,13 +25,14 @@ services:
     ports:
       - "8000:8000"
     environment:
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-SUPERSECRETKEY}
-      MEILI_INDEX_NAME: ${MEILI_INDEX_NAME:-entities}
+      MEILI_KEY: ${MEILI_KEY}
+      MEILI_UID: ${MEILI_UID}
       MEILI_URL: http://meilisearch:7700
-      SICK_MANIFEST: ${SICK_MANIFEST:-}
+      SICK_DB: /data/sick.db
     volumes:
       - ..:/workspace
       - backend_venv:/workspace/web/backend/.venv
+      - ${SICK_DB}:/data/sick.db:ro
     depends_on:
       meilisearch:
         condition: service_healthy
