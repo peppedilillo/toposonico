@@ -90,8 +90,7 @@ def recommend_fetch(
     if diversifiable:
         placeholders = ", ".join("?" * len(neighbor_ids))
         artist_rows = db.execute(
-            f"SELECT {entity.key}, artist_rowid FROM {entity.table} "
-            f"WHERE {entity.key} IN ({placeholders})",
+            f"SELECT {entity.key}, artist_rowid FROM {entity.table} " f"WHERE {entity.key} IN ({placeholders})",
             neighbor_ids,
         ).fetchall()
         artist_map = {row[0]: row[1] for row in artist_rows}
@@ -118,10 +117,7 @@ def recommend_fetch(
         neighbor_ids,
     ).fetchall()
     # returns recommends in neighbour order
-    rec_map = {
-        rec[0]: rec_cls(**dict(zip(rec_cols, rec)))
-        for rec in rec_rows
-    }
+    rec_map = {rec[0]: rec_cls(**dict(zip(rec_cols, rec))) for rec in rec_rows}
     return [rec_map[nid] for nid in neighbor_ids if nid in rec_map]
 
 

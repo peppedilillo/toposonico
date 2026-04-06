@@ -8,10 +8,10 @@ from src.shared import get_db
 from src.utils import AlbumEntity
 from src.utils import ArtistEntity
 from src.utils import cols
+from src.utils import Entity
 from src.utils import LabelEntity
 from src.utils import NAME2ENTITY
 from src.utils import TrackEntity
-from src.utils import Entity
 
 router = APIRouter()
 

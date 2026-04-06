@@ -1,7 +1,9 @@
-from typing import TypedDict
 import sqlite3
+from typing import TypedDict
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter
+from fastapi import HTTPException
+from fastapi import Query
 
 from src.shared import get_db
 from src.utils import AlbumEntity
@@ -22,6 +24,7 @@ class TrackRepr(TypedDict):
     lon: float
     lat: float
 
+
 class AlbumRepr(TypedDict):
     album_rowid: int
     album_name_norm: str
@@ -40,7 +43,12 @@ class ArtistRepr(TypedDict):
 Repr = TrackRepr | AlbumRepr | ArtistRepr
 
 
-def repr_fetch(entity: Entity, rowid: int, limit: int, db: sqlite3.Connection,) -> list[Repr]:
+def repr_fetch(
+    entity: Entity,
+    rowid: int,
+    limit: int,
+    db: sqlite3.Connection,
+) -> list[Repr]:
     match entity:
         case TrackEntity():
             return []

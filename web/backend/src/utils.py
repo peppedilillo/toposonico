@@ -39,7 +39,12 @@ class LabelEntity(NamedTuple):
 
 Entity = TrackEntity | AlbumEntity | ArtistEntity | LabelEntity
 
-TRACK = TrackEntity("track", "track_rowid", "tracks", "track_embedding",)
+TRACK = TrackEntity(
+    "track",
+    "track_rowid",
+    "tracks",
+    "track_embedding",
+)
 ALBUM = AlbumEntity(
     "album",
     "album_rowid",

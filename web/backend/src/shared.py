@@ -1,12 +1,11 @@
+from functools import cache
 import os
 import sqlite3
-from functools import cache
 from sqlite3 import connect
 from typing import NamedTuple
 
 import faiss
 import meilisearch
-
 
 REQUIRED_ENV_VARS = (
     "SICK_DB",
@@ -30,9 +29,7 @@ def get_config_str(var: str) -> str:
 def check_config() -> None:
     missing = [v for v in REQUIRED_ENV_VARS if v not in os.environ]
     if missing:
-        raise RuntimeError(
-            f"Missing required environment variables: {', '.join(missing)}"
-        )
+        raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
 
 
 @cache

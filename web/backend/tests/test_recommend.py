@@ -11,10 +11,7 @@ def test_recommend_track(db, faiss_indexes):
     assert results is not None
     assert len(results) == 3
     assert all(r["track_rowid"] != 1 for r in results)
-    assert all(
-        set(r.keys()) == {"track_rowid", "track_name", "artist_name", "lon", "lat"}
-        for r in results
-    )
+    assert all(set(r.keys()) == {"track_rowid", "track_name", "artist_name", "lon", "lat"} for r in results)
 
 
 def test_recommend_album(db, faiss_indexes):

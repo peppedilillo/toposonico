@@ -21,8 +21,7 @@ def _build_db() -> sqlite3.Connection:
 
     # -- entity tables --
 
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE tracks (
             track_rowid INTEGER PRIMARY KEY,
             track_name TEXT,
@@ -43,24 +42,94 @@ def _build_db() -> sqlite3.Connection:
             logcount REAL,
             release_date TEXT
         )
-        """
-    )
+        """)
     conn.executemany(
         "INSERT INTO tracks VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [
-            (1, "Blue in Green", 10, "Miles Davis", 20, "Kind of Blue", 30, "Columbia",
-             1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 4.7, "1959-08-17"),
-            (2, "So What", 10, "Miles Davis", 20, "Kind of Blue", 30, "Columbia",
-             1.2, 2.3, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 4.5, "1959-08-17"),
-            (3, "Nefertiti", 10, "Miles Davis", 21, "Nefertiti", 30, "Columbia",
-             1.3, 2.4, 3.4, 4.5, 5.5, 6.6, 7.7, 8.8, 3.9, "1968-01-01"),
-            (4, "Maiden Voyage", 11, "Herbie Hancock", 22, "Maiden Voyage", 31, "Blue Note",
-             1.4, 2.5, 3.5, 4.6, 5.6, 6.7, 7.8, 8.9, 4.1, "1965-05-17"),
+            (
+                1,
+                "Blue in Green",
+                10,
+                "Miles Davis",
+                20,
+                "Kind of Blue",
+                30,
+                "Columbia",
+                1.1,
+                2.2,
+                3.3,
+                4.4,
+                5.5,
+                6.6,
+                7.7,
+                8.8,
+                4.7,
+                "1959-08-17",
+            ),
+            (
+                2,
+                "So What",
+                10,
+                "Miles Davis",
+                20,
+                "Kind of Blue",
+                30,
+                "Columbia",
+                1.2,
+                2.3,
+                3.3,
+                4.4,
+                5.5,
+                6.6,
+                7.7,
+                8.8,
+                4.5,
+                "1959-08-17",
+            ),
+            (
+                3,
+                "Nefertiti",
+                10,
+                "Miles Davis",
+                21,
+                "Nefertiti",
+                30,
+                "Columbia",
+                1.3,
+                2.4,
+                3.4,
+                4.5,
+                5.5,
+                6.6,
+                7.7,
+                8.8,
+                3.9,
+                "1968-01-01",
+            ),
+            (
+                4,
+                "Maiden Voyage",
+                11,
+                "Herbie Hancock",
+                22,
+                "Maiden Voyage",
+                31,
+                "Blue Note",
+                1.4,
+                2.5,
+                3.5,
+                4.6,
+                5.6,
+                6.7,
+                7.8,
+                8.9,
+                4.1,
+                "1965-05-17",
+            ),
         ],
     )
 
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE albums (
             album_rowid INTEGER PRIMARY KEY,
             album_name_norm TEXT,
@@ -79,22 +148,68 @@ def _build_db() -> sqlite3.Connection:
             release_date TEXT,
             album_type TEXT
         )
-        """
-    )
+        """)
     conn.executemany(
         "INSERT INTO albums VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [
-            (20, "kind of blue", 10, "Miles Davis", 30, "Columbia",
-             3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 6.1, 5, "1959-08-17", "album"),
-            (21, "nefertiti", 10, "Miles Davis", 30, "Columbia",
-             3.4, 4.5, 5.5, 6.6, 7.7, 8.8, 5.2, 6, "1968-01-01", "album"),
-            (22, "maiden voyage", 11, "Herbie Hancock", 31, "Blue Note",
-             3.5, 4.6, 5.6, 6.7, 7.8, 8.9, 5.8, 8, "1965-05-17", "album"),
+            (
+                20,
+                "kind of blue",
+                10,
+                "Miles Davis",
+                30,
+                "Columbia",
+                3.3,
+                4.4,
+                5.5,
+                6.6,
+                7.7,
+                8.8,
+                6.1,
+                5,
+                "1959-08-17",
+                "album",
+            ),
+            (
+                21,
+                "nefertiti",
+                10,
+                "Miles Davis",
+                30,
+                "Columbia",
+                3.4,
+                4.5,
+                5.5,
+                6.6,
+                7.7,
+                8.8,
+                5.2,
+                6,
+                "1968-01-01",
+                "album",
+            ),
+            (
+                22,
+                "maiden voyage",
+                11,
+                "Herbie Hancock",
+                31,
+                "Blue Note",
+                3.5,
+                4.6,
+                5.6,
+                6.7,
+                7.8,
+                8.9,
+                5.8,
+                8,
+                "1965-05-17",
+                "album",
+            ),
         ],
     )
 
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE artists (
             artist_rowid INTEGER PRIMARY KEY,
             artist_name TEXT,
@@ -104,8 +219,7 @@ def _build_db() -> sqlite3.Connection:
             nalbum INTEGER,
             artist_genre TEXT
         )
-        """
-    )
+        """)
     conn.executemany(
         "INSERT INTO artists VALUES (?,?,?,?,?,?,?)",
         [
@@ -114,8 +228,7 @@ def _build_db() -> sqlite3.Connection:
         ],
     )
 
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE labels (
             label_rowid INTEGER PRIMARY KEY,
             label TEXT,
@@ -125,8 +238,7 @@ def _build_db() -> sqlite3.Connection:
             nalbum INTEGER,
             nartist INTEGER
         )
-        """
-    )
+        """)
     conn.executemany(
         "INSERT INTO labels VALUES (?,?,?,?,?,?,?)",
         [
@@ -138,69 +250,55 @@ def _build_db() -> sqlite3.Connection:
     # -- embedding tables --
 
     track_embs = _make_embeddings(4, rng)
-    conn.execute(
-        "CREATE TABLE track_embedding (track_rowid INTEGER PRIMARY KEY, embedding BLOB)"
-    )
+    conn.execute("CREATE TABLE track_embedding (track_rowid INTEGER PRIMARY KEY, embedding BLOB)")
     for rowid, emb in zip([1, 2, 3, 4], track_embs):
         conn.execute("INSERT INTO track_embedding VALUES (?, ?)", (rowid, emb.tobytes()))
 
     album_embs = _make_embeddings(3, rng)
-    conn.execute(
-        "CREATE TABLE album_embedding (album_rowid INTEGER PRIMARY KEY, embedding BLOB)"
-    )
+    conn.execute("CREATE TABLE album_embedding (album_rowid INTEGER PRIMARY KEY, embedding BLOB)")
     for rowid, emb in zip([20, 21, 22], album_embs):
         conn.execute("INSERT INTO album_embedding VALUES (?, ?)", (rowid, emb.tobytes()))
 
     artist_embs = _make_embeddings(2, rng)
-    conn.execute(
-        "CREATE TABLE artist_embedding (artist_rowid INTEGER PRIMARY KEY, embedding BLOB)"
-    )
+    conn.execute("CREATE TABLE artist_embedding (artist_rowid INTEGER PRIMARY KEY, embedding BLOB)")
     for rowid, emb in zip([10, 11], artist_embs):
         conn.execute("INSERT INTO artist_embedding VALUES (?, ?)", (rowid, emb.tobytes()))
 
     label_embs = _make_embeddings(2, rng)
-    conn.execute(
-        "CREATE TABLE label_embedding (label_rowid INTEGER PRIMARY KEY, embedding BLOB)"
-    )
+    conn.execute("CREATE TABLE label_embedding (label_rowid INTEGER PRIMARY KEY, embedding BLOB)")
     for rowid, emb in zip([30, 31], label_embs):
         conn.execute("INSERT INTO label_embedding VALUES (?, ?)", (rowid, emb.tobytes()))
 
     # -- repr tables --
 
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE album_repr_tracks (
             album_rowid INTEGER, rank INTEGER, track_rowid INTEGER, score REAL,
             PRIMARY KEY (album_rowid, rank)
         )
-        """
-    )
+        """)
     conn.executemany(
         "INSERT INTO album_repr_tracks VALUES (?,?,?,?)",
         [(20, 0, 1, 0.9), (20, 1, 2, 0.8), (21, 0, 3, 0.95)],
     )
 
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE artist_repr_albums (
             artist_rowid INTEGER, rank INTEGER, album_rowid INTEGER, score REAL,
             PRIMARY KEY (artist_rowid, rank)
         )
-        """
-    )
+        """)
     conn.executemany(
         "INSERT INTO artist_repr_albums VALUES (?,?,?,?)",
         [(10, 0, 20, 0.9), (10, 1, 21, 0.85), (11, 0, 22, 0.92)],
     )
 
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE label_repr_artists (
             label_rowid INTEGER, rank INTEGER, artist_rowid INTEGER, score REAL,
             PRIMARY KEY (label_rowid, rank)
         )
-        """
-    )
+        """)
     conn.executemany(
         "INSERT INTO label_repr_artists VALUES (?,?,?,?)",
         [(30, 0, 10, 0.88), (31, 0, 11, 0.91)],
