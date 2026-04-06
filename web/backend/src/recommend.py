@@ -57,7 +57,7 @@ Recommend = TrackRecommend | AlbumRecommend | ArtistRecommend | LabelRecommend
 async def recommend(
     rowid: int,
     entity_name: str,
-    limit: int = Query(10, ge=1, le=20),
+    limit: int = Query(10, ge=1, le=10),
     diverse: bool = True,
 ) -> list[Recommend]:
     if entity_name not in NAME2ENTITY:
