@@ -38,39 +38,41 @@ from src.utils import read_manifest
 
 BATCH_SIZE = 500_000
 
+# TODO: add a `nrepr` column := number of repr child per entity
 DDL = """
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous  = NORMAL;
 
 CREATE TABLE tracks (
     track_rowid           INTEGER PRIMARY KEY,
-    track_canonical_rowid INTEGER NOT NULL,
+    track_canonical_rowid INTEGER NOT NULL REFERENCES tracks(track_rowid),
     track_name            TEXT    NOT NULL,
-    track_popularity      INTEGER,
+    track_name_norm       TEXT    NOT NULL,
     logcount              REAL    NOT NULL,
-    release_date          TEXT,
-    id_isrc               TEXT,
     searchable            INTEGER NOT NULL DEFAULT 0,
     recable               INTEGER NOT NULL DEFAULT 0,
     lon                   REAL    NOT NULL,
     lat                   REAL    NOT NULL,
-    artist_rowid          INTEGER NOT NULL,
-    artist_name           TEXT,
-    artist_lon            REAL,
-    artist_lat            REAL,
-    album_rowid           INTEGER NOT NULL,
-    album_name            TEXT,
-    album_lon             REAL,
-    album_lat             REAL,
-    label_rowid           INTEGER NOT NULL,
-    label                 TEXT,
-    label_lon             REAL,
-    label_lat             REAL
+    artist_rowid          INTEGER NOT NULL REFERENCES artists(artist_rowid),
+    artist_name           TEXT    NOT NULL,
+    artist_lon            REAL    NOT NULL,
+    artist_lat            REAL    NOT NULL,
+    album_rowid           INTEGER NOT NULL REFERENCES albums(album_rowid),
+    album_name            TEXT    NOT NULL,
+    album_lon             REAL    NOT NULL,
+    album_lat             REAL    NOT NULL,
+    label_rowid           INTEGER NOT NULL REFERENCES labels(label_rowid),
+    label                 TEXT    NOT NULL,
+    label_lon             REAL    NOT NULL,
+    label_lat             REAL    NOT NULL,
+    track_popularity      INTEGER,
+    release_date          TEXT,
+    id_isrc               TEXT
 );
 
 CREATE TABLE albums (
     album_rowid              INTEGER PRIMARY KEY,
-    album_canonical_rowid    INTEGER NOT NULL,
+    album_canonical_rowid    INTEGER NOT NULL REFERENCES albums(album_rowid),
     album_name               TEXT    NOT NULL,
     album_name_norm          TEXT    NOT NULL,
     logcount                 REAL    NOT NULL,
@@ -78,42 +80,42 @@ CREATE TABLE albums (
     recable                  INTEGER NOT NULL DEFAULT 0,
     lon                      REAL    NOT NULL,
     lat                      REAL    NOT NULL,
-    artist_rowid             INTEGER NOT NULL,
-    artist_name              TEXT,
-    artist_lon               REAL,
-    artist_lat               REAL,
+    artist_rowid             INTEGER NOT NULL REFERENCES artists(artist_rowid),
+    artist_name              TEXT    NOT NULL,
+    artist_lon               REAL    NOT NULL,
+    artist_lat               REAL    NOT NULL,
+    label                    TEXT    NOT NULL,
+    label_rowid              INTEGER NOT NULL REFERENCES labels(label_rowid),
+    label_lon                REAL    NOT NULL,
+    label_lat                REAL    NOT NULL,
     album_type               TEXT,
-    label                    TEXT,
     total_tracks             INTEGER,
     release_date             TEXT,
-    release_date_precision   TEXT,
-    label_rowid              INTEGER NOT NULL,
-    label_lon                REAL,
-    label_lat                REAL
+    release_date_precision   TEXT
 );
 
 CREATE TABLE artists (
     artist_rowid           INTEGER PRIMARY KEY,
-    artist_canonical_rowid INTEGER NOT NULL,
+    artist_canonical_rowid INTEGER NOT NULL REFERENCES artists(artist_rowid),
     artist_name            TEXT    NOT NULL,
-    artist_genre           TEXT,
+    lon                    REAL    NOT NULL,
+    lat                    REAL    NOT NULL,
     logcount               REAL    NOT NULL,
-    ntrack                 INTEGER,
-    nalbum                 INTEGER,
+    ntrack                 INTEGER NOT NULL,
+    nalbum                 INTEGER NOT NULL,
     searchable             INTEGER NOT NULL DEFAULT 0,
     recable                INTEGER NOT NULL DEFAULT 0,
-    lon                    REAL    NOT NULL,
-    lat                    REAL    NOT NULL
+    artist_genre           TEXT
 );
 
 CREATE TABLE labels (
     label_rowid           INTEGER PRIMARY KEY,
-    label_canonical_rowid INTEGER NOT NULL,
+    label_canonical_rowid INTEGER NOT NULL REFERENCES labels(label_rowid),
     label                 TEXT    NOT NULL UNIQUE,
     logcount              REAL    NOT NULL,
-    ntrack                INTEGER,
-    nalbum                INTEGER,
-    nartist               INTEGER,
+    ntrack                INTEGER NOT NULL,
+    nalbum                INTEGER NOT NULL,
+    nartist               INTEGER NOT NULL,
     searchable            INTEGER NOT NULL DEFAULT 0,
     recable               INTEGER NOT NULL DEFAULT 0,
     lon                   REAL    NOT NULL,
@@ -121,45 +123,45 @@ CREATE TABLE labels (
 );
 
 CREATE TABLE track_embedding (
-    track_rowid INTEGER PRIMARY KEY,
+    track_rowid INTEGER PRIMARY KEY REFERENCES tracks(track_rowid),
     embedding   BLOB    NOT NULL
 );
 
 CREATE TABLE album_embedding (
-    album_rowid INTEGER PRIMARY KEY,
+    album_rowid INTEGER PRIMARY KEY REFERENCES albums(album_rowid),
     embedding   BLOB    NOT NULL
 );
 
 CREATE TABLE artist_embedding (
-    artist_rowid INTEGER PRIMARY KEY,
+    artist_rowid INTEGER PRIMARY KEY REFERENCES artists(artist_rowid),
     embedding    BLOB    NOT NULL
 );
 
 CREATE TABLE label_embedding (
-    label_rowid INTEGER PRIMARY KEY,
+    label_rowid INTEGER PRIMARY KEY REFERENCES labels(label_rowid),
     embedding   BLOB    NOT NULL
 );
 
 CREATE TABLE album_repr_tracks (
-    album_rowid INTEGER NOT NULL,
+    album_rowid INTEGER NOT NULL REFERENCES albums(album_rowid),
     rank        INTEGER NOT NULL,
-    track_rowid INTEGER NOT NULL,
+    track_rowid INTEGER NOT NULL REFERENCES tracks(track_rowid),
     score       REAL    NOT NULL,
     PRIMARY KEY (album_rowid, rank)
 );
 
 CREATE TABLE artist_repr_albums (
-    artist_rowid INTEGER NOT NULL,
+    artist_rowid INTEGER NOT NULL REFERENCES artists(artist_rowid),
     rank         INTEGER NOT NULL,
-    album_rowid  INTEGER NOT NULL,
+    album_rowid  INTEGER NOT NULL REFERENCES albums(album_rowid),
     score        REAL    NOT NULL,
     PRIMARY KEY (artist_rowid, rank)
 );
 
 CREATE TABLE label_repr_artists (
-    label_rowid  INTEGER NOT NULL,
+    label_rowid  INTEGER NOT NULL REFERENCES labels(label_rowid),
     rank         INTEGER NOT NULL,
-    artist_rowid INTEGER NOT NULL,
+    artist_rowid INTEGER NOT NULL REFERENCES artists(artist_rowid),
     score        REAL    NOT NULL,
     PRIMARY KEY (label_rowid, rank)
 );
@@ -176,8 +178,8 @@ CREATE INDEX idx_albums_artist ON albums(artist_rowid);
 ALBUM_TITLE_VARIANT_MARKERS = ("remaster", "edition", "version", "deluxe", "expanded")
 
 
-def normalize_album_title(name: str) -> str:
-    """Strip a small set of trailing edition markers from album titles."""
+def normalize_title(name: str) -> str:
+    """Strip a small set of trailing edition markers from titles."""
     s = " ".join(name.split())
     match = re.search(r"\s*\(([^()]*)\)\s*$", s)
     if not match:
@@ -188,35 +190,46 @@ def normalize_album_title(name: str) -> str:
     return s
 
 
+def _validate_required_columns(df: pd.DataFrame, required_cols: list[str], entity: str) -> None:
+    """Fail fast if schema-required columns contain null/empty values."""
+    missing = [col for col in required_cols if col not in df.columns]
+    if missing:
+        raise ValueError(f"{entity}: missing required columns: {', '.join(missing)}")
+
+    invalid_parts = []
+    for col in required_cols:
+        series = df[col]
+        mask = series.isna()
+        if pd.api.types.is_string_dtype(series):
+            mask = mask | series.astype(str).str.strip().eq("")
+        invalid_count = int(mask.sum())
+        if invalid_count:
+            invalid_parts.append(f"{col}={invalid_count}")
+
+    if invalid_parts:
+        raise ValueError(
+            f"{entity}: required columns contain null/empty values: {', '.join(invalid_parts)}"
+        )
+
+
 def get_album_canonical_updates(albums: pd.DataFrame) -> pd.DataFrame:
     """Return canonical album assignments for an albums DataFrame.
 
-    Albums are grouped by artist, album type, and normalized title. Within each
-    group, the canonical entry is the one with the highest logcount; ties are
-    broken by the smallest album_rowid for deterministic selection.
+    Albums are grouped by artist, album type, and case-insensitive normalized
+    title. Within each group, the entry with the smallest album_rowid is
+    elected as canonical.
     """
-    albums = albums.copy()
     albums["album_type_norm"] = albums["album_type"].fillna("")
+    albums["album_name_lower"] = albums["album_name_norm"].str.lower()
+    group_keys = ["artist_rowid", "album_type_norm", "album_name_lower"]
     canonical = (
-        albums.sort_values(
-            [
-                "artist_rowid",
-                "album_type_norm",
-                "album_name_norm",
-                "logcount",
-                "album_rowid",
-            ],
-            ascending=[True, True, True, False, True],
-        )
-        .drop_duplicates(
-            ["artist_rowid", "album_type_norm", "album_name_norm"],
-            keep="first",
-        )[["artist_rowid", "album_type_norm", "album_name_norm", "album_rowid"]]
+        albums.sort_values(group_keys + ["album_rowid"])
+        .drop_duplicates(group_keys, keep="first")[group_keys + ["album_rowid"]]
         .rename(columns={"album_rowid": "album_canonical_rowid"})
     )
     return albums.merge(
         canonical,
-        on=["artist_rowid", "album_type_norm", "album_name_norm"],
+        on=group_keys,
         how="left",
     )[["album_canonical_rowid", "album_rowid"]]
 
@@ -230,8 +243,7 @@ def canonicalize_albums(conn: sqlite3.Connection) -> None:
             artist_rowid,
             album_type,
             album_name,
-            album_name_norm,
-            logcount
+            album_name_norm
         FROM albums
         """,
         conn,
@@ -246,33 +258,38 @@ def canonicalize_albums(conn: sqlite3.Connection) -> None:
 def get_track_canonical_updates(tracks: pd.DataFrame) -> pd.DataFrame:
     """Return canonical track assignments for a tracks DataFrame.
 
-    Tracks are grouped by id_isrc. Tracks with NULL/empty/whitespace ISRC are
-    self-canonical. Among tracks sharing a valid ISRC, the one with the highest
-    logcount is canonical; ties are broken by the smallest track_rowid.
+    Tracks are grouped by canonical album and case-insensitive normalized
+    title. Within each group the entry with the smallest track_rowid is
+    elected as canonical.
     """
-    tracks = tracks.copy()
-    has_valid_isrc = tracks["id_isrc"].notna() & tracks["id_isrc"].astype(str).str.strip().ne("")
-    self_canonical = tracks[~has_valid_isrc][["track_rowid"]].copy()
-    self_canonical["track_canonical_rowid"] = self_canonical["track_rowid"]
-    self_canonical = self_canonical[["track_canonical_rowid", "track_rowid"]]
+    if "album_canonical_rowid" not in tracks.columns:
+        if "album_rowid" not in tracks.columns:
+            raise KeyError("tracks must include album_canonical_rowid or album_rowid")
+        tracks = tracks.rename(columns={"album_rowid": "album_canonical_rowid"})
 
-    dupes = tracks[has_valid_isrc].copy()
+    tracks["track_name_lower"] = tracks["track_name_norm"].str.lower()
+    group_keys = ["album_canonical_rowid", "track_name_lower"]
     canonical = (
-        dupes.sort_values(
-            ["id_isrc", "logcount", "track_rowid"],
-            ascending=[True, False, True],
-        )
-        .drop_duplicates("id_isrc", keep="first")[["id_isrc", "track_rowid"]]
+        tracks.sort_values(group_keys + ["track_rowid"])
+        .drop_duplicates(group_keys, keep="first")[group_keys + ["track_rowid"]]
         .rename(columns={"track_rowid": "track_canonical_rowid"})
     )
-    dupes = dupes.merge(canonical, on="id_isrc", how="left")[["track_canonical_rowid", "track_rowid"]]
-    return pd.concat([self_canonical, dupes], ignore_index=True)
+    return tracks.merge(
+        canonical,
+        on=group_keys,
+        how="left",
+    )[["track_canonical_rowid", "track_rowid"]]
 
 
 def canonicalize_tracks(conn: sqlite3.Connection) -> None:
-    """Assign each track row to a canonical track row based on ISRC grouping."""
+    """Assign each track row to a canonical track row within its duplicate group.
+
+    Groups by canonical album (not raw album_rowid), so tracks appearing in
+    duplicate albums are correctly deduplicated.
+    """
     tracks = pd.read_sql(
-        "SELECT track_rowid, id_isrc, logcount FROM tracks",
+        "SELECT t.track_rowid, a.album_canonical_rowid, t.track_name_norm "
+        "FROM tracks t JOIN albums a ON a.album_rowid = t.album_rowid",
         conn,
     )
     updates = get_track_canonical_updates(tracks)
@@ -281,7 +298,7 @@ def canonicalize_tracks(conn: sqlite3.Connection) -> None:
         list(updates.itertuples(index=False, name=None)),
     )
 
-
+# TODO: remove compilation album from recable
 def compute_searchable_recable(
     conn: sqlite3.Connection,
     searchable_track_min_logcount: float,
@@ -297,19 +314,23 @@ def compute_searchable_recable(
     tracks, meets an additional logcount threshold).
     """
     conn.execute(
-        "UPDATE tracks SET searchable = 1 " "WHERE track_canonical_rowid = track_rowid AND logcount >= ?",
+        "UPDATE tracks SET searchable = 1 "
+        "WHERE track_canonical_rowid = track_rowid AND logcount >= ?",
         (searchable_track_min_logcount,),
     )
     conn.execute(
-        "UPDATE albums SET searchable = 1 " "WHERE album_canonical_rowid = album_rowid AND total_tracks >= ?",
+        "UPDATE albums SET searchable = 1 " 
+        "WHERE album_canonical_rowid = album_rowid AND total_tracks >= ?",
         (searchable_album_min_total_tracks,),
     )
     conn.execute(
-        "UPDATE artists SET searchable = 1 " "WHERE artist_canonical_rowid = artist_rowid AND ntrack >= ?",
+        "UPDATE artists SET searchable = 1 " 
+        "WHERE artist_canonical_rowid = artist_rowid AND ntrack >= ?",
         (searchable_artist_min_ntrack,),
     )
     conn.execute(
-        "UPDATE labels SET searchable = 1 " "WHERE label_canonical_rowid = label_rowid AND nartist >= ?",
+        "UPDATE labels SET searchable = 1 " 
+        "WHERE label_canonical_rowid = label_rowid AND nartist >= ?",
         (searchable_label_min_nartist,),
     )
 
@@ -397,8 +418,20 @@ def build_albums(
         on=EKEYS.label,
         how="left",
     )
-    df["album_name_norm"] = df["album_name"].map(normalize_album_title)
+    df["album_name_norm"] = df["album_name"].map(normalize_title)
     df["album_canonical_rowid"] = df[EKEYS.album]
+    _validate_required_columns(
+        df,
+        [
+            "artist_name",
+            "artist_lon",
+            "artist_lat",
+            "label",
+            "label_lon",
+            "label_lat",
+        ],
+        "albums",
+    )
 
     df[
         [
@@ -445,6 +478,7 @@ def build_tracks(
         EKEYS.track,
         "track_canonical_rowid",
         "track_name",
+        "track_name_norm",
         "track_popularity",
         "logcount",
         "release_date",
@@ -477,8 +511,23 @@ def build_tracks(
             .merge(album_geo_r, on=EKEYS.album, how="left")
             .merge(label_geo_r, on=EKEYS.label, how="left")
         )
-        df["label"] = df["label"].replace("", None)
         df["track_canonical_rowid"] = df[EKEYS.track]
+        df["track_name_norm"] = df["track_name"].map(normalize_title)
+        _validate_required_columns(
+            df,
+            [
+                "artist_name",
+                "artist_lon",
+                "artist_lat",
+                "album_name",
+                "album_lon",
+                "album_lat",
+                "label",
+                "label_lon",
+                "label_lat",
+            ],
+            "tracks",
+        )
         df[out_cols].to_sql("tracks", conn, if_exists="append", index=False)
 
         total += len(df)
@@ -644,8 +693,16 @@ def build_label_repr_artists(conn: sqlite3.Connection, limit: int) -> None:
     print(f"  [label_repr_artists] {total:,} rows  ({time.time() - t0:.1f}s)")
 
 
+# TODO: there is something not quite working with reprs at moment.
+#   We shall guarantee that:
+#    `entity[searchable].entity_rowid ⊆ entity_repr_*.entity_rowid`
+#   This apparently work for `album_repr_track` but not for the other repr table.
+#   This is likely due to searchable being enforced over tracks even when
+#   representative entities aren't!
+# TODO: consider refactoring these complex sql queries to pandas and add tests.
 def build_representatives(conn: sqlite3.Connection, limit: int) -> None:
-    """Build all ranked representative-child tables for downward navigation."""
+    """Build all ranked representative-child tables for downward navigation,
+    from searchable entities."""
     build_album_repr_tracks(conn, limit)
     build_artist_repr_albums(conn, limit)
     build_label_repr_artists(conn, limit)
@@ -757,6 +814,7 @@ def main():
 
     t_total = time.time()
     conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(DDL)
 
     print("Loading lookups...")

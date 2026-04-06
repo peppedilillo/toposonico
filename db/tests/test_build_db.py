@@ -16,7 +16,7 @@ from scripts.build_db import compute_searchable_recable
 from scripts.build_db import DDL
 from scripts.build_db import get_album_canonical_updates
 from scripts.build_db import get_track_canonical_updates
-from scripts.build_db import normalize_album_title
+from scripts.build_db import normalize_title
 from src.utils import ENTITY_KEYS as EKEYS
 
 
@@ -26,6 +26,7 @@ def db():
     import sqlite3
 
     conn = sqlite3.connect(":memory:")
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(DDL)
     return conn
 
@@ -171,11 +172,11 @@ def _rows_as_dicts(db, sql):
     ],
     ids=["plain", "remaster", "deluxe", "non-marker-kept", "whitespace"],
 )
-def test_normalize_album_title(title, expected):
-    assert normalize_album_title(title) == expected
+def test_normalize_title(title, expected):
+    assert normalize_title(title) == expected
 
 
-def test_canonical_updates_prefers_highest_logcount():
+def test_album_canonical_picks_smallest_rowid():
     albums = pd.DataFrame(
         {
             "album_rowid": [201, 202],
@@ -183,74 +184,58 @@ def test_canonical_updates_prefers_highest_logcount():
             "album_type": ["album", "album"],
             "album_name": ["Untitled", "Untitled (Remastered Edition)"],
             "album_name_norm": ["Untitled", "Untitled"],
-            "logcount": [2.5, 3.0],
         }
     )
     updates = get_album_canonical_updates(albums)
     canonical = updates.set_index("album_rowid")["album_canonical_rowid"]
-    assert canonical[201] == 202, "lower logcount should point to higher logcount"
-    assert canonical[202] == 202, "highest logcount should be self-canonical"
+    assert canonical[201] == 201, "smallest rowid should be self-canonical"
+    assert canonical[202] == 201, "larger rowid should point to smallest"
 
 
-def test_canonical_updates_tiebreak_by_lowest_rowid():
+def test_album_canonical_is_case_insensitive():
     albums = pd.DataFrame(
         {
             "album_rowid": [201, 202],
             "artist_rowid": [101, 101],
             "album_type": ["album", "album"],
-            "album_name": ["Untitled", "Untitled (Remastered Edition)"],
-            "album_name_norm": ["Untitled", "Untitled"],
-            "logcount": [3.0, 3.0],
+            "album_name": ["OK Computer", "ok computer"],
+            "album_name_norm": ["OK Computer", "ok computer"],
         }
     )
     updates = get_album_canonical_updates(albums)
     canonical = updates.set_index("album_rowid")["album_canonical_rowid"]
     assert canonical[201] == 201
-    assert canonical[202] == 201
+    assert canonical[202] == 201, "case-different album should share canonical"
 
 
-def test_track_canonical_groups_by_isrc_picks_highest_logcount():
+def test_track_canonical_picks_smallest_rowid():
     tracks = pd.DataFrame(
         {
             "track_rowid": [1, 2, 3],
-            "id_isrc": ["ISRC_A", "ISRC_A", "ISRC_B"],
-            "logcount": [1.0, 3.0, 2.0],
+            "album_rowid": [201, 201, 202],
+            "track_name_norm": ["Song", "Song", "Other"],
         }
     )
     updates = get_track_canonical_updates(tracks)
     canonical = updates.set_index("track_rowid")["track_canonical_rowid"]
-    assert canonical[1] == 2, "lower logcount should point to higher"
-    assert canonical[2] == 2, "highest logcount should be self-canonical"
-    assert canonical[3] == 3, "sole ISRC should be self-canonical"
+    assert canonical[1] == 1, "smallest rowid should be self-canonical"
+    assert canonical[2] == 1, "larger rowid should point to smallest"
+    assert canonical[3] == 3, "different album should be self-canonical"
 
 
-def test_track_canonical_null_isrc_is_self_canonical():
+def test_track_canonical_is_case_insensitive():
     tracks = pd.DataFrame(
         {
             "track_rowid": [1, 2, 3],
-            "id_isrc": [np.nan, "", "  "],
-            "logcount": [1.0, 2.0, 3.0],
+            "album_rowid": [201, 201, 202],
+            "track_name_norm": ["Blue in Green", "blue in green", "Blue in Green"],
         }
     )
     updates = get_track_canonical_updates(tracks)
     canonical = updates.set_index("track_rowid")["track_canonical_rowid"]
-    assert canonical[1] == 1
-    assert canonical[2] == 2
-    assert canonical[3] == 3
-
-
-def test_track_canonical_tiebreak_by_lowest_rowid():
-    tracks = pd.DataFrame(
-        {
-            "track_rowid": [10, 20],
-            "id_isrc": ["ISRC_A", "ISRC_A"],
-            "logcount": [2.0, 2.0],
-        }
-    )
-    updates = get_track_canonical_updates(tracks)
-    canonical = updates.set_index("track_rowid")["track_canonical_rowid"]
-    assert canonical[10] == 10
-    assert canonical[20] == 10
+    assert canonical[1] == 1, "smallest rowid should be self-canonical"
+    assert canonical[2] == 1, "case-different name on same album should share canonical"
+    assert canonical[3] == 3, "different album should be self-canonical"
 
 
 def test_build_labels_writes_all_lookup_columns(db):
@@ -275,7 +260,9 @@ def test_build_artists_writes_genre_and_counts(db):
 
 
 def test_build_albums_denormalizes_artist_and_label_geo(db):
-    build_albums(db, _album_lookup(), _album_geo(), _artist_geo(), _label_geo())
+    label_geo = build_labels(db, _label_lookup(), _label_geo())
+    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
+    build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
 
     rows = _rows_as_dicts(db, "SELECT * FROM albums WHERE album_rowid = 201")
     row = rows[0]
@@ -287,7 +274,9 @@ def test_build_albums_denormalizes_artist_and_label_geo(db):
 
 
 def test_canonicalize_albums_groups_remaster_variants(db):
-    build_albums(db, _album_lookup(), _album_geo(), _artist_geo(), _label_geo())
+    label_geo = build_labels(db, _label_lookup(), _label_geo())
+    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
+    build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
     canonicalize_albums(db)
     db.commit()
 
@@ -298,14 +287,17 @@ def test_canonicalize_albums_groups_remaster_variants(db):
 
 
 def test_build_tracks_denormalizes_geo_and_includes_isrc(db, tmp_path):
+    label_geo = build_labels(db, _label_lookup(), _label_geo())
+    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
+    album_geo = build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
     lookup_path = _write_track_parquet(tmp_path)
     build_tracks(
         db,
         lookup_path,
         _track_geo(),
-        _artist_geo(),
-        _album_geo(),
-        _label_geo(),
+        artist_geo,
+        album_geo,
+        label_geo,
         batch_size=100,
     )
 
@@ -320,15 +312,18 @@ def test_build_tracks_denormalizes_geo_and_includes_isrc(db, tmp_path):
 
 def test_build_tracks_filters_to_geo_subset(db, tmp_path):
     """Tracks absent from track_geo are excluded (implicit geo filter)."""
+    label_geo = build_labels(db, _label_lookup(), _label_geo())
+    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
+    album_geo = build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
     lookup_path = _write_track_parquet(tmp_path)
     partial_geo = pd.DataFrame({EKEYS.track: [1001, 1003], "lon": [0.1, 0.3], "lat": [1.1, 1.3]})
     build_tracks(
         db,
         lookup_path,
         partial_geo,
-        _artist_geo(),
-        _album_geo(),
-        _label_geo(),
+        artist_geo,
+        album_geo,
+        label_geo,
         batch_size=100,
     )
 
@@ -336,37 +331,41 @@ def test_build_tracks_filters_to_geo_subset(db, tmp_path):
     assert count == 2
 
 
-def test_build_tracks_nullifies_empty_label(db, tmp_path):
-    """Tracks with empty-string label get NULL in the DB."""
+def test_build_tracks_rejects_empty_label(db, tmp_path):
+    """Tracks with empty-string label fail fast under the strict schema."""
     track = _track_lookup().copy()
     track.loc[track[EKEYS.track] == 1001, "label"] = ""
     path = tmp_path / "lookup_track.parquet"
     track.to_parquet(path)
 
-    build_tracks(
-        db,
-        path,
-        _track_geo(),
-        _artist_geo(),
-        _album_geo(),
-        _label_geo(),
-        batch_size=100,
-    )
-
-    row = _rows_as_dicts(db, "SELECT label FROM tracks WHERE track_rowid = 1001")[0]
-    assert row["label"] is None
+    with pytest.raises(ValueError, match=r"tracks: required columns contain null/empty values: label=1"):
+        build_tracks(
+            db,
+            path,
+            _track_geo(),
+            _artist_geo(),
+            _album_geo(),
+            _label_geo(),
+            batch_size=100,
+        )
 
 
 def test_canonicalize_tracks_in_db(db, tmp_path):
-    """Tracks sharing ISRC get the same canonical rowid in the DB."""
+    """Tracks with same album + normalized name share canonical in the DB."""
+    label_geo = build_labels(db, _label_lookup(), _label_geo())
+    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
+    build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
+    canonicalize_albums(db)
+    db.commit()
+
     tracks = pd.DataFrame(
         {
             EKEYS.track: [1, 2, 3],
-            "track_name": ["A", "B", "C"],
+            "track_name": ["A", "A", "C"],
             "track_popularity": [10, 20, 30],
             "logcount": [1.0, 3.0, 2.0],
             "release_date": ["2024-01-01"] * 3,
-            "id_isrc": ["DUP", "DUP", "UNIQUE"],
+            "id_isrc": ["ISRC1", "ISRC2", "ISRC3"],
             EKEYS.artist: [101, 101, 102],
             "artist_name": ["Autechre", "Autechre", "Burial"],
             EKEYS.album: [201, 201, 203],
@@ -384,9 +383,51 @@ def test_canonicalize_tracks_in_db(db, tmp_path):
     db.commit()
 
     canonical = {r[0]: r[1] for r in db.execute("SELECT track_rowid, track_canonical_rowid FROM tracks").fetchall()}
-    assert canonical[1] == 2, "lower logcount DUP should point to track 2"
-    assert canonical[2] == 2, "highest logcount DUP should be self-canonical"
-    assert canonical[3] == 3, "unique ISRC should be self-canonical"
+    assert canonical[1] == 1, "smallest rowid should be self-canonical"
+    assert canonical[2] == 1, "same name+album should share canonical"
+    assert canonical[3] == 3, "different album should be self-canonical"
+
+
+def test_canonicalize_tracks_across_canonical_albums(db, tmp_path):
+    """Tracks with the same name in duplicate albums share a canonical track."""
+    label_geo = build_labels(db, _label_lookup(), _label_geo())
+    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
+    build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
+    canonicalize_albums(db)
+    db.commit()
+
+    # Albums 201 and 202 are canonical duplicates (same artist, type, normalized name).
+    # Insert a track named "Gantz Graf" in each album — they should be deduplicated.
+    tracks = pd.DataFrame(
+        {
+            EKEYS.track: [1001, 1002],
+            "track_name": ["Gantz Graf", "Gantz Graf"],
+            "track_popularity": [45, 30],
+            "logcount": [3.1, 2.8],
+            "release_date": ["2024-01-01", "2024-01-01"],
+            "id_isrc": ["ISRC001", "ISRC002"],
+            EKEYS.artist: [101, 101],
+            "artist_name": ["Autechre", "Autechre"],
+            EKEYS.album: [201, 202],
+            "album_name": ["Untitled", "Untitled (Remastered Edition)"],
+            EKEYS.label: [1, 1],
+            "label": ["Warp Records", "Warp Records"],
+        }
+    )
+    path = tmp_path / "lookup_track.parquet"
+    tracks.to_parquet(path)
+    track_geo = pd.DataFrame({EKEYS.track: [1001, 1002], "lon": [0.1, 0.2], "lat": [1.1, 1.2]})
+
+    build_tracks(db, path, track_geo, artist_geo, _album_geo(), label_geo, batch_size=100)
+    canonicalize_tracks(db)
+    db.commit()
+
+    canonical = {
+        r[0]: r[1]
+        for r in db.execute("SELECT track_rowid, track_canonical_rowid FROM tracks").fetchall()
+    }
+    assert canonical[1001] == 1001, "smallest rowid should be self-canonical"
+    assert canonical[1002] == 1001, "same track name across canonical-duplicate albums should share canonical"
 
 
 def test_searchable_recable_flags(db, tmp_path):
@@ -417,6 +458,8 @@ def test_searchable_recable_flags(db, tmp_path):
 
 
 def test_build_embedding_stores_normalized_blobs(db, tmp_path):
+    _build_full_db(db, tmp_path)
+
     dim = 128
     rowids = [1001, 1002, 1003]
     rng = np.random.default_rng(42)

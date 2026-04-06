@@ -29,7 +29,7 @@ class EntityKey(NamedTuple):
     label: str = "label_rowid"
 
 
-MANIFEST_REQUIRED_SECTIONS = ("source", "embedding", "lookup", "umap")
+MANIFEST_REQUIRED_SECTIONS = ("embedding", "lookup", "umap")
 ENTITY_KEYS = EntityKey()
 
 
@@ -50,7 +50,7 @@ def _get_config_float(var: str) -> float:
 
 
 def read_manifest(
-    manifest_path: str | Path | None = None,
+    manifest_path: str | Path,
     required_sections: tuple[str, ...] | None = MANIFEST_REQUIRED_SECTIONS,
 ) -> dict[str, EntityPaths | dict[str, Path]]:
     """Reads and validates a manifest TOML, returning a nested Path dict.
@@ -58,22 +58,20 @@ def read_manifest(
     Entity sections (embedding, lookup, umap) are returned as EntityPaths;
     non-entity sections (source) are returned as plain dicts.
     """
-    if manifest_path is None:
-        manifest_path = os.environ.get("SICK_MANIFEST")
     manifest_path = Path(manifest_path)
     if not manifest_path.is_file():
-        raise ValueError("Manifest file not found. Set $SICK_MANIFEST or provide path.")
+        raise ValueError("Manifest file not found.")
 
     entity_keys = {"embedding", "lookup", "umap"}
     with open(manifest_path, "rb") as f:
         m = tomllib.load(f)
-    result: dict[str, EntityPaths | dict[str, Path]] = {}
-    for section in m:
+
+    result = {}
+    if "source" in m:
+        result["source"] = Path(m["source"])
+    for section in entity_keys:
         paths = {k: Path(v) for k, v in m[section].items()}
-        if section in entity_keys:
-            result[section] = EntityPaths(**paths)
-        else:
-            result[section] = paths
+        result[section] = EntityPaths(**paths)
     check_manifest(result, required_sections=required_sections)
     return result
 
@@ -86,20 +84,21 @@ def check_manifest(
     if required_sections is None:
         required_sections = MANIFEST_REQUIRED_SECTIONS
     rs = set(required_sections)
+
     missing_sections = rs - set(m)
     if missing_sections:
         raise ValueError(f"Missing manifest sections: {', '.join(sorted(missing_sections))}.")
+
     entity_sections = rs & {"embedding", "lookup", "umap"}
     for section in entity_sections:
         if not isinstance(m[section], EntityPaths):
             raise ValueError(f"Section `{section}` must have exactly: {', '.join(ENTITIES)}.")
+
     all_paths = []
-    for section in rs:
-        val = m[section]
-        if isinstance(val, EntityPaths):
-            all_paths.extend(val)
-        else:
-            all_paths.extend(val.values())
+    if "source" in rs:
+        all_paths.append(m["source"])
+    for section in rs - {"source"}:
+        all_paths.extend(m[section])
     missing = [p for p in all_paths if not p.is_file()]
     if missing:
         raise ValueError("Manifest paths not found:\n" + "\n".join(f"  {p}" for p in missing))
