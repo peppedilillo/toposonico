@@ -4,7 +4,7 @@ from typing import TypedDict
 from fastapi import APIRouter
 from fastapi import Query
 
-from src.shared import meili_index
+from src.shared import get_meili_index
 from src.utils import AlbumEntity
 from src.utils import ArtistEntity
 from src.utils import ENTITIES
@@ -101,4 +101,4 @@ async def search(
     limit: int = Query(10, ge=1, le=20),
 ) -> list[SearchHit]:
     """Search for up to `limit` entities matching `q` query."""
-    return [search_map(hit) for hit in meili_index.search(q, {"limit": limit})["hits"]]
+    return [search_map(hit) for hit in get_meili_index().search(q, {"limit": limit})["hits"]]

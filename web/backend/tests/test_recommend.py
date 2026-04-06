@@ -1,59 +1,80 @@
-import numpy as np
-import pytest
-
-from src import recommend as recommend_module
-
-
-class FakeIndex:
-    def __init__(self, ids: list[int]):
-        self.ids = ids
-
-    def search(self, emb, fetch_k):
-        assert emb.shape == (1, 2)
-        return None, np.array([self.ids[:fetch_k]], dtype=np.int64)
+from src.recommend import recommend_fetch
+from src.utils import ALBUM
+from src.utils import ARTIST
+from src.utils import LABEL
+from src.utils import TRACK
 
 
-class FakeCursor:
-    def __init__(self, row):
-        self._row = row
+def test_recommend_track(db, faiss_indexes):
+    results = recommend_fetch(TRACK, 1, limit=3, diverse=False, db=db, indexes=faiss_indexes)
 
-    def fetchone(self):
-        return self._row
-
-
-class FakeResult:
-    def __init__(self, rows):
-        self._rows = rows
-
-    def fetchall(self):
-        return self._rows
+    assert results is not None
+    assert len(results) == 3
+    assert all(r["track_rowid"] != 1 for r in results)
+    assert all(
+        set(r.keys()) == {"track_rowid", "track_name", "artist_name", "lon", "lat"}
+        for r in results
+    )
 
 
-class FakeDb:
-    def execute(self, query, params):
-        if "SELECT embedding" in query:
-            emb = np.array([1.0, 2.0], dtype=np.float32).tobytes()
-            return FakeCursor((emb,))
-        if "artist_rowid" in query:
-            # Return artist rows in a different order than neighbor_ids.
-            return FakeResult([(13, 103), (11, 101), (12, 102)])
-        if "SELECT track_rowid, track_name, artist_name, lon, lat" in query:
-            # Return recommendation rows in a different order than neighbor_ids.
-            return FakeResult(
-                [
-                    (12, "track 12", "artist 102", 12.0, 22.0),
-                    (11, "track 11", "artist 101", 11.0, 21.0),
-                    (13, "track 13", "artist 103", 13.0, 23.0),
-                ]
-            )
-        raise AssertionError(query)
+def test_recommend_album(db, faiss_indexes):
+    results = recommend_fetch(ALBUM, 20, limit=2, diverse=False, db=db, indexes=faiss_indexes)
+
+    assert results is not None
+    assert len(results) == 2
+    assert all(r["album_rowid"] != 20 for r in results)
 
 
-@pytest.mark.anyio
-async def test_recommend_preserves_faiss_order(monkeypatch):
-    monkeypatch.setattr(recommend_module, "faiss_track_index", FakeIndex([10, 13, 11, 12]))
-    monkeypatch.setattr(recommend_module, "sick_db", FakeDb())
+def test_recommend_artist(db, faiss_indexes):
+    results = recommend_fetch(ARTIST, 10, limit=1, diverse=False, db=db, indexes=faiss_indexes)
 
-    result = await recommend_module.recommend(rowid=10, entity_name="track", limit=3, diverse=True)
+    assert results == [
+        {
+            "artist_rowid": 11,
+            "artist_name": "Herbie Hancock",
+            "lon": 5.6,
+            "lat": 6.7,
+        }
+    ]
 
-    assert [row["track_rowid"] for row in result] == [13, 11, 12]
+
+def test_recommend_label(db, faiss_indexes):
+    results = recommend_fetch(LABEL, 30, limit=1, diverse=False, db=db, indexes=faiss_indexes)
+
+    assert results == [
+        {
+            "label_rowid": 31,
+            "label": "Blue Note",
+            "lon": 7.8,
+            "lat": 8.9,
+        }
+    ]
+
+
+def test_recommend_track_diverse(db, faiss_indexes):
+    results = recommend_fetch(TRACK, 1, limit=3, diverse=True, db=db, indexes=faiss_indexes)
+
+    assert results is not None
+    artist_names = [r["artist_name"] for r in results]
+    assert len(artist_names) == len(set(artist_names))
+
+
+def test_recommend_album_diverse(db, faiss_indexes):
+    results = recommend_fetch(ALBUM, 20, limit=2, diverse=True, db=db, indexes=faiss_indexes)
+
+    assert results is not None
+    artist_names = [r["artist_name"] for r in results]
+    assert len(artist_names) == len(set(artist_names))
+
+
+def test_recommend_diverse_noop_for_artist(db, faiss_indexes):
+    diverse = recommend_fetch(ARTIST, 10, limit=1, diverse=True, db=db, indexes=faiss_indexes)
+    plain = recommend_fetch(ARTIST, 10, limit=1, diverse=False, db=db, indexes=faiss_indexes)
+
+    assert diverse == plain
+
+
+def test_recommend_missing_row(db, faiss_indexes):
+    result = recommend_fetch(TRACK, 999, limit=3, diverse=False, db=db, indexes=faiss_indexes)
+
+    assert result is None

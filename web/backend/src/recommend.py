@@ -1,3 +1,4 @@
+import sqlite3
 from typing import TypedDict
 
 from fastapi import APIRouter
@@ -5,14 +6,13 @@ from fastapi import HTTPException
 from fastapi import Query
 import numpy as np
 
-from src.shared import faiss_album_index
-from src.shared import faiss_artist_index
-from src.shared import faiss_label_index
-from src.shared import faiss_track_index
-from src.shared import sick_db
+from src.shared import FaissIndexes
+from src.shared import get_db
+from src.shared import get_faiss_indexes
 from src.utils import AlbumEntity
 from src.utils import ArtistEntity
 from src.utils import cols
+from src.utils import Entity
 from src.utils import LabelEntity
 from src.utils import NAME2ENTITY
 from src.utils import TrackEntity
@@ -53,34 +53,33 @@ class LabelRecommend(TypedDict):
 Recommend = TrackRecommend | AlbumRecommend | ArtistRecommend | LabelRecommend
 
 
-@router.get("/api/recommend")
-async def recommend(
+def recommend_fetch(
+    entity: Entity,
     rowid: int,
-    entity_name: str,
-    limit: int = Query(10, ge=1, le=10),
-    diverse: bool = True,
-) -> list[Recommend]:
-    if entity_name not in NAME2ENTITY:
-        raise HTTPException(status_code=404, detail="Entity not found")
-    entity = NAME2ENTITY[entity_name]
+    limit: int,
+    diverse: bool,
+    db: sqlite3.Connection,
+    indexes: FaissIndexes,
+) -> list[Recommend] | None:
     match entity:
         case TrackEntity():
             rec_cls = TrackRecommend
-            index = faiss_track_index
+            index = indexes.track
         case AlbumEntity():
             rec_cls = AlbumRecommend
-            index = faiss_album_index
+            index = indexes.album
         case ArtistEntity():
             rec_cls = ArtistRecommend
-            index = faiss_artist_index
+            index = indexes.artist
         case LabelEntity():
             rec_cls = LabelRecommend
-            index = faiss_label_index
-
-    row = sick_db.execute(
+            index = indexes.label
+    row = db.execute(
         f"SELECT embedding FROM {entity.embedding} WHERE {entity.key} = ?",
         (rowid,),
     ).fetchone()
+    if row is None:
+        return None
 
     emb = np.frombuffer(row[0], dtype=np.float32).reshape(1, -1)
     diversifiable = diverse and isinstance(entity, (TrackEntity, AlbumEntity))
@@ -90,7 +89,7 @@ async def recommend(
 
     if diversifiable:
         placeholders = ", ".join("?" * len(neighbor_ids))
-        artist_rows = sick_db.execute(
+        artist_rows = db.execute(
             f"SELECT {entity.key}, artist_rowid FROM {entity.table} "
             f"WHERE {entity.key} IN ({placeholders})",
             neighbor_ids,
@@ -114,7 +113,7 @@ async def recommend(
 
     rec_cols = cols(rec_cls)  # noqa
     placeholders = ", ".join("?" * len(neighbor_ids))
-    rec_rows = sick_db.execute(
+    rec_rows = db.execute(
         f"SELECT {', '.join(rec_cols)} FROM {entity.table} WHERE {entity.key} IN ({placeholders})",
         neighbor_ids,
     ).fetchall()
@@ -124,3 +123,19 @@ async def recommend(
         for rec in rec_rows
     }
     return [rec_map[nid] for nid in neighbor_ids if nid in rec_map]
+
+
+@router.get("/api/recommend")
+async def recommend(
+    rowid: int,
+    entity_name: str,
+    limit: int = Query(10, ge=1, le=10),
+    diverse: bool = True,
+) -> list[Recommend]:
+    if entity_name not in NAME2ENTITY:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    entity = NAME2ENTITY[entity_name]
+    results = recommend_fetch(entity, rowid, limit, diverse, get_db(), get_faiss_indexes())
+    if results is None:
+        raise HTTPException(status_code=404, detail="Row not found")
+    return results

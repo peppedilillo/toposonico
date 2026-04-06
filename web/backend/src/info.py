@@ -1,15 +1,17 @@
+import sqlite3
 from typing import TypedDict
 
 from fastapi import APIRouter
 from fastapi import HTTPException
 
-from src.shared import sick_db
+from src.shared import get_db
 from src.utils import AlbumEntity
 from src.utils import ArtistEntity
 from src.utils import cols
 from src.utils import LabelEntity
 from src.utils import NAME2ENTITY
 from src.utils import TrackEntity
+from src.utils import Entity
 
 router = APIRouter()
 
@@ -79,11 +81,7 @@ class LabelInfo(TypedDict):
 Info = TrackInfo | LabelInfo | AlbumInfo | ArtistInfo
 
 
-@router.get("/api/info")
-async def info(rowid: int, entity_name: str) -> Info:
-    if entity_name not in NAME2ENTITY:
-        raise HTTPException(status_code=404, detail=f"Entity '{entity_name}' not supported.")
-    entity = NAME2ENTITY[entity_name]
+def info_fetch(entity: Entity, rowid: int, db: sqlite3.Connection) -> Info | None:
     match entity:
         case TrackEntity():
             info_cls = TrackInfo
@@ -94,10 +92,21 @@ async def info(rowid: int, entity_name: str) -> Info:
         case LabelEntity():
             info_cls = LabelInfo
     keys = cols(info_cls)
-    row = sick_db.execute(
+    row = db.execute(
         f"SELECT {', '.join(keys)} FROM {entity.table} WHERE {entity.key} = ?",
         (rowid,),
     ).fetchone()
     if row is None:
-        raise HTTPException(status_code=404, detail="Row not found")
+        return None
     return info_cls(**dict(zip(keys, row)))
+
+
+@router.get("/api/info")
+async def info(rowid: int, entity_name: str) -> Info:
+    if entity_name not in NAME2ENTITY:
+        raise HTTPException(status_code=404, detail=f"Entity '{entity_name}' not supported.")
+    entity = NAME2ENTITY[entity_name]
+    entity_info = info_fetch(entity, rowid, get_db())
+    if entity_info is None:
+        raise HTTPException(status_code=404, detail="Row not found")
+    return entity_info
