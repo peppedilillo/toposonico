@@ -24,7 +24,7 @@ def test_search_map_track():
 def test_search_map_album():
     hit = {
         "id": "album_2",
-        "album_name": "Kind of Blue",
+        "album_name_norm": "Kind of Blue",
         "artist_name": "Miles Davis",
         "logcount": 6.1,
     }
@@ -32,7 +32,7 @@ def test_search_map_album():
     assert result == {
         "entity_type": "album",
         "album_rowid": 2,
-        "album_name": "Kind of Blue",
+        "album_name_norm": "Kind of Blue",
         "artist_name": "Miles Davis",
         "logcount": 6.1,
     }

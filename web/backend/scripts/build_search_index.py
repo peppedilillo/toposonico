@@ -18,7 +18,7 @@ from src.utils import LABEL
 from src.utils import TRACK
 
 INDEX_SETTINGS = {
-    "searchableAttributes": ["label", "artist_name", "album_name", "track_name"],
+    "searchableAttributes": ["label", "artist_name", "album_name_norm", "track_name"],
     "sortableAttributes": ["rank", "logcount"],
     "rankingRules": [
         "words",

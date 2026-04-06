@@ -29,10 +29,18 @@ services:
       MEILI_UID: ${MEILI_UID}
       MEILI_URL: http://meilisearch:7700
       SICK_DB: /data/sick.db
+      SICK_FAISS_TRACK: /data/faiss_track.index
+      SICK_FAISS_ALBUM: /data/faiss_album.index
+      SICK_FAISS_ARTIST: /data/faiss_artist.index
+      SICK_FAISS_LABEL: /data/faiss_label.index
     volumes:
       - ..:/workspace
       - backend_venv:/workspace/web/backend/.venv
       - ${SICK_DB}:/data/sick.db:ro
+      - ${SICK_FAISS_TRACK}:/data/faiss_track.index:ro
+      - ${SICK_FAISS_ALBUM}:/data/faiss_album.index:ro
+      - ${SICK_FAISS_ARTIST}:/data/faiss_artist.index:ro
+      - ${SICK_FAISS_LABEL}:/data/faiss_label.index:ro
     depends_on:
       meilisearch:
         condition: service_healthy

@@ -20,4 +20,4 @@ app.include_router(recommend_router)
 
 @app.get("/")
 async def root():
-    return {"message": "API is runnybiv2 5ing"}
+    return {"message": "API is running"}

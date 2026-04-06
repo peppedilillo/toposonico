@@ -30,7 +30,7 @@ class TrackRecommend(TypedDict):
 
 class AlbumRecommend(TypedDict):
     album_rowid: int
-    album_name: str
+    album_name_norm: str
     artist_name: str
     lon: float
     lat: float
@@ -58,6 +58,7 @@ async def recommend(
     rowid: int,
     entity_name: str,
     limit: int = Query(10, ge=1, le=20),
+    diverse: bool = True,
 ) -> list[Recommend]:
     if entity_name not in NAME2ENTITY:
         raise HTTPException(status_code=404, detail="Entity not found")
@@ -82,8 +83,32 @@ async def recommend(
     ).fetchone()
 
     emb = np.frombuffer(row[0], dtype=np.float32).reshape(1, -1)
-    _, ids = index.search(emb, limit + 1)  # noqa
-    neighbor_ids = [int(i) for i in ids[0] if i != -1 and i != rowid][:limit]
+    diversifiable = diverse and isinstance(entity, (TrackEntity, AlbumEntity))
+    fetch_k = 10 * limit + 1 if diversifiable else limit + 1
+    _, ids = index.search(emb, fetch_k)  # noqa
+    neighbor_ids = [int(i) for i in ids[0] if i != -1 and i != rowid]
+
+    if diversifiable:
+        placeholders = ", ".join("?" * len(neighbor_ids))
+        artist_rows = sick_db.execute(
+            f"SELECT {entity.key}, artist_rowid FROM {entity.table} "
+            f"WHERE {entity.key} IN ({placeholders})",
+            neighbor_ids,
+        ).fetchall()
+        artist_map = {row[0]: row[1] for row in artist_rows}
+        seen_artists: set[int] = set()
+        diverse_ids: list[int] = []
+        for nid in neighbor_ids:
+            aid = artist_map.get(nid)
+            if aid is not None and aid not in seen_artists:
+                seen_artists.add(aid)
+                diverse_ids.append(nid)
+                if len(diverse_ids) == limit:
+                    break
+        neighbor_ids = diverse_ids
+    else:
+        neighbor_ids = neighbor_ids[:limit]
+
     if not neighbor_ids:
         return []
 
@@ -93,4 +118,9 @@ async def recommend(
         f"SELECT {', '.join(rec_cols)} FROM {entity.table} WHERE {entity.key} IN ({placeholders})",
         neighbor_ids,
     ).fetchall()
-    return [rec_cls(**dict(zip(rec_cols, rec))) for rec in rec_rows]  # noqa
+    # returns recommends in neighbour order
+    rec_map = {
+        rec[0]: rec_cls(**dict(zip(rec_cols, rec)))
+        for rec in rec_rows
+    }
+    return [rec_map[nid] for nid in neighbor_ids if nid in rec_map]
