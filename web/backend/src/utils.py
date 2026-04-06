@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import NamedTuple, TypedDict
 
 
@@ -6,8 +8,6 @@ class TrackEntity(NamedTuple):
     key: str
     table: str
     embedding: str
-    repr: None
-    repr_join: None
 
 
 class AlbumEntity(NamedTuple):
@@ -16,7 +16,7 @@ class AlbumEntity(NamedTuple):
     table: str
     embedding: str
     repr: str
-    repr_join: str
+    repr_entity: Entity
 
 
 class ArtistEntity(NamedTuple):
@@ -25,7 +25,7 @@ class ArtistEntity(NamedTuple):
     table: str
     embedding: str
     repr: str
-    repr_join: str
+    repr_entity: Entity
 
 
 class LabelEntity(NamedTuple):
@@ -34,15 +34,36 @@ class LabelEntity(NamedTuple):
     table: str
     embedding: str
     repr: str
-    repr_join: str
+    repr_entity: Entity
 
 
 Entity = TrackEntity | AlbumEntity | ArtistEntity | LabelEntity
 
-TRACK = TrackEntity("track", "track_rowid", "tracks", "track_embedding", None, None)
-ALBUM = AlbumEntity("album", "album_rowid", "albums", "album_embedding", "album_repr_tracks", "tracks")
-ARTIST = ArtistEntity("artist", "artist_rowid", "artists", "artist_embedding", "artist_repr_albums", "albums")
-LABEL = LabelEntity("label", "label_rowid", "labels", "label_embedding", "label_repr_artists", "artists")
+TRACK = TrackEntity("track", "track_rowid", "tracks", "track_embedding",)
+ALBUM = AlbumEntity(
+    "album",
+    "album_rowid",
+    "albums",
+    "album_embedding",
+    "album_repr_tracks",
+    TRACK,
+)
+ARTIST = ArtistEntity(
+    "artist",
+    "artist_rowid",
+    "artists",
+    "artist_embedding",
+    "artist_repr_albums",
+    ALBUM,
+)
+LABEL = LabelEntity(
+    "label",
+    "label_rowid",
+    "labels",
+    "label_embedding",
+    "label_repr_artists",
+    ARTIST,
+)
 
 ENTITIES = (TRACK, ALBUM, ARTIST, LABEL)
 NAME2ENTITY = {e.name: e for e in ENTITIES}

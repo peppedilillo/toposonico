@@ -3,7 +3,13 @@ from typing import TypedDict
 from fastapi import APIRouter, HTTPException, Query
 
 from src.shared import sick_db
-from src.utils import NAME2ENTITY, TrackEntity, AlbumEntity, ArtistEntity, LabelEntity, cols
+from src.utils import AlbumEntity
+from src.utils import ArtistEntity
+from src.utils import cols
+from src.utils import Entity
+from src.utils import LabelEntity
+from src.utils import NAME2ENTITY
+from src.utils import TrackEntity
 
 router = APIRouter()
 
@@ -22,40 +28,46 @@ class AlbumRepr(TypedDict):
     lon: float
     lat: float
 
-class LabelRepr(TypedDict):
-    label_rowid: int
-    label: str
+
+class ArtistRepr(TypedDict):
+    artist_rowid: int
+    artist_name: str
     lon: float
     lat: float
 
 
-Repr = TrackRepr | AlbumRepr | LabelRepr
+Repr = TrackRepr | AlbumRepr | ArtistRepr
 
 
 @router.get("/api/repr")
 async def repr(
     rowid: int,
     entity_name: str,
-    limit: Query(10, ge=1, le=3),
-) -> Repr:
+    limit: int = Query(3, ge=1, le=3),
+) -> list[Repr]:
     if entity_name not in NAME2ENTITY:
         raise HTTPException(status_code=404, detail="Entity not found")
     entity = NAME2ENTITY[entity_name]
     match entity:
         case TrackEntity():
-            raise NotImplementedError("Track have no representative child.")
+            return []
         case AlbumEntity():
-            repr_cls = TrackRepr
+            child_repr_cls = TrackRepr
         case ArtistEntity():
-            repr_cls = AlbumRepr
+            child_repr_cls = AlbumRepr
         case LabelEntity():
-            repr_cls = LabelRepr
+            child_repr_cls = ArtistRepr
 
-    repr_cols = cols(repr_cls)  # noqa
+    child = entity.repr_entity
+    repr_cols = cols(child_repr_cls)
+    repr_select = ", ".join(f"c.{col}" for col in repr_cols)
     repr_rows = sick_db.execute(
-        f"SELECT {', '.join(repr_cols)} "
+        f"SELECT {repr_select} "
         f"FROM {entity.repr} AS r "
-        f"JOIN {entity.repr_join} AS rj ON r.track_id = rj.track_id "
-        f"WHERE r.album_id = 'YOUR_ALBUM_ID';"
+        f"JOIN {child.table} AS c ON r.{child.key} = c.{child.key} "
+        f"WHERE r.{entity.key} = ? "
+        f"ORDER BY c.{child.key} ASC "
+        f"LIMIT ?",
+        (rowid, limit),
     ).fetchall()
-    return [repr_cls(**dict(zip(repr_cols, repr))) for repr in repr_rows]
+    return [child_repr_cls(**dict(zip(repr_cols, row))) for row in repr_rows]
