@@ -51,6 +51,7 @@ class AlbumInfo(TypedDict):
     label_lon: float
     label_lat: float
     logcount: float
+    nrepr: int
     total_tracks: int | None
     release_date: str | None
     album_type: str | None
@@ -62,8 +63,9 @@ class ArtistInfo(TypedDict):
     lon: float
     lat: float
     logcount: float
-    # TODO: make non null after db schema fix
-    nalbum: int | None
+    ntrack: int
+    nalbum: int
+    nrepr: int
     artist_genre: str | None
 
 
@@ -73,9 +75,10 @@ class LabelInfo(TypedDict):
     lon: float
     lat: float
     logcount: float
-    # TODO: make non null after db schema fix
-    nalbum: int | None
-    nartist: int | None
+    ntrack: int
+    nalbum: int
+    nartist: int
+    nrepr: int
 
 
 Info = TrackInfo | LabelInfo | AlbumInfo | ArtistInfo

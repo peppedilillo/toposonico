@@ -67,7 +67,7 @@ def repr_fetch(
         f"FROM {entity.repr} AS r "
         f"JOIN {child.table} AS c ON r.{child.key} = c.{child.key} "
         f"WHERE r.{entity.key} = ? "
-        f"ORDER BY c.{child.key} ASC "
+        f"ORDER BY r.rank ASC "
         f"LIMIT ?",
         (rowid, limit),
     ).fetchall()
