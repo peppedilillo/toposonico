@@ -1,13 +1,14 @@
-import { useState } from 'react'
-import { MapView } from '@deck.gl/core'
-import { MVTLayer } from '@deck.gl/geo-layers'
-import { GeoJsonLayer } from '@deck.gl/layers'
+import {useCallback, useState} from 'react'
+import Search from './Search'
+import {FlyToInterpolator, MapView} from '@deck.gl/core'
+import {MVTLayer} from '@deck.gl/geo-layers'
+import {GeoJsonLayer} from '@deck.gl/layers'
 import DeckGL from '@deck.gl/react'
-import type { Feature, FeatureCollection, Geometry } from 'geojson'
-import colors, { rgba } from './theme'
+import type {Feature, FeatureCollection, Geometry} from 'geojson'
 
-const INITIAL_VIEW_STATE = { longitude: 4.28, latitude: -7.21, zoom: 5, pitch: 10, bearing: 0 }
-const TILES = import.meta.env.VITE_TILE_URL ?? 'http://localhost:8081/tiles/{z}/{x}/{y}.pbf'
+
+const INITIAL_VIEW_STATE = {longitude: 4.28, latitude: -7.21, zoom: 5, pitch: 10, bearing: 0}
+const TILES = '/tiles/{z}/{x}/{y}.pbf'
 const MIN_ZOOM = 5
 const MAX_ZOOM = 14
 const TILE_BOUNDS = {
@@ -17,29 +18,38 @@ const TILE_BOUNDS = {
   maxLatitude: 22.5,
 }
 
-const gridLines: FeatureCollection = { type: 'FeatureCollection', features: [] }
+// Reads a CSS custom property and returns a deck.gl-compatible [r, g, b, a] color array.
+export function cssColor(variable: string, alpha = 255): [number, number, number, number] {
+  const hex = getComputedStyle(document.documentElement).getPropertyValue(variable).trim()
+  const n = parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255, alpha]
+}
+
+
+const gridLines: FeatureCollection = {type: 'FeatureCollection', features: []}
 for (let lon = -180; lon <= 180; lon += 5) {
   gridLines.features.push({
     type: 'Feature',
-    geometry: { type: 'LineString', coordinates: [[lon, -90], [lon, 90]] },
+    geometry: {type: 'LineString', coordinates: [[lon, -90], [lon, 90]]},
     properties: {},
   })
 }
 for (let lat = -90; lat <= 90; lat += 5) {
   gridLines.features.push({
     type: 'Feature',
-    geometry: { type: 'LineString', coordinates: [[-180, lat], [180, lat]] },
+    geometry: {type: 'LineString', coordinates: [[-180, lat], [180, lat]]},
     properties: {},
   })
 }
 
+// Renders the lat/lon graticule as a GeoJSON line layer.
 function gridLayer() {
   return new GeoJsonLayer({
     id: 'grid',
     data: gridLines,
     stroked: true,
     filled: false,
-    getLineColor: rgba(colors.border),
+    getLineColor: cssColor('--color-border'),
     getLineWidth: 1,
     lineWidthUnits: 'pixels',
   })
@@ -51,6 +61,7 @@ type TileProperties = {
 
 type TileFeature = Feature<Geometry, TileProperties>
 
+// Maps a tile feature's logcount to a pixel radius, falling back to 1.
 function getRadius(f: TileFeature) {
   return f.properties.logcount ?? 1
 }
@@ -65,46 +76,47 @@ const TILE_BASE = {
   pickable: true,
 }
 
+// MVT layer factory functions — one per entity type, each scoped to its source layer.
 function tracksLayer() {
-  const color = rgba(colors.track, 180)
+  const color = cssColor('--color-track', 180)
 
   return new MVTLayer<TileProperties>({
     ...TILE_BASE,
     id: 'tracks',
-    loadOptions: { mvt: { layers: ['tracks'] } },
+    loadOptions: {mvt: {layers: ['tracks']}},
     getFillColor: color,
   })
 }
 
 function albumsLayer() {
-  const color = rgba(colors.album, 180)
+  const color = cssColor('--color-album', 180)
 
   return new MVTLayer<TileProperties>({
     ...TILE_BASE,
     id: 'albums',
-    loadOptions: { mvt: { layers: ['albums'] } },
+    loadOptions: {mvt: {layers: ['albums']}},
     getFillColor: color,
   })
 }
 
 function artistsLayer() {
-  const color = rgba(colors.artist, 180)
+  const color = cssColor('--color-artist', 180)
 
   return new MVTLayer<TileProperties>({
     ...TILE_BASE,
     id: 'artists',
-    loadOptions: { mvt: { layers: ['artists'] } },
+    loadOptions: {mvt: {layers: ['artists']}},
     getFillColor: color,
   })
 }
 
 function labelsLayer() {
-  const color = rgba(colors.label, 180)
+  const color = cssColor('--color-label', 180)
 
   return new MVTLayer<TileProperties>({
     ...TILE_BASE,
     id: 'labels',
-    loadOptions: { mvt: { layers: ['labels'] } },
+    loadOptions: {mvt: {layers: ['labels']}},
     getFillColor: color,
   })
 }
@@ -113,6 +125,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
+// Clamps zoom and position to the tile bounds so the user can't pan off the data extent.
 function clampViewState(viewState: typeof INITIAL_VIEW_STATE) {
   return {
     ...viewState,
@@ -122,18 +135,34 @@ function clampViewState(viewState: typeof INITIAL_VIEW_STATE) {
   }
 }
 
+/** Root application component — owns view state and wires navigation to the map. */
 export default function App() {
-  const [viewState, setViewState] = useState(INITIAL_VIEW_STATE)
+  const [viewState, setViewState] = useState<object>(INITIAL_VIEW_STATE)
+
+  /** Flies the map to the given coordinates at a zoom appropriate for the entity type. */
+  const navigate = useCallback((_entityType: string, _rowid: number, lon: number, lat: number) => {
+    setViewState({
+      ...INITIAL_VIEW_STATE,
+      longitude: lon,
+      latitude: lat,
+      zoom: 10,
+      transitionDuration: 1000,
+      transitionInterpolator: new FlyToInterpolator(),
+    })
+  }, [])
 
   return (
-    <DeckGL
-      viewState={viewState}
-      controller
-      onViewStateChange={({ viewState: nextViewState }) => {
-        setViewState(clampViewState(nextViewState as typeof INITIAL_VIEW_STATE))
-      }}
-      layers={[gridLayer(), tracksLayer(), albumsLayer(), artistsLayer(), labelsLayer()]}
-      views={new MapView({ repeat: false })}
-    />
+    <div className="relative w-screen h-screen">
+      <DeckGL
+        viewState={viewState}
+        controller={true}
+        onViewStateChange={({viewState: nextViewState}) => {
+          setViewState(clampViewState(nextViewState as typeof INITIAL_VIEW_STATE))
+        }}
+        layers={[gridLayer(), tracksLayer(), albumsLayer(), artistsLayer(), labelsLayer()]}
+        views={new MapView({repeat: false})}
+      />
+      <Search navigate={navigate}/>
+    </div>
   )
 }

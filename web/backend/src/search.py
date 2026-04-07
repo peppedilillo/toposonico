@@ -23,6 +23,8 @@ class TrackHit(TypedDict):
     track_rowid: int
     track_name: str
     artist_name: str
+    lon: float
+    lat: float
     logcount: float
 
 
@@ -31,6 +33,8 @@ class AlbumHit(TypedDict):
     album_rowid: int
     album_name_norm: str
     artist_name: str
+    lon: float
+    lat: float
     logcount: float
 
 
@@ -38,6 +42,8 @@ class ArtistHit(TypedDict):
     entity_type: str
     artist_rowid: int
     artist_name: str
+    lon: float
+    lat: float
     logcount: float
 
 
@@ -45,6 +51,8 @@ class LabelHit(TypedDict):
     entity_type: str
     label_rowid: int
     label: str
+    lon: float
+    lat: float
     logcount: float
 
 
@@ -66,6 +74,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
                 track_rowid=rowid,
                 track_name=hit["track_name"],
                 artist_name=hit["artist_name"],
+                lon=hit["lon"],
+                lat=hit["lat"],
                 logcount=hit["logcount"],
             )
         case AlbumEntity():
@@ -74,6 +84,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
                 album_rowid=rowid,
                 album_name_norm=hit["album_name_norm"],
                 artist_name=hit["artist_name"],
+                lon=hit["lon"],
+                lat=hit["lat"],
                 logcount=hit["logcount"],
             )
         case ArtistEntity():
@@ -81,6 +93,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
                 entity_type=entity.name,
                 artist_rowid=rowid,
                 artist_name=hit["artist_name"],
+                lon=hit["lon"],
+                lat=hit["lat"],
                 logcount=hit["logcount"],
             )
         case LabelEntity():
@@ -88,6 +102,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
                 entity_type=entity.name,
                 label_rowid=rowid,
                 label=hit["label"],
+                lon=hit["lon"],
+                lat=hit["lat"],
                 logcount=hit["logcount"],
             )
 

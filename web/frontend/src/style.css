@@ -1,4 +1,21 @@
 @import "tailwindcss";
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body, #root { width: 100%; height: 100%; background: #000; overflow: hidden; }
+@theme {
+    --font-sans: "Roboto", sans-serif;
+    --color-surface: #303030;
+    --color-muted: #7e7d7d;
+    --color-overlay: rgba(25, 25, 25, 0.8);
+    --color-border: #303030;
+    --color-track: #3bda28;
+    --color-artist: #58e1bd;
+    --color-album: #bad747;
+    --color-label: #ca53fa;
+}
+
+
+html, body, #root {
+    width: 100%;
+    height: 100%;
+    color-scheme: dark;
+    overflow: hidden;
+}

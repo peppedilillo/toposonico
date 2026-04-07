@@ -71,13 +71,12 @@ services:
           tail -f /dev/null
         fi
         npm install
-        npm run dev -- --host 0.0.0.0 --port 5173
+        npm run dev -- --host --port 5173
     ports:
       - "5173:5173"
     environment:
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
-      VITE_TILE_URL: http://localhost:8081/tiles/{z}/{x}/{y}.pbf
     volumes:
       - ..:/workspace
       - frontend_node_modules:/workspace/web/frontend/node_modules
