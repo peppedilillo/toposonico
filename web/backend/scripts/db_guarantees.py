@@ -6,7 +6,7 @@ import os
 import sqlite3
 from typing import Any
 
-from src.utils import ALBUM
+from src.utils import ALBUM, TRACK
 from src.utils import ARTIST
 from src.utils import ENTITIES
 from src.utils import Entity
@@ -89,18 +89,27 @@ def main():
             rpr = entity.repr
             assert rpr is not None
             check(conn, entity, rpr, entity.table)
-            # it's expected for these to fail, as only searchable entities can
-            # end up in a repr table.
-            check(conn, entity, entity.table, rpr)
 
         print("searchable repr coverage")
         for entity in ENTITIES:
-            if entity.repr is None:
+            if entity == TRACK:
                 continue
-            searchable_ids = get_searchable_ids(conn, entity.key, entity.table)
-            repr_ids = get_entity_ids(conn, entity.key, entity.repr)
-            ok = set(searchable_ids).issubset(repr_ids)
-            report(f"{entity.table}[searchable].{entity.key} ⊆ {entity.repr}.{entity.key}", ok)
+            searchable_ids = get_searchable_ids(conn, entity.repr_entity.key, entity.repr_entity.table)
+            repr_ids = get_entity_ids(conn, entity.repr_entity.key, entity.repr)
+            ok = set(repr_ids).issubset(searchable_ids)
+            report(f"{entity.repr}.{entity.repr_entity.key} ⊆ {entity.repr_entity.table}[searchable].{entity.repr_entity.key}", ok)
+
+        print("nrepr consistency")
+        for entity in (ALBUM, ARTIST, LABEL):
+            rpr = entity.repr
+            assert rpr is not None
+            mismatches = conn.execute(
+                f"SELECT COUNT(*) FROM {entity.table} e "
+                f"WHERE e.nrepr != (SELECT COUNT(*) FROM {rpr} r "
+                f"WHERE r.{entity.key} = e.{entity.key})"
+            ).fetchone()[0]
+            ok = mismatches == 0
+            report(f"{entity.table}.nrepr matches {rpr} counts", ok)
 
         print("embedding inclusions")
         for entity in ENTITIES:

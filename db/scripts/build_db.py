@@ -38,7 +38,6 @@ from src.utils import read_manifest
 
 BATCH_SIZE = 500_000
 
-# TODO: add a `nrepr` column := number of repr child per entity
 DDL = """
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous  = NORMAL;
@@ -78,6 +77,7 @@ CREATE TABLE albums (
     logcount                 REAL    NOT NULL,
     searchable               INTEGER NOT NULL DEFAULT 0,
     recable                  INTEGER NOT NULL DEFAULT 0,
+    nrepr                    INTEGER NOT NULL DEFAULT 0,
     lon                      REAL    NOT NULL,
     lat                      REAL    NOT NULL,
     artist_rowid             INTEGER NOT NULL REFERENCES artists(artist_rowid),
@@ -105,6 +105,7 @@ CREATE TABLE artists (
     nalbum                 INTEGER NOT NULL,
     searchable             INTEGER NOT NULL DEFAULT 0,
     recable                INTEGER NOT NULL DEFAULT 0,
+    nrepr                  INTEGER NOT NULL DEFAULT 0,
     artist_genre           TEXT
 );
 
@@ -118,6 +119,7 @@ CREATE TABLE labels (
     nartist               INTEGER NOT NULL,
     searchable            INTEGER NOT NULL DEFAULT 0,
     recable               INTEGER NOT NULL DEFAULT 0,
+    nrepr                 INTEGER NOT NULL DEFAULT 0,
     lon                   REAL    NOT NULL,
     lat                   REAL    NOT NULL
 );
@@ -298,7 +300,7 @@ def canonicalize_tracks(conn: sqlite3.Connection) -> None:
         list(updates.itertuples(index=False, name=None)),
     )
 
-# TODO: remove compilation album from recable
+
 def compute_searchable_recable(
     conn: sqlite3.Connection,
     searchable_track_min_logcount: float,
@@ -566,147 +568,157 @@ def build_album_repr_tracks(conn: sqlite3.Connection, limit: int) -> None:
     print(f"  [album_repr_tracks]  {total:,} rows  ({time.time() - t0:.1f}s)")
 
 
-def build_artist_repr_albums(conn: sqlite3.Connection, limit: int) -> None:
-    """Store representative albums for each artist.
+def rank_artist_repr_albums(
+    tracks: pd.DataFrame,
+    albums: pd.DataFrame,
+    limit: int,
+) -> pd.DataFrame:
+    """Rank representative albums per artist.
 
-    Scored by median child-track logcount. Prefers full albums over EPs over
-    other release types. Only canonical albums participate.
+    Tracks are grouped under their canonical album. Scored by median
+    child-track logcount. Prefers full albums over EPs over other release
+    types. Expects pre-filtered (searchable) inputs.
+
+    Returns a DataFrame with columns: artist_rowid, rank, album_rowid, score.
     """
+    # the tracks we selected are self-canonical.
+    # they could still belong to different versions of the same album.
+    # we group them under the same album entry.
+    # this is somewhat unfortunate as it may artificially inflate the album tracklist
+    # and drift the median.
+    # the alternative is not great anyway: we could group under album_rowid, ending up
+    # losing important track entries from an album entity.
+    album_scores = tracks.groupby("album_canonical_rowid")["logcount"].median().rename("score")
+    candidates = albums.merge(album_scores, left_on="album_rowid", right_on="album_canonical_rowid")
+
+    # EP will have less tracks and an absolute hit may throw an EP above a more relevant
+    # album entry. singles and nan falls together at priority 2.
+    type_map = {"album": 0, "ep": 1}
+    candidates["type_priority"] = (
+        # this is needed as album types can definitely be nan or empty.
+        candidates["album_type"].fillna("").str.lower().map(type_map).fillna(2).astype(int)
+    )
+
+    best = candidates.groupby("artist_rowid")["type_priority"].min().rename("best")
+    candidates = candidates.merge(best, on="artist_rowid")
+    candidates = candidates[candidates["type_priority"] == candidates["best"]]
+
+    # we sort by score, then logcount, then rowid (for tie-break) and keep the first `n`.
+    candidates = candidates.sort_values(
+        ["artist_rowid", "score", "logcount", "album_rowid"],
+        ascending=[True, False, False, True],
+    )
+    candidates["rank"] = candidates.groupby("artist_rowid").cumcount()
+    candidates = candidates[candidates["rank"] < limit]
+
+    return candidates[["artist_rowid", "rank", "album_rowid", "score"]]
+
+
+def build_artist_repr_albums(conn: sqlite3.Connection, limit: int) -> None:
+    """Store representative albums for each artist."""
     t0 = time.time()
     conn.execute("DELETE FROM artist_repr_albums")
-    conn.execute(
-        """
-        INSERT INTO artist_repr_albums (artist_rowid, rank, album_rowid, score)
-        WITH track_ranks AS (
-            SELECT
-                album_rowid,
-                logcount,
-                ROW_NUMBER() OVER (
-                    PARTITION BY album_rowid
-                    ORDER BY logcount
-                ) AS rn,
-                COUNT(*) OVER (
-                    PARTITION BY album_rowid
-                ) AS cnt
-            FROM tracks
-            WHERE searchable = 1 
-        ),
-        album_track_stats AS (
-            SELECT
-                album_rowid,
-                logcount AS median_track_logcount
-            FROM track_ranks
-            WHERE rn = (cnt + 1) / 2
-        ),
-        album_candidates AS (
-            SELECT
-                a.artist_rowid,
-                a.album_rowid,
-                ats.median_track_logcount AS score,
-                a.logcount AS album_logcount,
-                CASE LOWER(COALESCE(a.album_type, ''))
-                    WHEN 'album' THEN 0
-                    WHEN 'ep' THEN 1
-                    ELSE 2
-                END AS type_priority
-            FROM albums a
-            JOIN album_track_stats ats ON ats.album_rowid = a.album_rowid
-            WHERE a.album_rowid = a.album_canonical_rowid
-        ),
-        artist_type_choice AS (
-            SELECT artist_rowid, MIN(type_priority) AS chosen_priority
-            FROM album_candidates
-            GROUP BY artist_rowid
-        ),
-        ranked AS (
-            SELECT
-                c.artist_rowid,
-                c.album_rowid,
-                c.score,
-                ROW_NUMBER() OVER (
-                    PARTITION BY c.artist_rowid
-                    ORDER BY
-                        c.score DESC,
-                        c.album_logcount DESC,
-                        c.album_rowid ASC
-                ) AS rn
-            FROM album_candidates c
-            JOIN artist_type_choice t
-                ON t.artist_rowid = c.artist_rowid
-               AND t.chosen_priority = c.type_priority
-        )
-        SELECT artist_rowid, rn - 1, album_rowid, score
-        FROM ranked
-        WHERE rn <= ?
-        """,
-        (limit,),
+
+    tracks = pd.read_sql(
+        "SELECT a.album_canonical_rowid, t.logcount "
+        "FROM tracks t "
+        "JOIN albums a ON a.album_rowid = t.album_rowid "
+        "WHERE t.searchable = 1",
+        conn,
     )
-    total = conn.execute("SELECT COUNT(*) FROM artist_repr_albums").fetchone()[0]
-    print(f"  [artist_repr_albums] {total:,} rows  ({time.time() - t0:.1f}s)")
+    albums = pd.read_sql(
+        "SELECT album_rowid, artist_rowid, logcount, album_type "
+        "FROM albums WHERE searchable = 1",
+        conn,
+    )
+
+    result = rank_artist_repr_albums(tracks, albums, limit)
+    if not result.empty:
+        result.to_sql("artist_repr_albums", conn, if_exists="append", index=False)
+
+    print(f"  [artist_repr_albums] {len(result):,} rows  ({time.time() - t0:.1f}s)")
+
+
+def rank_label_repr_artists(
+    tracks: pd.DataFrame,
+    limit: int,
+) -> pd.DataFrame:
+    """Rank representative artists per label.
+
+    Scored as sum(logcount) / sqrt(track_count), which softens catalog-size
+    bias. Ties broken by album breadth, strongest single track, rowid.
+    Expects pre-filtered (searchable tracks of searchable artists) inputs.
+
+    Returns a DataFrame with columns: label_rowid, rank, artist_rowid, score.
+    """
+    stats = tracks.groupby(["label_rowid", "artist_rowid"]).agg(
+        total_logcount=("logcount", "sum"),
+        track_count=("logcount", "count"),
+        album_count=("album_rowid", "nunique"),
+        best_track=("logcount", "max"),
+    )
+    stats["score"] = stats["total_logcount"] / np.sqrt(stats["track_count"])
+    stats = stats.reset_index()
+
+    stats = stats.sort_values(
+        ["label_rowid", "score", "album_count", "best_track", "artist_rowid"],
+        ascending=[True, False, False, False, True],
+    )
+    stats["rank"] = stats.groupby("label_rowid").cumcount()
+    stats = stats[stats["rank"] < limit]
+
+    return stats[["label_rowid", "rank", "artist_rowid", "score"]]
 
 
 def build_label_repr_artists(conn: sqlite3.Connection, limit: int) -> None:
-    """Store representative artists for each label.
-
-    Scored as sum(logcount) / sqrt(track_count) within the label, which softens
-    catalog-size bias. Ties broken by album breadth, strongest single track, rowid.
-    """
+    """Store representative artists for each label."""
     t0 = time.time()
     conn.execute("DELETE FROM label_repr_artists")
-    conn.execute(
-        """
-        INSERT INTO label_repr_artists (label_rowid, rank, artist_rowid, score)
-        WITH label_artist_stats AS (
-            SELECT
-                label_rowid,
-                artist_rowid,
-                SUM(logcount) / SQRT(COUNT(*)) AS score,
-                COUNT(*) AS track_count,
-                COUNT(DISTINCT album_rowid) AS album_count,
-                MAX(logcount) AS best_track
-            FROM tracks
-            WHERE searchable = 1 
-            GROUP BY label_rowid, artist_rowid
-        ),
-        ranked AS (
-            SELECT
-                label_rowid,
-                artist_rowid,
-                ROW_NUMBER() OVER (
-                    PARTITION BY label_rowid
-                    ORDER BY
-                        score DESC,
-                        album_count DESC,
-                        best_track DESC,
-                        artist_rowid ASC
-                ) AS rn,
-                score
-            FROM label_artist_stats
-        )
-        SELECT label_rowid, rn - 1, artist_rowid, score
-        FROM ranked
-        WHERE rn <= ?
-        """,
-        (limit,),
+
+    tracks = pd.read_sql(
+        "SELECT t.label_rowid, t.artist_rowid, t.album_rowid, t.logcount "
+        "FROM tracks t "
+        "JOIN artists a ON a.artist_rowid = t.artist_rowid "
+        "AND a.searchable = 1 "
+        "WHERE t.searchable = 1",
+        conn,
     )
-    total = conn.execute("SELECT COUNT(*) FROM label_repr_artists").fetchone()[0]
-    print(f"  [label_repr_artists] {total:,} rows  ({time.time() - t0:.1f}s)")
+
+    result = rank_label_repr_artists(tracks, limit)
+    if not result.empty:
+        result.to_sql("label_repr_artists", conn, if_exists="append", index=False)
+
+    print(f"  [label_repr_artists] {len(result):,} rows  ({time.time() - t0:.1f}s)")
 
 
-# TODO: there is something not quite working with reprs at moment.
-#   We shall guarantee that:
-#    `entity[searchable].entity_rowid ⊆ entity_repr_*.entity_rowid`
-#   This apparently work for `album_repr_track` but not for the other repr table.
-#   This is likely due to searchable being enforced over tracks even when
-#   representative entities aren't!
-# TODO: consider refactoring these complex sql queries to pandas and add tests.
 def build_representatives(conn: sqlite3.Connection, limit: int) -> None:
-    """Build all ranked representative-child tables for downward navigation,
-    from searchable entities."""
+    """Build all ranked representative-child tables and set nrepr counts."""
     build_album_repr_tracks(conn, limit)
     build_artist_repr_albums(conn, limit)
     build_label_repr_artists(conn, limit)
+
+    conn.execute(
+        "UPDATE albums SET nrepr = "
+        "(SELECT COUNT(*) FROM album_repr_tracks r "
+        "WHERE r.album_rowid = albums.album_rowid)"
+    )
+    conn.execute(
+        "UPDATE artists SET nrepr = "
+        "(SELECT COUNT(*) FROM artist_repr_albums r "
+        "WHERE r.artist_rowid = artists.artist_rowid)"
+    )
+    conn.execute(
+        "UPDATE labels SET nrepr = "
+        "(SELECT COUNT(*) FROM label_repr_artists r "
+        "WHERE r.label_rowid = labels.label_rowid)"
+    )
     conn.commit()
+
+    for table in ("albums", "artists", "labels"):
+        total, with_repr = conn.execute(
+            f"SELECT COUNT(*), SUM(nrepr > 0) FROM {table}"
+        ).fetchone()
+        print(f"  [{table}] {with_repr:,}/{total:,} have repr children")
 
 
 def build_embedding(

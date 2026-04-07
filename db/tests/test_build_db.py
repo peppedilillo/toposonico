@@ -6,9 +6,14 @@ import pytest
 
 from scripts.build_db import build_album_repr_tracks
 from scripts.build_db import build_albums
+from scripts.build_db import build_artist_repr_albums
+from scripts.build_db import rank_artist_repr_albums
 from scripts.build_db import build_artists
 from scripts.build_db import build_embedding
+from scripts.build_db import build_label_repr_artists
+from scripts.build_db import rank_label_repr_artists
 from scripts.build_db import build_labels
+from scripts.build_db import build_representatives
 from scripts.build_db import build_tracks
 from scripts.build_db import canonicalize_albums
 from scripts.build_db import canonicalize_tracks
@@ -504,3 +509,143 @@ def test_album_repr_tracks_ranks_by_logcount(db, tmp_path):
     assert rows[0][0] == 1001, "track 1001 (logcount=3.1) should rank first"
     assert rows[1][0] == 1002, "track 1002 (logcount=2.8) should rank second"
     assert rows[0][1] > rows[1][1]
+
+    # Track 1004 (logcount=1.9) is not searchable — must not appear
+    all_track_ids = {r[0] for r in db.execute("SELECT track_rowid FROM album_repr_tracks").fetchall()}
+    assert 1004 not in all_track_ids, "non-searchable track must not appear in repr"
+
+
+def test_rank_artist_repr_albums():
+    """Pure-function test: canonical grouping, type preference, median scoring, ranking."""
+    tracks = pd.DataFrame(
+        {
+            "album_canonical_rowid": [1, 1, 1, 2, 2, 3, 3],
+            "logcount": [3.0, 1.0, 2.0, 5.0, 4.0, 1.0, 1.0],
+        }
+    )
+    albums = pd.DataFrame(
+        {
+            "album_rowid": [1, 2, 3],
+            "artist_rowid": [10, 10, 10],
+            "logcount": [3.0, 2.0, 1.0],
+            "album_type": ["album", "album", "ep"],
+        }
+    )
+    result = rank_artist_repr_albums(tracks, albums, limit=2)
+
+    assert list(result.columns) == ["artist_rowid", "rank", "album_rowid", "score"]
+    rows = list(result.itertuples(index=False, name=None))
+    # Album 2 (median=4.5) ranks above album 1 (median=2.0); EP 3 excluded by type preference
+    assert rows[0] == (10, 0, 2, 4.5)
+    assert rows[1] == (10, 1, 1, 2.0)
+
+
+def test_artist_repr_albums_excludes_non_searchable(db, tmp_path):
+    """Non-searchable albums must not appear as representative albums."""
+    _build_full_db(db, tmp_path)
+    # total_tracks threshold of 5 makes album 203 (total_tracks=4) non-searchable
+    compute_searchable_recable(
+        db,
+        searchable_track_min_logcount=2.0,
+        searchable_album_min_total_tracks=5,
+        searchable_artist_min_ntrack=10,
+        searchable_label_min_nartist=10,
+        recable_track_min_logcount=3.0,
+    )
+    db.commit()
+    build_artist_repr_albums(db, limit=10)
+
+    rows = db.execute(
+        "SELECT artist_rowid, album_rowid FROM artist_repr_albums ORDER BY artist_rowid, rank"
+    ).fetchall()
+    repr_album_ids = {album_rowid for _, album_rowid in rows}
+    non_searchable = {
+        r[0]
+        for r in db.execute("SELECT album_rowid FROM albums WHERE searchable = 0").fetchall()
+    }
+    assert repr_album_ids.isdisjoint(non_searchable), "non-searchable albums must not appear in repr"
+    assert (101, 201) in rows, "artist 101 should retain searchable album 201 in repr"
+    assert not any(artist_rowid == 102 for artist_rowid, _ in rows), (
+        "artist 102 only has non-searchable albums and should not get repr rows"
+    )
+
+
+def test_rank_label_repr_artists():
+    """Pure-function test: scoring, tiebreak, ranking."""
+    tracks = pd.DataFrame(
+        {
+            "label_rowid": [1, 1, 1, 1, 1],
+            "artist_rowid": [10, 10, 20, 20, 20],
+            "album_rowid": [100, 101, 200, 200, 201],
+            "logcount": [4.0, 3.0, 2.0, 2.0, 2.0],
+        }
+    )
+    result = rank_label_repr_artists(tracks, limit=2)
+
+    assert list(result.columns) == ["label_rowid", "rank", "artist_rowid", "score"]
+    rows = list(result.itertuples(index=False, name=None))
+    # artist 10: sum=7.0, count=2, score=7/sqrt(2)≈4.95, albums=2, best=4.0
+    # artist 20: sum=6.0, count=3, score=6/sqrt(3)≈3.46, albums=2, best=2.0
+    assert rows[0][2] == 10, "artist 10 should rank first (higher score)"
+    assert rows[1][2] == 20, "artist 20 should rank second"
+    assert rows[0][1] == 0
+    assert rows[1][1] == 1
+
+
+def test_label_repr_artists_excludes_non_searchable(db, tmp_path):
+    """Non-searchable artists must not appear as representative artists."""
+    _build_full_db(db, tmp_path)
+    # ntrack threshold of 100 makes artist 102 (ntrack=60) non-searchable
+    compute_searchable_recable(
+        db,
+        searchable_track_min_logcount=2.0,
+        searchable_album_min_total_tracks=2,
+        searchable_artist_min_ntrack=100,
+        searchable_label_min_nartist=10,
+        recable_track_min_logcount=3.0,
+    )
+    db.commit()
+    build_label_repr_artists(db, limit=10)
+
+    rows = db.execute(
+        "SELECT label_rowid, artist_rowid FROM label_repr_artists ORDER BY label_rowid, rank"
+    ).fetchall()
+    repr_artist_ids = {artist_rowid for _, artist_rowid in rows}
+    non_searchable = {
+        r[0]
+        for r in db.execute("SELECT artist_rowid FROM artists WHERE searchable = 0").fetchall()
+    }
+    assert repr_artist_ids.isdisjoint(non_searchable), "non-searchable artists must not appear in repr"
+    assert (1, 101) in rows, "label 1 should retain searchable artist 101 in repr"
+    assert not any(label_rowid == 2 for label_rowid, _ in rows), (
+        "label 2 only has non-searchable artists and should not get repr rows"
+    )
+
+
+def test_compute_nrepr(db, tmp_path):
+    """nrepr must match actual repr table row counts per parent."""
+    _build_full_db(db, tmp_path)
+    compute_searchable_recable(
+        db,
+        searchable_track_min_logcount=2.0,
+        searchable_album_min_total_tracks=2,
+        searchable_artist_min_ntrack=10,
+        searchable_label_min_nartist=10,
+        recable_track_min_logcount=3.0,
+    )
+    db.commit()
+    build_representatives(db, limit=3)
+
+    for parent_key, table, repr_table in (
+        ("album_rowid", "albums", "album_repr_tracks"),
+        ("artist_rowid", "artists", "artist_repr_albums"),
+        ("label_rowid", "labels", "label_repr_artists"),
+    ):
+        rows = db.execute(f"SELECT {parent_key}, nrepr FROM {table}").fetchall()
+        for rowid, nrepr in rows:
+            actual = db.execute(
+                f"SELECT COUNT(*) FROM {repr_table} WHERE {parent_key} = ?", (rowid,)
+            ).fetchone()[0]
+            assert nrepr == actual, (
+                f"{table} rowid={rowid}: nrepr={nrepr} but repr table has {actual} rows"
+            )
