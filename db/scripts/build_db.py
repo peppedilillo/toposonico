@@ -646,7 +646,7 @@ def rank_label_repr_artists(
     """Rank representative artists per label.
 
     Scored as sum(logcount) / sqrt(track_count), which softens catalog-size
-    bias. Ties broken by album breadth, strongest single track, rowid.
+    bias. Ties broken by rowid.
     Expects pre-filtered (searchable tracks of searchable artists) inputs.
 
     Returns a DataFrame with columns: label_rowid, rank, artist_rowid, score.
@@ -654,15 +654,13 @@ def rank_label_repr_artists(
     stats = tracks.groupby(["label_rowid", "artist_rowid"]).agg(
         total_logcount=("logcount", "sum"),
         track_count=("logcount", "count"),
-        album_count=("album_rowid", "nunique"),
-        best_track=("logcount", "max"),
     )
     stats["score"] = stats["total_logcount"] / np.sqrt(stats["track_count"])
     stats = stats.reset_index()
 
     stats = stats.sort_values(
-        ["label_rowid", "score", "album_count", "best_track", "artist_rowid"],
-        ascending=[True, False, False, False, True],
+        ["label_rowid", "score", "artist_rowid"],
+        ascending=[True, False, True],
     )
     stats["rank"] = stats.groupby("label_rowid").cumcount()
     stats = stats[stats["rank"] < limit]
@@ -676,7 +674,7 @@ def build_label_repr_artists(conn: sqlite3.Connection, limit: int) -> None:
     conn.execute("DELETE FROM label_repr_artists")
 
     tracks = pd.read_sql(
-        "SELECT t.label_rowid, t.artist_rowid, t.album_rowid, t.logcount "
+        "SELECT t.label_rowid, t.artist_rowid, t.logcount "
         "FROM tracks t "
         "JOIN artists a ON a.artist_rowid = t.artist_rowid "
         "AND a.searchable = 1 "
