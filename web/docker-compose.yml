@@ -51,6 +51,14 @@ services:
       retries: 10
       start_period: 20s
 
+  tiles:
+    image: nginx:1.27-alpine
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./tileserver/tiles:/usr/share/nginx/html/tiles:ro
+      - ./tileserver/default.conf:/etc/nginx/conf.d/default.conf:ro
+
   frontend:
     image: node:22-bookworm
     working_dir: /workspace/web/frontend
@@ -69,12 +77,15 @@ services:
     environment:
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
+      VITE_TILE_URL: http://localhost:8081/tiles/{z}/{x}/{y}.pbf
     volumes:
       - ..:/workspace
       - frontend_node_modules:/workspace/web/frontend/node_modules
     depends_on:
       backend:
         condition: service_healthy
+      tiles:
+        condition: service_started
 
 volumes:
   meilisearch_data:

@@ -43,7 +43,7 @@ for path_var in "${required_vars[@]}"; do
     fi
 done
 
-TILES_DIR="$SCRIPT_DIR/frontend/public/tiles"
+TILES_DIR="$SCRIPT_DIR/tileserver/tiles"
 rm -rf "$TILES_DIR"
 mkdir -p "$TILES_DIR"
 
@@ -52,7 +52,7 @@ echo "Output: $TILES_DIR"
 
 tippecanoe -e "$TILES_DIR" \
     --full-detail=7 --low-detail=7 \
-    --maximum-zoom=13 --minimum-zoom=5 --drop-rate=1.8 \
+    --maximum-zoom=14 --minimum-zoom=5 --drop-rate=1.7 \
     --drop-densest-as-needed \
     --read-parallel --force \
     --named-layer=tracks:"$SICK_JSON_TRACK" \
