@@ -10,11 +10,11 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "jupyter>=1.0.0",
-    "pandas~=2.3.0",
-    "numpy~=2.2.0",
-    "pyarrow~=23.0.0",
-    "matplotlib~=3.10.0",
-    "tqdm~=4.67",
+    "pandas>=2.3.0",
+    "numpy>=2.2.0",
+    "pyarrow>=23.0.0",
+    "matplotlib>=3.10.0",
+    "tqdm>=4.67",
     "faiss-cpu>=1.13.2",
 ]
 

@@ -9,7 +9,7 @@ Usage:
     python scripts/lambda_sniper.py [--instances TYPE [TYPE ...]]
                                    [--regions PREFIX [PREFIX ...]]
                                    [--poll-interval SECS] [--api-key KEY]
-                                   [--dry-run]
+                                   [--ssh-key NAME] [--dry-run]
 
 Examples:
     python scripts/lambda_sniper.py
@@ -49,13 +49,23 @@ def elapsed(start: float) -> str:
     return f"{s}s"
 
 
-def get_ssh_key(api_key):
-    """Return the name of the first SSH key registered on the account."""
+def get_ssh_key(api_key, name=None):
+    """Return the name of an SSH key registered on the account.
+
+    If *name* is given, validates it exists; otherwise returns the first key.
+    """
     resp = requests.get(f"{API_BASE}/ssh-keys", auth=auth(api_key), timeout=10)
     resp.raise_for_status()
     keys = resp.json().get("data", [])
     if not keys:
         raise RuntimeError("No SSH keys found in your Lambda account.")
+    if name is not None:
+        known = {k["name"] for k in keys}
+        if name not in known:
+            raise RuntimeError(
+                f"SSH key '{name}' not found. Available: {', '.join(sorted(known))}"
+            )
+        return name
     return keys[0]["name"]
 
 
@@ -124,7 +134,7 @@ def launch(api_key, itype, region, key_name):
     )
 
 
-def snipe(api_key, instances, regions, poll_interval, dry_run):
+def snipe(api_key, instances, regions, poll_interval, dry_run, ssh_key=None):
     """Fetch the catalog once, print it, then poll until a target instance is available.
 
     Exits after the first launch attempt (successful or not). With dry_run=True,
@@ -146,11 +156,12 @@ def snipe(api_key, instances, regions, poll_interval, dry_run):
         return
 
     try:
-        key_name = get_ssh_key(api_key)
+        key_name = get_ssh_key(api_key, ssh_key)
     except Exception as e:
         print(f"[{ts()}] {e}")
         return
 
+    print(f"[{ts()}] SSH key: {key_name}")
     print(f"[{ts()}] Sniping {', '.join(instances)} in {prefix_str} — polling every {poll_interval}s")
 
     checks = 0
@@ -228,6 +239,12 @@ def main():
         help="Seconds between polls (default: 12.01)",
     )
     parser.add_argument(
+        "--ssh-key",
+        default=None,
+        metavar="NAME",
+        help="SSH key name to use. Defaults to the first key on the account.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print catalog and exit without polling.",
@@ -241,7 +258,7 @@ def main():
         )
 
     try:
-        snipe(args.api_key, args.instances, args.regions, args.poll_interval, args.dry_run)
+        snipe(args.api_key, args.instances, args.regions, args.poll_interval, args.dry_run, args.ssh_key)
     except KeyboardInterrupt:
         print(f"\n[{ts()}] Stopped.")
 

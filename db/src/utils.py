@@ -68,7 +68,7 @@ def read_manifest(
 
     result = {}
     if "source" in m:
-        result["source"] = Path(m["source"])
+        result["source"] = {k: Path(v) for k, v in m["source"].items()}
     for section in entity_keys:
         paths = {k: Path(v) for k, v in m[section].items()}
         result[section] = EntityPaths(**paths)
@@ -96,7 +96,7 @@ def check_manifest(
 
     all_paths = []
     if "source" in rs:
-        all_paths.append(m["source"])
+        all_paths.extend(m["source"].values())
     for section in rs - {"source"}:
         all_paths.extend(m[section])
     missing = [p for p in all_paths if not p.is_file()]
