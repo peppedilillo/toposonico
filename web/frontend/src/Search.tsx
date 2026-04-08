@@ -109,11 +109,7 @@ export default function Search({navigate}: SearchProps) {
   // Debounced search fetch — fires 300ms after the query stops changing.
   const DEBOUNCE_MS = 300;
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([])
-      setActiveIdx(null)
-      return
-    }
+    if (!query.trim()) return
     const timer = setTimeout(() => {
       fetch(`/api/search?q=${encodeURIComponent(query)}&limit=10`)
         .then(r => r.json())
@@ -158,7 +154,7 @@ export default function Search({navigate}: SearchProps) {
     <div
       // touch-auto re-enables touch interactions with the search UI elements
       className="
-      absolute top-3 z-100 w-[90%] left-1/2 -translate-x-1/2 sm:w-80 sm:left-3 sm:translate-x-0
+      absolute top-3 z-100 w-[90%] left-1/2 -translate-x-1/2 sm:w-md sm:left-3 sm:translate-x-0
       touch-auto
       "
       // these will prevent UI interaction to bubble up to the map
@@ -168,7 +164,7 @@ export default function Search({navigate}: SearchProps) {
       <div className="flex items-center bg-surface rounded-3xl h-12">
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); if (!e.target.value.trim()) setOpen(false) }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={handleKeyDown}
@@ -185,7 +181,7 @@ export default function Search({navigate}: SearchProps) {
           >×</div>
         )}
       </div>
-      {results.length > 0 && open && (
+      {query.trim() && results.length > 0 && open && (
         <ul
           className="bg-surface rounded-xl mt-1 py-2 max-h-[30dvh] overflow-y-auto overscroll-contain list-none">
           {results.map((hit, i) => {

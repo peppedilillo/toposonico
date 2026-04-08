@@ -1,17 +1,20 @@
 import {useCallback, useState} from 'react'
 import Search from './Search'
+import Panel from './Panel'
+import type {Selection} from './Panel'
 import {FlyToInterpolator, MapView} from '@deck.gl/core'
+import type {PickingInfo} from '@deck.gl/core'
 import {MVTLayer} from '@deck.gl/geo-layers'
 import {GeoJsonLayer} from '@deck.gl/layers'
 import DeckGL from '@deck.gl/react'
-import type {Feature, FeatureCollection, Geometry} from 'geojson'
+import type {FeatureCollection} from 'geojson'
 
 
 const INITIAL_VIEW_STATE = {longitude: 4.28, latitude: -7.21, zoom: 5, pitch: 10, bearing: 0}
 const TILES = '/tiles/{z}/{x}/{y}.pbf'
 
 /** Reads a CSS custom property and returns a deck.gl-compatible [r, g, b, a] color array. */
-export function cssColor(variable: string, alpha = 255): [number, number, number, number] {
+function cssColor(variable: string, alpha = 255): [number, number, number, number] {
   const hex = getComputedStyle(document.documentElement).getPropertyValue(variable).trim()
   const n = parseInt(hex.slice(1), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255, alpha]
@@ -43,85 +46,97 @@ for (let lat = -90; lat <= 90; lat += 5) {
   })
 }
 
+
 /** Renders the lat/lon graticule as a GeoJSON line layer. */
-function gridLayer() {
-  return new GeoJsonLayer({
-    id: 'grid',
-    data: gridLines,
-    stroked: true,
-    filled: false,
-    getLineColor: COLORS.border,
-    getLineWidth: 1,
-    lineWidthUnits: 'pixels',
-  })
+const gridLayer = new GeoJsonLayer({
+  id: 'grid',
+  data: gridLines,
+  stroked: true,
+  filled: false,
+  getLineColor: COLORS.border,
+  getLineWidth: 1,
+  lineWidthUnits: 'pixels',
+})
+
+
+/** Maps a tile feature's logcount to a pixel radius. */
+function getPointRadius(feature: {properties: {logcount: number}}) {
+  return feature.properties.logcount
 }
 
-type TileProperties = {
-  logcount?: number
-}
-
-type TileFeature = Feature<Geometry, TileProperties>
-
-/** Maps a tile feature's logcount to a pixel radius, falling back to 1. */
-function getRadius(f: TileFeature) {
-  return f.properties.logcount ?? 1
-}
-
-
-const TILE_BASE = {
+/** MVT layers — one per entity type, initialized once at module level. */
+const tracksLayer = new MVTLayer({
+  id: 'tracks',
   data: TILES,
-  pointType: 'circle' as const,
-  getPointRadius: getRadius,
-  pointRadiusUnits: 'pixels' as const,
+  loadOptions: {mvt: {layers: ['tracks']}},
+  pointType: 'circle',
+  getPointRadius: getPointRadius,
+  pointRadiusUnits: 'pixels',
   pointRadiusMinPixels: 1,
   pointRadiusMaxPixels: 15,
+  getFillColor: COLORS.track,
   pickable: true,
-}
+})
 
-/** MVT layer factory functions — one per entity type, each scoped to its source layer. */
-function tracksLayer() {
-  return new MVTLayer<TileProperties>({
-    ...TILE_BASE,
-    id: 'tracks',
-    loadOptions: {mvt: {layers: ['tracks']}},
-    getFillColor: COLORS.track,
-  })
-}
+const albumsLayer = new MVTLayer({
+  id: 'albums',
+  data: TILES,
+  loadOptions: {mvt: {layers: ['albums']}},
+  pointType: 'circle',
+  getPointRadius: getPointRadius,
+  pointRadiusUnits: 'pixels',
+  pointRadiusMinPixels: 1,
+  pointRadiusMaxPixels: 15,
+  getFillColor: COLORS.album,
+  pickable: true,
+})
 
-function albumsLayer() {
-  return new MVTLayer<TileProperties>({
-    ...TILE_BASE,
-    id: 'albums',
-    loadOptions: {mvt: {layers: ['albums']}},
-    getFillColor: COLORS.album,
-  })
-}
+const artistsLayer = new MVTLayer({
+  id: 'artists',
+  data: TILES,
+  loadOptions: {mvt: {layers: ['artists']}},
+  pointType: 'circle',
+  getPointRadius: getPointRadius,
+  pointRadiusUnits: 'pixels',
+  pointRadiusMinPixels: 1,
+  pointRadiusMaxPixels: 15,
+  getFillColor: COLORS.artist,
+  pickable: true,
+})
 
-function artistsLayer() {
-  return new MVTLayer<TileProperties>({
-    ...TILE_BASE,
-    id: 'artists',
-    loadOptions: {mvt: {layers: ['artists']}},
-    getFillColor: COLORS.artist,
-  })
-}
+const labelsLayer = new MVTLayer({
+  id: 'labels',
+  data: TILES,
+  loadOptions: {mvt: {layers: ['labels']}},
+  pointType: 'circle',
+  getPointRadius: getPointRadius,
+  pointRadiusUnits: 'pixels',
+  pointRadiusMinPixels: 1,
+  pointRadiusMaxPixels: 15,
+  getFillColor: COLORS.label,
+  pickable: true,
+})
 
-function labelsLayer() {
-  return new MVTLayer<TileProperties>({
-    ...TILE_BASE,
-    id: 'labels',
-    loadOptions: {mvt: {layers: ['labels']}},
-    getFillColor: COLORS.label,
-  })
-}
+const LAYERS = [gridLayer, tracksLayer, albumsLayer, artistsLayer, labelsLayer]
+const MAP_VIEW = new MapView({repeat: false})
 
 
-/** Root application component — owns view state and wires navigation to the map. */
+/** Root application component — owns view state, selection, and wires navigation to the map. */
 export default function App() {
   const [viewState, setViewState] = useState<object>(INITIAL_VIEW_STATE)
+  const [selection, setSelection] = useState<Selection | null>(null)
 
-  /** Flies the map to the given coordinates, preserving current pitch and bearing. */
-  const navigate = useCallback((_entityType: string, _rowid: number, lon: number, lat: number) => {
+  /** Fetches entity info and updates the panel selection, without moving the map. */
+  const selectEntity = useCallback((entityType: string, rowid: number) => {
+    setSelection({status: 'loading'})
+    fetch(`/api/info?rowid=${rowid}&entity_name=${entityType}`)
+      .then(r => r.json())
+      .then(data => setSelection({status: 'loaded', entity_type: entityType, ...data}))
+      .catch(() => setSelection({status: 'error'}))
+  }, [])
+
+  /** Flies the map to the given coordinates and selects the entity. */
+  const navigate = useCallback((entityType: string, rowid: number, lon: number, lat: number) => {
     setViewState(prev => ({
       ...prev,
       longitude: lon,
@@ -130,7 +145,20 @@ export default function App() {
       transitionDuration: 1000,
       transitionInterpolator: new FlyToInterpolator(),
     }))
-  }, [])
+    selectEntity(entityType, rowid)
+  }, [selectEntity])
+
+  /** Handles clicks on pickable map dots — selects the entity without moving the map. */
+  function handleMapClick(info: PickingInfo) {
+    if (!info.object || !info.layer) return
+    const p = (info.object as {properties: Record<string, number>}).properties
+    switch (info.layer.id) {
+      case 'tracks':  return selectEntity('track',  p.track_rowid)
+      case 'albums':  return selectEntity('album',  p.album_rowid)
+      case 'artists': return selectEntity('artist', p.artist_rowid)
+      case 'labels':  return selectEntity('label',  p.label_rowid)
+    }
+  }
 
   return (
     <div className="relative w-screen h-screen">
@@ -138,10 +166,13 @@ export default function App() {
         viewState={viewState}
         controller={{minZoom: 5, maxZoom: 14}}
         onViewStateChange={({viewState: vs}) => setViewState(vs)}
-        layers={[gridLayer(), tracksLayer(), albumsLayer(), artistsLayer(), labelsLayer()]}
-        views={new MapView({repeat: false})}
+        layers={LAYERS}
+        views={MAP_VIEW}
+        onClick={handleMapClick}
+        getCursor={({isHovering}) => isHovering ? 'pointer' : 'default'}
       />
       <Search navigate={navigate}/>
+      <Panel selection={selection} navigate={navigate} onClose={() => setSelection(null)}/>
     </div>
   )
 }
