@@ -161,7 +161,7 @@ function TrackPanel({s, navigate}: {s: TrackInfo; navigate: NavigateFn}) {
       <div className="flex items-center gap-2 mt-2 text-xs text-muted">
         {s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
         <PlaylistCount logcount={s.logcount}/>
-        <span className="ml-auto">id:{s.track_rowid}</span>
+        <span className="absolute right-4 bottom-auto">id:{s.track_rowid}</span>
       </div>
     </>
   )
@@ -184,7 +184,7 @@ function AlbumPanel({s, navigate}: {s: AlbumInfo; navigate: NavigateFn}) {
       <div className="flex items-center gap-2 mt-2 text-xs text-muted">
         {s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
         <PlaylistCount logcount={s.logcount}/>
-        <span className="ml-auto">id:{s.album_rowid}</span>
+        <span className="absolute right-4 bottom-auto">id:{s.album_rowid}</span>
       </div>
     </>
   )
@@ -197,7 +197,7 @@ function ArtistPanel({s}: {s: ArtistInfo}) {
       {s.artist_genre && <div className="text-xs text-muted truncate">{s.artist_genre}</div>}
       <div className="flex items-center gap-2 mt-2 text-xs text-muted">
         <PlaylistCount logcount={s.logcount}/>
-        <span className="ml-auto">id:{s.artist_rowid}</span>
+        <span className="absolute right-4 bottom-auto">id:{s.artist_rowid}</span>
       </div>
     </>
   )
@@ -209,7 +209,7 @@ function LabelPanel({s}: {s: LabelInfo}) {
       <div className="text-lg font-semibold leading-snug truncate">{s.label}</div>
       <div className="flex items-center gap-2 mt-2 text-xs text-muted">
         <PlaylistCount logcount={s.logcount}/>
-        <span className="ml-auto">id:{s.label_rowid}</span>
+        <span className="absolute right-4 bottom-auto">id:{s.label_rowid}</span>
       </div>
     </>
   )
@@ -255,7 +255,7 @@ function RecItem({rec, entityType, navigate}: {rec: Recommend; entityType: strin
     <li>
       <button
         onClick={(e) => { e.stopPropagation(); navigate(et, rowid, lon, lat) }}
-        className="text-left w-full cursor-pointer hover:bg-white/5 -mx-5 px-5 py-1.5"
+        className="text-left w-full cursor-pointer hover:bg-overlay py-1.5 px-4"
       >
         <div className="text-sm font-medium truncate">{name}</div>
         {sub && <div className="text-xs text-muted truncate">{sub}</div>}
@@ -290,6 +290,7 @@ function RecsSection({entity, navigate}: {entity: EntityInfo; navigate: Navigate
   const [recs, setRecs] = useState<RecsState | null>(null)
   const aborter = useRef(makeAbortable())
   const rowid = getRowid(entity)
+  const RECSNUMBER = 3
 
   const handleToggle = () => {
     if (open) { setOpen(false); return }
@@ -297,7 +298,7 @@ function RecsSection({entity, navigate}: {entity: EntityInfo; navigate: Navigate
     if (recs !== null) return
     setRecs({status: 'loading'})
     const signal = aborter.current.nextSignal()
-    fetch(`/api/recommend?rowid=${rowid}&entity_name=${entity.entity_type}&limit=5&diverse=true`, {signal})
+    fetch(`/api/recommend?rowid=${rowid}&entity_name=${entity.entity_type}&limit=${RECSNUMBER}&diverse=true`, {signal})
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
       .then((data: Recommend[]) => setRecs({status: 'loaded', items: data}))
       .catch(err => { if (err.name !== 'AbortError') setRecs({status: 'error'}) })
@@ -307,9 +308,11 @@ function RecsSection({entity, navigate}: {entity: EntityInfo; navigate: Navigate
     <div className="mt-3 border-t border-muted/20 pt-2">
       <div
         onClick={handleToggle}
-        className="text-muted text-xs flex items-center gap-1 cursor-pointer w-full py-1 -my-1"
+        className={`text-xs flex items-center gap-1 cursor-pointer w-full px-4 py-1 -my-1 select-none
+        bg-linear-to-r from-gray-500 via-gray-50 to-gray-500 bg-size-[200%_auto] bg-clip-text text-transparent
+        ${!open ? 'animate-sweep' : ''}`}
       >
-        Similar {open ? '▲' : '▼'}
+        More like this..
       </div>
       {open && <RecBody recs={recs} entityType={entity.entity_type} navigate={navigate}/>}
     </div>
@@ -343,19 +346,19 @@ export default function Panel({selection, navigate, onClose}: PanelProps) {
                  sm:bottom-4 sm:left-3 sm:top-auto sm:right-auto sm:w-md
                  max-h-[60dvh] sm:max-h-[calc(100vh-6rem)]
                  overflow-y-auto overscroll-contain
-                 bg-surface font-sans text-base text-white p-5
+                 bg-surface font-sans text-base text-white
                  rounded-t-2xl sm:rounded-xl shadow-xl touch-auto"
       style={{paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))'}}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={(e) => e.stopPropagation()}
     >
       <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 px-4 pt-4">
           {body}
         </div>
         <button
           onClick={onClose}
-          className="text-muted hover:text-white transition-colors text-lg leading-none flex-shrink-0 mt-0.5"
+          className="text-muted hover:text-white transition-colors text-lg leading-none flex-shrink-0 mt-0.5 p-4"
           aria-label="Close"
         >×</button>
       </div>

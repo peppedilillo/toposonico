@@ -10,6 +10,12 @@
     --color-artist: #58e1bd;
     --color-album: #bad747;
     --color-label: #ca53fa;
+
+    @keyframes sweep {
+        0% { background-position: -200% center; }
+        100% { background-position: 200% center; }
+    }
+    --animate-sweep: sweep 8s linear infinite;
 }
 
 html, body {
