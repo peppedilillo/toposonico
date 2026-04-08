@@ -290,7 +290,7 @@ function RecsSection({entity, navigate}: {entity: EntityInfo; navigate: Navigate
   const [recs, setRecs] = useState<RecsState | null>(null)
   const aborter = useRef(makeAbortable())
   const rowid = getRowid(entity)
-  const RECSNUMBER = 3
+  const RECSNUMBER = 10
 
   const handleToggle = () => {
     if (open) { setOpen(false); return }
@@ -305,7 +305,7 @@ function RecsSection({entity, navigate}: {entity: EntityInfo; navigate: Navigate
   }
 
   return (
-    <div className="mt-3 border-t border-muted/20 pt-2">
+    <div className="mt-3 border-t border-muted/20 pt-2 max-h-40 overflow-y-auto overscroll-contain">
       <div
         onClick={handleToggle}
         className={`text-xs flex items-center gap-1 cursor-pointer w-full px-4 py-1 -my-1 select-none
