@@ -1,5 +1,6 @@
-import {useState} from 'react'
+import {useRef, useState} from 'react'
 import Badge from './Badge'
+import {makeAbortable} from './requests'
 
 // --- Types mirroring backend TypedDicts ---
 
@@ -73,6 +74,19 @@ type LabelInfo = {
 }
 
 type EntityInfo = TrackInfo | AlbumInfo | ArtistInfo | LabelInfo
+
+// --- Recommendation types mirroring backend TypedDicts ---
+
+type TrackRecommend = { track_rowid: number; track_name: string; artist_name: string; lon: number; lat: number }
+type AlbumRecommend = { album_rowid: number; album_name_norm: string; artist_name: string; lon: number; lat: number }
+type ArtistRecommend = { artist_rowid: number; artist_name: string; lon: number; lat: number }
+type LabelRecommend = { label_rowid: number; label: string; lon: number; lat: number }
+type Recommend = TrackRecommend | AlbumRecommend | ArtistRecommend | LabelRecommend
+
+type RecsState =
+  | {status: 'loading'}
+  | {status: 'error'}
+  | {status: 'loaded'; items: Recommend[]}
 
 /** Discriminated union representing the panel's async state. */
 export type Selection =
@@ -201,6 +215,107 @@ function LabelPanel({s}: {s: LabelInfo}) {
   )
 }
 
+// --- Recommendation helpers and components ---
+
+/** Extracts the rowid from any loaded entity info. */
+function getRowid(s: EntityInfo): number {
+  switch (s.entity_type) {
+    case 'track':  return s.track_rowid
+    case 'album':  return s.album_rowid
+    case 'artist': return s.artist_rowid
+    case 'label':  return s.label_rowid
+  }
+}
+
+/** Extracts navigation args from a recommendation. */
+function getRecNav(rec: Recommend, entityType: string): [string, number, number, number] {
+  switch (entityType) {
+    case 'track':  { const r = rec as TrackRecommend;  return ['track',  r.track_rowid,  r.lon, r.lat] }
+    case 'album':  { const r = rec as AlbumRecommend;  return ['album',  r.album_rowid,  r.lon, r.lat] }
+    case 'artist': { const r = rec as ArtistRecommend; return ['artist', r.artist_rowid, r.lon, r.lat] }
+    default:       { const r = rec as LabelRecommend;  return ['label',  r.label_rowid,  r.lon, r.lat] }
+  }
+}
+
+/** Returns display name and optional subtitle for a recommendation. */
+function getRecDisplay(rec: Recommend, entityType: string): {name: string; sub?: string} {
+  switch (entityType) {
+    case 'track':  return {name: (rec as TrackRecommend).track_name,      sub: (rec as TrackRecommend).artist_name}
+    case 'album':  return {name: (rec as AlbumRecommend).album_name_norm, sub: (rec as AlbumRecommend).artist_name}
+    case 'artist': return {name: (rec as ArtistRecommend).artist_name}
+    default:       return {name: (rec as LabelRecommend).label}
+  }
+}
+
+/** Single recommendation row — full-width clickable button. */
+function RecItem({rec, entityType, navigate}: {rec: Recommend; entityType: string; navigate: NavigateFn}) {
+  const {name, sub} = getRecDisplay(rec, entityType)
+  const [et, rowid, lon, lat] = getRecNav(rec, entityType)
+  return (
+    <li>
+      <button
+        onClick={(e) => { e.stopPropagation(); navigate(et, rowid, lon, lat) }}
+        className="text-left w-full cursor-pointer hover:bg-white/5 -mx-5 px-5 py-1.5"
+      >
+        <div className="text-sm font-medium truncate">{name}</div>
+        {sub && <div className="text-xs text-muted truncate">{sub}</div>}
+      </button>
+    </li>
+  )
+}
+
+/** Renders loading/error/empty/list states for recommendations. */
+function RecBody({recs, entityType, navigate}: {recs: RecsState | null; entityType: string; navigate: NavigateFn}) {
+  if (!recs || recs.status === 'loading')
+    return <div className="text-muted text-xs py-2 animate-pulse">Loading...</div>
+  if (recs.status === 'error')
+    return <div className="text-muted text-xs py-2">Failed to load.</div>
+  if (recs.items.length === 0)
+    return <div className="text-muted text-xs py-2">No recommendations.</div>
+  return (
+    <ol className="mt-1">
+      {recs.items.map((rec, i) => (
+        <RecItem key={i} rec={rec} entityType={entityType} navigate={navigate}/>
+      ))}
+    </ol>
+  )
+}
+
+/**
+ * Collapsible recommendations section with fetch-on-open and caching.
+ * Keyed by entity identity in the parent — remounts on entity change.
+ */
+function RecsSection({entity, navigate}: {entity: EntityInfo; navigate: NavigateFn}) {
+  const [open, setOpen] = useState(false)
+  const [recs, setRecs] = useState<RecsState | null>(null)
+  const aborter = useRef(makeAbortable())
+  const rowid = getRowid(entity)
+
+  const handleToggle = () => {
+    if (open) { setOpen(false); return }
+    setOpen(true)
+    if (recs !== null) return
+    setRecs({status: 'loading'})
+    const signal = aborter.current.nextSignal()
+    fetch(`/api/recommend?rowid=${rowid}&entity_name=${entity.entity_type}&limit=5&diverse=true`, {signal})
+      .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
+      .then((data: Recommend[]) => setRecs({status: 'loaded', items: data}))
+      .catch(err => { if (err.name !== 'AbortError') setRecs({status: 'error'}) })
+  }
+
+  return (
+    <div className="mt-3 border-t border-muted/20 pt-2">
+      <div
+        onClick={handleToggle}
+        className="text-muted text-xs flex items-center gap-1 cursor-pointer w-full py-1 -my-1"
+      >
+        Similar {open ? '▲' : '▼'}
+      </div>
+      {open && <RecBody recs={recs} entityType={entity.entity_type} navigate={navigate}/>}
+    </div>
+  )
+}
+
 // --- Main Panel ---
 
 /** Detail panel for a selected entity — bottom sheet on mobile, sidebar on desktop. */
@@ -244,6 +359,9 @@ export default function Panel({selection, navigate, onClose}: PanelProps) {
           aria-label="Close"
         >×</button>
       </div>
+      {selection.status === 'loaded' && (
+        <RecsSection key={`${selection.entity_type}:${getRowid(selection)}`} entity={selection} navigate={navigate}/>
+      )}
     </div>
   )
 }
