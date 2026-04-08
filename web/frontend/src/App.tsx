@@ -1,16 +1,20 @@
-import {useCallback, useEffect, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 import Search from './Search'
-import Panel from './Panel'
 import type {Selection} from './Panel'
+import Panel from './Panel'
+import type {MapViewState, PickingInfo} from '@deck.gl/core'
 import {FlyToInterpolator, MapView} from '@deck.gl/core'
-import type {PickingInfo} from '@deck.gl/core'
 import {MVTLayer} from '@deck.gl/geo-layers'
 import {GeoJsonLayer} from '@deck.gl/layers'
 import DeckGL from '@deck.gl/react'
 import type {FeatureCollection} from 'geojson'
+import {makeAbortable} from "./requests.ts";
 
 
-const INITIAL_VIEW_STATE = {longitude: 4.28, latitude: -7.21, zoom: 5, pitch: 10, bearing: 0}
+const INITIAL_VIEW_STATE: MapViewState = {
+  longitude: 4.28, latitude: -7.21, zoom: 5, pitch: 10, bearing: 0,
+  minZoom: 5, maxZoom: 14,
+}
 
 /** Reads map state from the URL hash. Missing keys fall back to INITIAL_VIEW_STATE defaults. */
 function parseHash() {
@@ -38,6 +42,8 @@ function updateHash(updates: Record<string, string | number | null>) {
     else p.set(k, String(v))
   history.replaceState(null, '', '#' + p.toString())
 }
+
+
 const TILES = '/tiles/{z}/{x}/{y}.pbf'
 
 /** Reads a CSS custom property and returns a deck.gl-compatible [r, g, b, a] color array. */
@@ -148,22 +154,30 @@ const LAYERS = [gridLayer, tracksLayer, albumsLayer, artistsLayer, labelsLayer]
 const MAP_VIEW = new MapView({repeat: false})
 
 
+/** Fetches entity info from the API, validating the response status. */
+function fetchEntityInfo(entityType: string, rowid: number | string, signal: AbortSignal) {
+  return fetch(`/api/info?rowid=${rowid}&entity_name=${entityType}`, {signal})
+    .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
+}
+
+
 /** Root application component — owns view state, selection, and wires navigation to the map. */
 export default function App() {
   const {longitude, latitude, zoom, entity: initEntity, rowid: initRowid} = parseHash()
-  const [viewState, setViewState] = useState<object>({...INITIAL_VIEW_STATE, longitude, latitude, zoom})
+  const [viewState, setViewState] = useState<MapViewState>({...INITIAL_VIEW_STATE, longitude, latitude, zoom})
   const [selection, setSelection] = useState<Selection | null>(
     initEntity && initRowid ? {status: 'loading'} : null
   )
+  const nextSelection = useRef(makeAbortable())
 
   /** Fetches entity info and updates the panel selection, without moving the map. */
   const selectEntity = useCallback((entityType: string, rowid: number) => {
     updateHash({entity: entityType, rowid})
     setSelection({status: 'loading'})
-    fetch(`/api/info?rowid=${rowid}&entity_name=${entityType}`)
-      .then(r => r.json())
+    const signal = nextSelection.current.nextSignal()
+    fetchEntityInfo(entityType, rowid, signal)
       .then(data => setSelection({status: 'loaded', entity_type: entityType, ...data}))
-      .catch(() => setSelection({status: 'error'}))
+      .catch(err => { if (err.name !== 'AbortError') setSelection({status: 'error'}) })
   }, [])
 
   /** Flies the map to the given coordinates and selects the entity. */
@@ -183,11 +197,11 @@ export default function App() {
   useEffect(() => {
     const {entity, rowid} = parseHash()
     if (!entity || !rowid) return
-    fetch(`/api/info?rowid=${rowid}&entity_name=${entity}`)
-      .then(r => r.json())
+    const signal = nextSelection.current.nextSignal()
+    fetchEntityInfo(entity, rowid, signal)
       .then(data => setSelection({status: 'loaded', entity_type: entity, ...data}))
-      .catch(() => setSelection({status: 'error'}))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+      .catch(err => { if (err.name !== 'AbortError') setSelection({status: 'error'}) })
+  }, [])
 
   /** Handles clicks on pickable map dots — selects the entity without moving the map. */
   function handleMapClick(info: PickingInfo) {
@@ -205,11 +219,14 @@ export default function App() {
     <div className="relative w-screen h-screen">
       <DeckGL
         viewState={viewState}
-        controller={{minZoom: 5, maxZoom: 14}}
+        controller={true}
         onViewStateChange={({viewState: vs}) => {
           setViewState(vs)
-          const {longitude, latitude, zoom} = vs as {longitude: number; latitude: number; zoom: number}
-          updateHash({lon: longitude.toFixed(4), lat: latitude.toFixed(4), z: zoom.toFixed(2)})
+          updateHash({
+            lon: vs.longitude.toFixed(4),
+            lat: vs.latitude.toFixed(4),
+            z: vs.zoom.toFixed(2)}
+          )
         }}
         layers={LAYERS}
         views={MAP_VIEW}
@@ -218,6 +235,7 @@ export default function App() {
       />
       <Search navigate={navigate}/>
       <Panel selection={selection} navigate={navigate} onClose={() => {
+        nextSelection.current.cancel()
         setSelection(null)
         updateHash({entity: null, rowid: null})
       }}/>

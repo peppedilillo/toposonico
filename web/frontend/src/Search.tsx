@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import Badge from './Badge'
+import {makeAbortable} from "./requests.ts";
 
 /** A track search result. */
 type TrackHit = {
@@ -93,6 +94,7 @@ function getSubtitle(hit: SearchHit): string | null {
   }
 }
 
+
 /** Search input with debounced API calls, a results dropdown, and keyboard navigation. */
 export default function Search({navigate}: SearchProps) {
   const [query, setQuery] = useState('')
@@ -100,6 +102,7 @@ export default function Search({navigate}: SearchProps) {
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
   const activeItemRef = useRef<HTMLLIElement>(null)
+  const nextSearch = useRef(makeAbortable())
 
   // Scroll the active item into view when keyboard navigation changes it.
   useEffect(() => {
@@ -109,22 +112,27 @@ export default function Search({navigate}: SearchProps) {
   // Debounced search fetch — fires 300ms after the query stops changing.
   const DEBOUNCE_MS = 300;
   useEffect(() => {
-    if (!query.trim()) return
+    if (!query.trim()) {
+      nextSearch.current.cancel();
+      return
+    }
     const timer = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(query)}&limit=10`)
-        .then(r => r.json())
+      const signal = nextSearch.current.nextSignal()
+      fetch(`/api/search?q=${encodeURIComponent(query)}&limit=10`, {signal})
+        .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
         .then((hits: SearchHit[]) => {
           setResults(hits)
           setOpen(true)
           setActiveIdx(null)
         })
-        .catch(() => setResults([]))
+        .catch(err => { if (err.name !== 'AbortError') setResults([]) })
     }, DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [query])
 
   /** Clears the query, results, and keyboard selection. */
   function clearSearch() {
+    nextSearch.current.cancel()
     setQuery('')
     setResults([])
     setActiveIdx(null)
