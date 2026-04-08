@@ -156,7 +156,12 @@ export default function Search({navigate}: SearchProps) {
 
   return (
     <div
-      className="absolute top-3 z-100 w-[90%] left-1/2 -translate-x-1/2 sm:w-80 sm:left-3 sm:translate-x-0"
+      // touch-auto re-enables touch interactions with the search UI elements
+      className="
+      absolute top-3 z-100 w-[90%] left-1/2 -translate-x-1/2 sm:w-80 sm:left-3 sm:translate-x-0
+      touch-auto
+      "
+      // these will prevent UI interaction to bubble up to the map
       onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={(e) => e.stopPropagation()}
     >
@@ -181,9 +186,8 @@ export default function Search({navigate}: SearchProps) {
         )}
       </div>
       {results.length > 0 && open && (
-        // touch-pan-y re-enables vertical scroll on touch devices, overriding the global touch-action: none.
         <ul
-          className="bg-surface rounded-xl mt-1 py-2 max-h-[30dvh] overflow-y-auto overscroll-contain list-none touch-pan-y">
+          className="bg-surface rounded-xl mt-1 py-2 max-h-[30dvh] overflow-y-auto overscroll-contain list-none">
           {results.map((hit, i) => {
             const subtitle = getSubtitle(hit)
             return (
