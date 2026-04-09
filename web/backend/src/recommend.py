@@ -125,7 +125,7 @@ def recommend_fetch(
 async def recommend(
     rowid: int,
     entity_name: str,
-    limit: int = Query(10, ge=1, le=10),
+    limit: int = Query(10, ge=1, le=50),
     diverse: bool = True,
 ) -> list[Recommend]:
     if entity_name not in NAME2ENTITY:

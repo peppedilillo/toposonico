@@ -47,10 +47,18 @@ class FaissIndexes(NamedTuple):
     label: faiss.Index
 
 
+def get_faiss_track_index() -> faiss.Index:
+    index = faiss.read_index(get_config_str("SICK_FAISS_TRACK"))
+    ivf = faiss.extract_index_ivf(index)
+    quantizer = faiss.downcast_index(ivf.quantizer)
+    quantizer.hnsw.efSearch = 64
+    return index
+
+
 @cache
 def get_faiss_indexes() -> FaissIndexes:
     return FaissIndexes(
-        track=faiss.read_index(get_config_str("SICK_FAISS_TRACK")),
+        track=get_faiss_track_index(),
         album=faiss.read_index(get_config_str("SICK_FAISS_ALBUM")),
         artist=faiss.read_index(get_config_str("SICK_FAISS_ARTIST")),
         label=faiss.read_index(get_config_str("SICK_FAISS_LABEL")),
