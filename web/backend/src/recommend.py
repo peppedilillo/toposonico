@@ -26,6 +26,8 @@ class TrackRecommend(TypedDict):
     artist_name: str
     lon: float
     lat: float
+    logcount: float
+    simscore: float
 
 
 class AlbumRecommend(TypedDict):
@@ -34,6 +36,8 @@ class AlbumRecommend(TypedDict):
     artist_name: str
     lon: float
     lat: float
+    logcount: float
+    simscore: float
 
 
 class ArtistRecommend(TypedDict):
@@ -41,6 +45,9 @@ class ArtistRecommend(TypedDict):
     artist_name: str
     lon: float
     lat: float
+    logcount: float
+    simscore: float
+    artist_genre: str | None
 
 
 class LabelRecommend(TypedDict):
@@ -48,6 +55,8 @@ class LabelRecommend(TypedDict):
     label: str
     lon: float
     lat: float
+    logcount: float
+    simscore: float
 
 
 Recommend = TrackRecommend | AlbumRecommend | ArtistRecommend | LabelRecommend
@@ -65,15 +74,58 @@ def recommend_fetch(
         case TrackEntity():
             rec_cls = TrackRecommend
             index = indexes.track
+            query = """
+                SELECT
+                    track_rowid,
+                    track_name,
+                    artist_name,
+                    lon,
+                    lat,
+                    logcount
+                FROM tracks
+                WHERE track_rowid IN ({placeholders})
+            """
         case AlbumEntity():
             rec_cls = AlbumRecommend
             index = indexes.album
+            query = """
+                SELECT
+                    album_rowid,
+                    album_name_norm,
+                    artist_name,
+                    lon,
+                    lat,
+                    logcount
+                FROM albums
+                WHERE album_rowid IN ({placeholders})
+            """
         case ArtistEntity():
             rec_cls = ArtistRecommend
             index = indexes.artist
+            query = """
+                SELECT
+                    artist_rowid,
+                    artist_name,
+                    lon,
+                    lat,
+                    logcount,
+                    artist_genre 
+                FROM artists
+                WHERE artist_rowid IN ({placeholders})
+            """
         case LabelEntity():
             rec_cls = LabelRecommend
             index = indexes.label
+            query = """
+                SELECT
+                    label_rowid,
+                    label,
+                    lon,
+                    lat,
+                    logcount
+                FROM labels
+                WHERE label_rowid IN ({placeholders})
+            """
     row = db.execute(
         f"SELECT embedding FROM {entity.embedding} WHERE {entity.key} = ?",
         (rowid,),
@@ -84,8 +136,11 @@ def recommend_fetch(
     emb = np.frombuffer(row[0], dtype=np.float32).reshape(1, -1)
     diversifiable = diverse and isinstance(entity, (TrackEntity, AlbumEntity))
     fetch_k = 10 * limit + 1 if diversifiable else limit + 1
-    _, ids = index.search(emb, fetch_k)  # noqa
-    neighbor_ids = [int(i) for i in ids[0] if i != -1 and i != rowid]
+    sims, ids = index.search(emb, fetch_k)  # noqa
+    sim_map = {int(nid): float(sim) for sim, nid in zip(sims[0], ids[0]) if nid != -1 and nid != rowid}
+    neighbor_ids = list(sim_map)
+    if not neighbor_ids:
+        return []
 
     if diversifiable:
         placeholders = ", ".join("?" * len(neighbor_ids))
@@ -106,18 +161,21 @@ def recommend_fetch(
         neighbor_ids = diverse_ids
     else:
         neighbor_ids = neighbor_ids[:limit]
-
     if not neighbor_ids:
+        # this shall IN PRINCIPLE not happen, so it will happen.
         return []
 
-    rec_cols = list(rec_cls.__annotations__)  # noqa
     placeholders = ", ".join("?" * len(neighbor_ids))
     rec_rows = db.execute(
-        f"SELECT {', '.join(rec_cols)} FROM {entity.table} WHERE {entity.key} IN ({placeholders})",
+        query.format(placeholders=placeholders),
         neighbor_ids,
     ).fetchall()
     # returns recommends in neighbour order
-    rec_map = {rec[0]: rec_cls(**dict(zip(rec_cols, rec))) for rec in rec_rows}
+    rec_map = {}
+    for rec in rec_rows:
+        rec_data = dict(rec)
+        rec_data["simscore"] = sim_map[rec[0]]
+        rec_map[rec[0]] = rec_cls(**rec_data)
     return [rec_map[nid] for nid in neighbor_ids if nid in rec_map]
 
 

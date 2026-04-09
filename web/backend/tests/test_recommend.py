@@ -11,7 +11,11 @@ def test_recommend_track(db, faiss_indexes):
     assert results is not None
     assert len(results) == 3
     assert all(r["track_rowid"] != 1 for r in results)
-    assert all(set(r.keys()) == {"track_rowid", "track_name", "artist_name", "lon", "lat"} for r in results)
+    assert all(
+        set(r.keys()) == {"track_rowid", "track_name", "artist_name", "lon", "lat", "logcount", "simscore"}
+        for r in results
+    )
+    assert all(isinstance(r["simscore"], float) for r in results)
 
 
 def test_recommend_album(db, faiss_indexes):
@@ -31,8 +35,12 @@ def test_recommend_artist(db, faiss_indexes):
             "artist_name": "Herbie Hancock",
             "lon": 5.6,
             "lat": 6.7,
+            "logcount": 6.8,
+            "artist_genre": "jazz",
+            "simscore": results[0]["simscore"],
         }
     ]
+    assert isinstance(results[0]["simscore"], float)
 
 
 def test_recommend_label(db, faiss_indexes):
@@ -44,8 +52,11 @@ def test_recommend_label(db, faiss_indexes):
             "label": "Blue Note",
             "lon": 7.8,
             "lat": 8.9,
+            "logcount": 5.5,
+            "simscore": results[0]["simscore"],
         }
     ]
+    assert isinstance(results[0]["simscore"], float)
 
 
 def test_recommend_track_diverse(db, faiss_indexes):
