@@ -162,6 +162,10 @@ function fetchEntityInfo(entityType: string, rowid: number | string, signal: Abo
 
 
 /** Root application component — owns view state, selection, and wires navigation to the map. */
+// Debounce hash updates: fly animations fire onViewStateChange every frame,
+// and iOS Safari throws SecurityError if replaceState exceeds 100 calls/10s.
+let hashTimer: ReturnType<typeof setTimeout> | null = null
+
 export default function App() {
   const {longitude, latitude, zoom, entity: initEntity, rowid: initRowid} = parseHash()
   const [viewState, setViewState] = useState<MapViewState>({...INITIAL_VIEW_STATE, longitude, latitude, zoom})
@@ -222,11 +226,15 @@ export default function App() {
         controller={true}
         onViewStateChange={({viewState: vs}) => {
           setViewState(vs)
-          updateHash({
-            lon: vs.longitude.toFixed(4),
-            lat: vs.latitude.toFixed(4),
-            z: vs.zoom.toFixed(2)}
-          )
+          if (hashTimer) clearTimeout(hashTimer)
+          hashTimer = setTimeout(() => {
+            updateHash({
+              lon: vs.longitude.toFixed(4),
+              lat: vs.latitude.toFixed(4),
+              z: vs.zoom.toFixed(2),
+            })
+            hashTimer = null
+          }, 100)
         }}
         layers={LAYERS}
         views={MAP_VIEW}

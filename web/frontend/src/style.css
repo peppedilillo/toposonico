@@ -18,6 +18,9 @@
     --animate-sweep: sweep 8s linear infinite;
 }
 
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 html, body {
     width: 100%;
     height: 100%;

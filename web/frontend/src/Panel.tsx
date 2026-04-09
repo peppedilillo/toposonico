@@ -58,6 +58,7 @@ type ArtistInfo = {
   nalbum: number
   nrepr: number
   artist_genre: string | null
+  repr: AlbumRepr[]
 }
 
 type LabelInfo = {
@@ -71,6 +72,7 @@ type LabelInfo = {
   nalbum: number
   nartist: number
   nrepr: number
+  repr: ArtistRepr[]
 }
 
 type EntityInfo = TrackInfo | AlbumInfo | ArtistInfo | LabelInfo
@@ -82,6 +84,11 @@ type AlbumRecommend = { album_rowid: number; album_name_norm: string; artist_nam
 type ArtistRecommend = { artist_rowid: number; artist_name: string; lon: number; lat: number }
 type LabelRecommend = { label_rowid: number; label: string; lon: number; lat: number }
 type Recommend = TrackRecommend | AlbumRecommend | ArtistRecommend | LabelRecommend
+
+// --- Repr types mirroring backend TypedDicts ---
+
+type AlbumRepr = { album_rowid: number; album_name_norm: string; artist_name: string; lon: number; lat: number }
+type ArtistRepr = { artist_rowid: number; artist_name: string; lon: number; lat: number }
 
 type RecsState =
   | {status: 'loading'}
@@ -132,18 +139,10 @@ function LoadingBody() {
   )
 }
 
-/** Formats a logcount value as an approximate playlist count. */
-function PlaylistCount({logcount}: {logcount: number}) {
-  return (
-    <span className="bg-muted/10 px-1.5 py-0.5 rounded">
-      {Math.round(10 ** logcount).toLocaleString()} playlists
-    </span>
-  )
-}
-
 function TrackPanel({s, navigate}: {s: TrackInfo; navigate: NavigateFn}) {
   return (
     <>
+      <div className="mb-2"><Badge entityType="track"/></div>
       <div className="text-lg font-semibold leading-snug truncate">{s.track_name}</div>
       <div className="italic font-medium leading-tight text-sm mt-0.5 truncate">
         <Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)} color="var(--color-artist)">{s.artist_name}</Link>
@@ -153,15 +152,14 @@ function TrackPanel({s, navigate}: {s: TrackInfo; navigate: NavigateFn}) {
           <Link onClick={() => navigate('album', s.album_rowid, s.album_lon, s.album_lat)} color="var(--color-album)">{s.album_name}</Link>
         </div>
       )}
-      {s.label && (
-        <div className="text-xs text-muted mt-0.5 truncate">
-          <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)} color="var(--color-label)">{s.label}</Link>
+      {(s.label || s.release_date) && (
+        <div className="text-sm text-muted mt-0.5 truncate">
+          {s.label && <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)} color="var(--color-label)">{s.label}</Link>}
+          {s.label && s.release_date && ' · '}{s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
         </div>
       )}
-      <div className="flex items-center gap-2 mt-2 text-xs text-muted">
-        {s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
-        <PlaylistCount logcount={s.logcount}/>
-        <span className="absolute right-4 bottom-auto">id:{s.track_rowid}</span>
+      <div className="text-sm text-muted mt-0.5 truncate">
+        {Math.round(10 ** s.logcount).toLocaleString()} playlists · id:{s.track_rowid}
       </div>
     </>
   )
@@ -170,47 +168,69 @@ function TrackPanel({s, navigate}: {s: TrackInfo; navigate: NavigateFn}) {
 function AlbumPanel({s, navigate}: {s: AlbumInfo; navigate: NavigateFn}) {
   return (
     <>
+      <div className="mb-2"><Badge entityType="album"/></div>
       <div className="text-lg font-semibold leading-snug truncate">{s.album_name_norm}</div>
       {s.artist_name && (
         <div className="italic font-medium leading-tight text-sm mt-0.5 truncate">
           <Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)} color="var(--color-artist)">{s.artist_name}</Link>
         </div>
       )}
-      {s.label && (
-        <div className="text-xs text-muted mt-0.5 truncate">
-          <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)} color="var(--color-label)">{s.label}</Link>
+      {(s.label || s.release_date) && (
+        <div className="text-sm text-muted mt-0.5 truncate">
+          {s.label && <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)} color="var(--color-label)">{s.label}</Link>}
+          {s.label && s.release_date && ' · '}{s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
         </div>
       )}
-      <div className="flex items-center gap-2 mt-2 text-xs text-muted">
-        {s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
-        <PlaylistCount logcount={s.logcount}/>
-        <span className="absolute right-4 bottom-auto">id:{s.album_rowid}</span>
+      <div className="text-sm text-muted mt-0.5 truncate">
+        {Math.round(10 ** s.logcount).toLocaleString()} playlists · id:{s.album_rowid}
       </div>
     </>
   )
 }
 
-function ArtistPanel({s}: {s: ArtistInfo}) {
+function ArtistPanel({s, navigate}: {s: ArtistInfo; navigate: NavigateFn}) {
   return (
     <>
+      <div className="mb-2"><Badge entityType="artist"/></div>
       <div className="text-lg font-semibold leading-snug truncate">{s.artist_name}</div>
-      {s.artist_genre && <div className="text-xs text-muted truncate">{s.artist_genre}</div>}
-      <div className="flex items-center gap-2 mt-2 text-xs text-muted">
-        <PlaylistCount logcount={s.logcount}/>
-        <span className="absolute right-4 bottom-auto">id:{s.artist_rowid}</span>
+      <div className="text-sm text-muted mt-0.5 truncate">
+        {s.artist_genre && <>{s.artist_genre} · </>}
+        {Math.round(10 ** s.logcount).toLocaleString()} playlists · id:{s.artist_rowid}
       </div>
+      {s.repr?.length > 0 && (
+        <div className="text-sm mt-1 overflow-x-auto whitespace-nowrap no-scrollbar">
+          <span className="text-muted mr-1.5">top albums:</span>
+          {s.repr.map((r, i) => (
+            <span key={r.album_rowid}>
+              {i > 0 && ', '}
+              <Link onClick={() => navigate('album', r.album_rowid, r.lon, r.lat)} color="var(--color-album)">{r.album_name_norm}</Link>
+            </span>
+          ))}
+        </div>
+      )}
     </>
   )
 }
 
-function LabelPanel({s}: {s: LabelInfo}) {
+function LabelPanel({s, navigate}: {s: LabelInfo; navigate: NavigateFn}) {
   return (
     <>
+      <div className="mb-2"><Badge entityType="label"/></div>
       <div className="text-lg font-semibold leading-snug truncate">{s.label}</div>
-      <div className="flex items-center gap-2 mt-2 text-xs text-muted">
-        <PlaylistCount logcount={s.logcount}/>
-        <span className="absolute right-4 bottom-auto">id:{s.label_rowid}</span>
+      <div className="text-sm text-muted mt-0.5 truncate">
+        {Math.round(10 ** s.logcount).toLocaleString()} playlists · id:{s.label_rowid}
       </div>
+      {s.repr?.length > 0 && (
+        <div className="text-sm mt-1 overflow-x-auto whitespace-nowrap no-scrollbar">
+          <span className="text-muted mr-1.5">top artists:</span>
+          {s.repr.map((r, i) => (
+            <span key={r.artist_rowid}>
+              {i > 0 && ', '}
+              <Link onClick={() => navigate('artist', r.artist_rowid, r.lon, r.lat)} color="var(--color-artist)">{r.artist_name}</Link>
+            </span>
+          ))}
+        </div>
+      )}
     </>
   )
 }
@@ -267,11 +287,11 @@ function RecItem({rec, entityType, navigate}: {rec: Recommend; entityType: strin
 /** Renders loading/error/empty/list states for recommendations. */
 function RecBody({recs, entityType, navigate}: {recs: RecsState | null; entityType: string; navigate: NavigateFn}) {
   if (!recs || recs.status === 'loading')
-    return <div className="text-muted text-xs py-2 animate-pulse">Loading...</div>
+    return <div className="text-muted text-xs py-2 animate-pulse px-4">Loading...</div>
   if (recs.status === 'error')
-    return <div className="text-muted text-xs py-2">Failed to load.</div>
+    return <div className="text-muted text-xs py-2 px-4">Failed to load.</div>
   if (recs.items.length === 0)
-    return <div className="text-muted text-xs py-2">No recommendations.</div>
+    return <div className="text-muted text-xs py-2 px-4">No recommendations.</div>
   return (
     <ol className="mt-1">
       {recs.items.map((rec, i) => (
@@ -331,13 +351,13 @@ export default function Panel({selection, navigate, onClose}: PanelProps) {
   } else if (selection.status === 'error') {
     body = <div className="text-muted text-sm mt-1">Failed to load.</div>
   } else if (selection.entity_type === 'track') {
-    body = <><div className="mb-2"><Badge entityType="track"/></div><TrackPanel s={selection} navigate={navigate}/></>
+    body = <TrackPanel s={selection} navigate={navigate}/>
   } else if (selection.entity_type === 'album') {
-    body = <><div className="mb-2"><Badge entityType="album"/></div><AlbumPanel s={selection} navigate={navigate}/></>
+    body = <AlbumPanel s={selection} navigate={navigate}/>
   } else if (selection.entity_type === 'artist') {
-    body = <><div className="mb-2"><Badge entityType="artist"/></div><ArtistPanel s={selection}/></>
+    body = <ArtistPanel s={selection} navigate={navigate}/>
   } else {
-    body = <><div className="mb-2"><Badge entityType="label"/></div><LabelPanel s={selection}/></>
+    body = <LabelPanel s={selection} navigate={navigate}/>
   }
 
   return (
@@ -352,13 +372,11 @@ export default function Panel({selection, navigate, onClose}: PanelProps) {
       onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={(e) => e.stopPropagation()}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0 px-4 pt-4">
-          {body}
-        </div>
+      <div className="relative px-4 pt-4">
+        {body}
         <button
           onClick={onClose}
-          className="text-muted hover:text-white transition-colors text-lg leading-none flex-shrink-0 mt-0.5 p-4"
+          className="absolute top-0 right-0 text-muted hover:text-white transition-colors text-lg leading-none p-4"
           aria-label="Close"
         >×</button>
       </div>
