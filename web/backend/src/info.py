@@ -7,7 +7,6 @@ from fastapi import HTTPException
 from src.shared import get_db
 from src.utils import AlbumEntity
 from src.utils import ArtistEntity
-from src.utils import cols
 from src.utils import Entity
 from src.utils import LabelEntity
 from src.utils import NAME2ENTITY
@@ -88,20 +87,89 @@ def info_fetch(entity: Entity, rowid: int, db: sqlite3.Connection) -> Info | Non
     match entity:
         case TrackEntity():
             info_cls = TrackInfo
+            query = """
+                SELECT
+                    track_rowid,
+                    track_name,
+                    artist_rowid,
+                    artist_name,
+                    album_rowid,
+                    album_name,
+                    label_rowid,
+                    label,
+                    lon,
+                    lat,
+                    album_lon,
+                    album_lat,
+                    artist_lon,
+                    artist_lat,
+                    label_lon,
+                    label_lat,
+                    logcount,
+                    release_date
+                FROM tracks
+                WHERE track_rowid = ?
+            """
         case AlbumEntity():
             info_cls = AlbumInfo
+            query = """
+                SELECT
+                    album_rowid,
+                    album_name_norm,
+                    artist_rowid,
+                    artist_name,
+                    label_rowid,
+                    label,
+                    lon,
+                    lat,
+                    artist_lon,
+                    artist_lat,
+                    label_lon,
+                    label_lat,
+                    logcount,
+                    nrepr,
+                    total_tracks,
+                    release_date,
+                    album_type
+                FROM albums
+                WHERE album_rowid = ?
+            """
         case ArtistEntity():
             info_cls = ArtistInfo
+            query = """
+                SELECT
+                    artist_rowid,
+                    artist_name,
+                    lon,
+                    lat,
+                    logcount,
+                    ntrack,
+                    nalbum,
+                    nrepr,
+                    artist_genre
+                FROM artists
+                WHERE artist_rowid = ?
+            """
         case LabelEntity():
             info_cls = LabelInfo
-    keys = cols(info_cls)
-    row = db.execute(
-        f"SELECT {', '.join(keys)} FROM {entity.table} WHERE {entity.key} = ?",
-        (rowid,),
-    ).fetchone()
+            query = """
+                SELECT
+                    label_rowid,
+                    label,
+                    lon,
+                    lat,
+                    logcount,
+                    ntrack,
+                    nalbum,
+                    nartist,
+                    nrepr
+                FROM labels
+                WHERE label_rowid = ?
+            """
+    row = db.execute(query, (rowid,)).fetchone()
     if row is None:
         return None
-    return info_cls(**dict(zip(keys, row)))
+    return info_cls(**dict(row))
 
 
 @router.get("/api/info")

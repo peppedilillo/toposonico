@@ -18,6 +18,7 @@ def _make_embeddings(n: int, rng: np.random.Generator) -> np.ndarray:
 def _build_db() -> sqlite3.Connection:
     rng = np.random.default_rng(42)
     conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
 
     # -- entity tables --
 
@@ -144,13 +145,14 @@ def _build_db() -> sqlite3.Connection:
             label_lon REAL,
             label_lat REAL,
             logcount REAL,
+            nrepr INTEGER,
             total_tracks INTEGER,
             release_date TEXT,
             album_type TEXT
         )
         """)
     conn.executemany(
-        "INSERT INTO albums VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO albums VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [
             (
                 20,
@@ -166,6 +168,7 @@ def _build_db() -> sqlite3.Connection:
                 7.7,
                 8.8,
                 6.1,
+                2,
                 5,
                 "1959-08-17",
                 "album",
@@ -184,6 +187,7 @@ def _build_db() -> sqlite3.Connection:
                 7.7,
                 8.8,
                 5.2,
+                1,
                 6,
                 "1968-01-01",
                 "album",
@@ -202,8 +206,28 @@ def _build_db() -> sqlite3.Connection:
                 7.8,
                 8.9,
                 5.8,
+                1,
                 8,
                 "1965-05-17",
+                "album",
+            ),
+            (
+                23,
+                "no repr album",
+                11,
+                "Herbie Hancock",
+                31,
+                "Blue Note",
+                3.6,
+                4.7,
+                5.6,
+                6.7,
+                7.8,
+                8.9,
+                4.8,
+                0,
+                4,
+                "1970-01-01",
                 "album",
             ),
         ],
@@ -216,15 +240,17 @@ def _build_db() -> sqlite3.Connection:
             lon REAL,
             lat REAL,
             logcount REAL,
+            ntrack INTEGER,
             nalbum INTEGER,
+            nrepr INTEGER,
             artist_genre TEXT
         )
         """)
     conn.executemany(
-        "INSERT INTO artists VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO artists VALUES (?,?,?,?,?,?,?,?,?)",
         [
-            (10, "Miles Davis", 5.5, 6.6, 7.3, 42, "jazz"),
-            (11, "Herbie Hancock", 5.6, 6.7, 6.8, 30, "jazz"),
+            (10, "Miles Davis", 5.5, 6.6, 7.3, 128, 42, 2, "jazz"),
+            (11, "Herbie Hancock", 5.6, 6.7, 6.8, 96, 30, 1, "jazz"),
         ],
     )
 
@@ -235,15 +261,17 @@ def _build_db() -> sqlite3.Connection:
             lon REAL,
             lat REAL,
             logcount REAL,
+            ntrack INTEGER,
             nalbum INTEGER,
             nartist INTEGER
+            ,nrepr INTEGER
         )
         """)
     conn.executemany(
-        "INSERT INTO labels VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO labels VALUES (?,?,?,?,?,?,?,?,?)",
         [
-            (30, "Columbia", 7.7, 8.8, 5.0, 100, 50),
-            (31, "Blue Note", 7.8, 8.9, 5.5, 80, 40),
+            (30, "Columbia", 7.7, 8.8, 5.0, 500, 100, 50, 1),
+            (31, "Blue Note", 7.8, 8.9, 5.5, 300, 80, 40, 1),
         ],
     )
 

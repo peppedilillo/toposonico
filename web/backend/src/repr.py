@@ -8,7 +8,6 @@ from fastapi import Query
 from src.shared import get_db
 from src.utils import AlbumEntity
 from src.utils import ArtistEntity
-from src.utils import cols
 from src.utils import Entity
 from src.utils import LabelEntity
 from src.utils import NAME2ENTITY
@@ -54,24 +53,50 @@ def repr_fetch(
             return []
         case AlbumEntity():
             child_repr_cls = TrackRepr
+            query = """
+                SELECT
+                    c.track_rowid,
+                    c.track_name,
+                    c.artist_name,
+                    c.lon,
+                    c.lat
+                FROM album_repr_tracks AS r
+                JOIN tracks AS c ON r.track_rowid = c.track_rowid
+                WHERE r.album_rowid = ?
+                ORDER BY r.rank ASC
+                LIMIT ?
+            """
         case ArtistEntity():
             child_repr_cls = AlbumRepr
+            query = """
+                SELECT
+                    c.album_rowid,
+                    c.album_name_norm,
+                    c.artist_name,
+                    c.lon,
+                    c.lat
+                FROM artist_repr_albums AS r
+                JOIN albums AS c ON r.album_rowid = c.album_rowid
+                WHERE r.artist_rowid = ?
+                ORDER BY r.rank ASC
+                LIMIT ?
+            """
         case LabelEntity():
             child_repr_cls = ArtistRepr
-
-    child = entity.repr_entity
-    repr_cols = cols(child_repr_cls)
-    repr_select = ", ".join(f"c.{col}" for col in repr_cols)
-    repr_rows = db.execute(
-        f"SELECT {repr_select} "
-        f"FROM {entity.repr} AS r "
-        f"JOIN {child.table} AS c ON r.{child.key} = c.{child.key} "
-        f"WHERE r.{entity.key} = ? "
-        f"ORDER BY r.rank ASC "
-        f"LIMIT ?",
-        (rowid, limit),
-    ).fetchall()
-    return [child_repr_cls(**dict(zip(repr_cols, row))) for row in repr_rows]
+            query = """
+                SELECT
+                    c.artist_rowid,
+                    c.artist_name,
+                    c.lon,
+                    c.lat
+                FROM label_repr_artists AS r
+                JOIN artists AS c ON r.artist_rowid = c.artist_rowid
+                WHERE r.label_rowid = ?
+                ORDER BY r.rank ASC
+                LIMIT ?
+            """
+    repr_rows = db.execute(query, (rowid, limit)).fetchall()
+    return [child_repr_cls(**dict(row)) for row in repr_rows]
 
 
 @router.get("/api/repr")

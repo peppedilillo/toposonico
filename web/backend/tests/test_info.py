@@ -47,6 +47,7 @@ def test_info_album(db):
         "label_lon": 7.7,
         "label_lat": 8.8,
         "logcount": 6.1,
+        "nrepr": 2,
         "total_tracks": 5,
         "release_date": "1959-08-17",
         "album_type": "album",
@@ -62,7 +63,9 @@ def test_info_artist(db):
         "lon": 5.5,
         "lat": 6.6,
         "logcount": 7.3,
+        "ntrack": 128,
         "nalbum": 42,
+        "nrepr": 2,
         "artist_genre": "jazz",
     }
 
@@ -76,8 +79,10 @@ def test_info_label(db):
         "lon": 7.7,
         "lat": 8.8,
         "logcount": 5.0,
+        "ntrack": 500,
         "nalbum": 100,
         "nartist": 50,
+        "nrepr": 1,
     }
 
 

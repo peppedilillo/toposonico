@@ -35,7 +35,9 @@ def check_config() -> None:
 @cache
 def get_db() -> sqlite3.Connection:
     DB = get_config_str("SICK_DB")
-    return connect(f"file:{DB}?mode=ro", uri=True, check_same_thread=False)
+    db = connect(f"file:{DB}?mode=ro", uri=True, check_same_thread=False)
+    db.row_factory = sqlite3.Row
+    return db
 
 
 class FaissIndexes(NamedTuple):

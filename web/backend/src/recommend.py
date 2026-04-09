@@ -11,11 +11,11 @@ from src.shared import get_db
 from src.shared import get_faiss_indexes
 from src.utils import AlbumEntity
 from src.utils import ArtistEntity
-from src.utils import cols
 from src.utils import Entity
 from src.utils import LabelEntity
 from src.utils import NAME2ENTITY
 from src.utils import TrackEntity
+
 
 router = APIRouter()
 
@@ -110,7 +110,7 @@ def recommend_fetch(
     if not neighbor_ids:
         return []
 
-    rec_cols = cols(rec_cls)  # noqa
+    rec_cols = list(rec_cls.__annotations__)  # noqa
     placeholders = ", ".join("?" * len(neighbor_ids))
     rec_rows = db.execute(
         f"SELECT {', '.join(rec_cols)} FROM {entity.table} WHERE {entity.key} IN ({placeholders})",

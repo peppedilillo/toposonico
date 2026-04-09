@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import NamedTuple, TypedDict
+from typing import NamedTuple
 
 
 class TrackEntity(NamedTuple):
@@ -82,7 +82,3 @@ def entity_child(entity: Entity) -> tuple[Entity, ...]:
     if isinstance(entity, (ArtistEntity, LabelEntity)):
         return tuple()
     raise ValueError(f"Unknown entity: {entity}")
-
-
-def cols(info_cls: TypedDict) -> list[str]:
-    return list(info_cls.__annotations__)
