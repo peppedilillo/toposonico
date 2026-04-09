@@ -24,6 +24,13 @@ required_vars=(
     SICK_JSON_ALBUM
     SICK_JSON_ARTIST
     SICK_JSON_LABEL
+    SICK_TILES_DIR
+)
+required_files=(
+    SICK_JSON_TRACK
+    SICK_JSON_ALBUM
+    SICK_JSON_ARTIST
+    SICK_JSON_LABEL
 )
 
 missing=()
@@ -35,7 +42,7 @@ if [[ ${#missing[@]} -gt 0 ]]; then
     exit 1
 fi
 
-for path_var in "${required_vars[@]}"; do
+for path_var in "${required_files[@]}"; do
     path="${!path_var}"
     if [[ ! -f "$path" ]]; then
         echo "Error: input file not found for $path_var: $path"
@@ -43,14 +50,13 @@ for path_var in "${required_vars[@]}"; do
     fi
 done
 
-TILES_DIR="$SCRIPT_DIR/tileserver/tiles"
-rm -rf "$TILES_DIR"
-mkdir -p "$TILES_DIR"
+rm -rf "$SICK_TILES_DIR"
+mkdir -p "$SICK_TILES_DIR"
 
 echo "=== Building tiles ==="
-echo "Output: $TILES_DIR"
+echo "Output: $SICK_TILES_DIR"
 
-tippecanoe -e "$TILES_DIR" \
+tippecanoe -e "$SICK_TILES_DIR" \
     --full-detail=7 --low-detail=7 \
     --maximum-zoom=14 --minimum-zoom=5 --drop-rate=1.7 \
     --drop-densest-as-needed \

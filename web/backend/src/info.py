@@ -17,7 +17,7 @@ router = APIRouter()
 
 class TrackInfo(TypedDict):
     track_rowid: int
-    track_name: str
+    track_name_norm: str
     artist_rowid: int
     artist_name: str
     album_rowid: int
@@ -90,7 +90,7 @@ def info_fetch(entity: Entity, rowid: int, db: sqlite3.Connection) -> Info | Non
             query = """
                 SELECT
                     track_rowid,
-                    track_name,
+                    track_name_norm,
                     artist_rowid,
                     artist_name,
                     album_rowid,

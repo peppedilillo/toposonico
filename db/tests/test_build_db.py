@@ -174,8 +174,24 @@ def _rows_as_dicts(db, sql):
         ("OK Computer (Deluxe)", "OK Computer"),
         ("In Rainbows (Disk 2)", "In Rainbows (Disk 2)"),
         ("  Spaced   (Expanded)  ", "Spaced"),
+        ("...And Justice For All", "..And Justice For All"),
+        ("....And Justice For All", "..And Justice For All"),
+        ("Foo.....Bar", "Foo..Bar"),
+        ("...Album [Deluxe]", "..Album"),
+        ("..And Justice For All", "..And Justice For All"),
     ],
-    ids=["plain", "remaster", "deluxe", "non-marker-kept", "whitespace"],
+    ids=[
+        "plain",
+        "remaster",
+        "deluxe",
+        "non-marker-kept",
+        "whitespace",
+        "triple-dots-collapsed",
+        "quadruple-dots-collapsed",
+        "mid-string-dot-run-collapsed",
+        "dot-run-plus-marker-stripped",
+        "double-dots-unchanged",
+    ],
 )
 def test_normalize_title(title, expected):
     assert normalize_title(title) == expected
@@ -211,6 +227,22 @@ def test_album_canonical_is_case_insensitive():
     canonical = updates.set_index("album_rowid")["album_canonical_rowid"]
     assert canonical[201] == 201
     assert canonical[202] == 201, "case-different album should share canonical"
+
+
+def test_album_canonical_collapses_long_dot_runs():
+    albums = pd.DataFrame(
+        {
+            "album_rowid": [201, 202],
+            "artist_rowid": [101, 101],
+            "album_type": ["album", "album"],
+            "album_name": ["...And Justice For All", "..And Justice For All"],
+            "album_name_norm": ["..And Justice For All", "..And Justice For All"],
+        }
+    )
+    updates = get_album_canonical_updates(albums)
+    canonical = updates.set_index("album_rowid")["album_canonical_rowid"]
+    assert canonical[201] == 201
+    assert canonical[202] == 201, "albums differing only by long dot runs should share canonical"
 
 
 def test_track_canonical_picks_smallest_rowid():

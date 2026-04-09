@@ -157,18 +157,18 @@ class Artists:
         Returns:
             DataFrame with columns `artist_rowid` (`int64`), `logcount`
             (`float32`), `ntrack` (`int32`), and `nalbum` (`int32`).
-            `logcount` is the mean of per-track `log10(playlist_count)`
-            across valid artist tracks. `ntrack` is the number of valid
-            tracks per artist. `nalbum` is the number of distinct albums.
+            `logcount` is `log10(sum(playlist_count))` across valid artist
+            tracks. `ntrack` is the number of valid tracks per artist.
+            `nalbum` is the number of distinct albums.
         """
         valid_ids = Artists.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
         out = (
             (
-                np.log10(t1_df.loc[mask, "playlist_count"])
-                .astype("float32")
+                t1_df.loc[mask, "playlist_count"].astype("float32")
                 .groupby(t1_df.loc[mask, "artist_rowid"], sort=False)
-                .mean()
+                .sum()
+                .pipe(np.log10)
                 .reset_index(name="logcount")
             )
             .merge(t1_df.loc[mask].value_counts("artist_rowid"), on="artist_rowid")
@@ -258,16 +258,16 @@ class Albums:
 
         Returns:
             DataFrame with columns `album_rowid` (`int64`) and `logcount`
-            (`float32`). `logcount` is the mean of per-track
-            `log10(playlist_count)` across valid album tracks.
+            (`float32`). `logcount` is `log10(sum(playlist_count))`
+            across valid album tracks.
         """
         valid_ids = Albums.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
         out = (
-            np.log10(t1_df.loc[mask, "playlist_count"])
-            .astype("float32")
+            t1_df.loc[mask, "playlist_count"].astype("float32")
             .groupby(t1_df.loc[mask, "album_rowid"], sort=False)
-            .mean()
+            .sum()
+            .pipe(np.log10)
             .reset_index(name="logcount")
         )
         out["album_rowid"] = out["album_rowid"].astype("int64")
@@ -349,19 +349,19 @@ class Labels:
 
         Returns:
             DataFrame with columns `label_rowid` (`int32`), `logcount`
-            (`float32`), and `ntrack` (`int32`). `logcount` is the mean of
-            per-track `log10(playlist_count)` across valid label tracks.
+            (`float32`), and `ntrack` (`int32`). `logcount` is
+            `log10(sum(playlist_count))` across valid label tracks.
             `ntrack` is the number of valid tracks per label.
         """
         valid_ids = Labels.valid_ids(t1_df, model_dict)
         mask = t1_df["track_rowid"].isin(valid_ids)
         out = (
             (
-                # adds mean of log10(track counts)
-                np.log10(t1_df.loc[mask, "playlist_count"])
-                .astype("float32")
+                # adds log10 of the summed track playlist counts
+                t1_df.loc[mask, "playlist_count"].astype("float32")
                 .groupby(t1_df.loc[mask, "label_rowid"], sort=False)
-                .mean()
+                .sum()
+                .pipe(np.log10)
                 .reset_index(name="logcount")
             )
             .merge(t1_df.loc[mask].value_counts("label_rowid"), on="label_rowid")

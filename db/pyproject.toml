@@ -16,6 +16,7 @@ dependencies = [
     "matplotlib>=3.10.0",
     "tqdm>=4.67",
     "faiss-cpu>=1.13.2",
+    "pandas-stubs~=2.3.3",
 ]
 
 [tool.hatch.build.targets.wheel]

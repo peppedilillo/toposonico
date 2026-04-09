@@ -10,7 +10,7 @@ def test_panel_track(db):
 
     assert result == {
         "track_rowid": 1,
-        "track_name": "Blue in Green",
+        "track_name_norm": "Blue in Green",
         "artist_rowid": 10,
         "artist_name": "Miles Davis",
         "album_rowid": 20,
@@ -55,14 +55,14 @@ def test_panel_album_with_repr(db):
         "reprs": [
             {
                 "track_rowid": 1,
-                "track_name": "Blue in Green",
+                "track_name_norm": "Blue in Green",
                 "artist_name": "Miles Davis",
                 "lon": 1.1,
                 "lat": 2.2,
             },
             {
                 "track_rowid": 2,
-                "track_name": "So What",
+                "track_name_norm": "So What",
                 "artist_name": "Miles Davis",
                 "lon": 1.2,
                 "lat": 2.3,

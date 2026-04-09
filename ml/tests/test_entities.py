@@ -15,6 +15,8 @@ from src.entities import Artists
 from src.entities import Labels
 from src.entities import Tracks
 
+EXPECTED_AGGREGATE_LOGCOUNT = np.array([np.log10(110)], dtype=np.float32)
+
 
 def _model_dict() -> dict:
     return {
@@ -89,13 +91,17 @@ def test_unlabeled_checkpoint_track_is_excluded_from_exported_entities():
 
     np.testing.assert_allclose(
         artist_lookup["logcount"].to_numpy(),
-        np.array([1.5], dtype=np.float32),
+        EXPECTED_AGGREGATE_LOGCOUNT,
     )
     assert artist_lookup["ntrack"].tolist() == [2]
     assert artist_lookup["nalbum"].tolist() == [1]
     np.testing.assert_allclose(
         Albums.lookup(t1_df, model_dict)["logcount"].to_numpy(),
-        np.array([1.5], dtype=np.float32),
+        EXPECTED_AGGREGATE_LOGCOUNT,
+    )
+    np.testing.assert_allclose(
+        label_lookup["logcount"].to_numpy(),
+        EXPECTED_AGGREGATE_LOGCOUNT,
     )
     assert label_lookup["ntrack"].tolist() == [2]
     assert label_lookup["nalbum"].tolist() == [1]

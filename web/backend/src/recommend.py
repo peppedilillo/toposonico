@@ -22,7 +22,7 @@ router = APIRouter()
 
 class TrackRecommend(TypedDict):
     track_rowid: int
-    track_name: str
+    track_name_norm: str
     artist_name: str
     lon: float
     lat: float
@@ -77,7 +77,7 @@ def recommend_fetch(
             query = """
                 SELECT
                     track_rowid,
-                    track_name,
+                    track_name_norm,
                     artist_name,
                     lon,
                     lat,

@@ -7,7 +7,7 @@ from src.search import search_mid2eid
 def test_search_map_track():
     hit = {
         "id": "track_1",
-        "track_name": "Blue in Green",
+        "track_name_norm": "Blue in Green",
         "artist_name": "Miles Davis",
         "lon": 1.1,
         "lat": 2.2,
@@ -17,7 +17,7 @@ def test_search_map_track():
     assert result == {
         "entity_type": "track",
         "track_rowid": 1,
-        "track_name": "Blue in Green",
+        "track_name_norm": "Blue in Green",
         "artist_name": "Miles Davis",
         "lon": 1.1,
         "lat": 2.2,

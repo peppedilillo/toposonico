@@ -156,14 +156,12 @@ const MAP_VIEW = new MapView({repeat: false})
 
 /** Fetches entity info from the API, validating the response status. */
 function fetchEntityInfo(entityType: string, rowid: number | string, signal: AbortSignal) {
-  return fetch(`/api/info?rowid=${rowid}&entity_name=${entityType}`, {signal})
+  return fetch(`/api/panel?rowid=${rowid}&entity_name=${entityType}`, {signal})
     .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
 }
 
 
 /** Root application component — owns view state, selection, and wires navigation to the map. */
-// Debounce hash updates: fly animations fire onViewStateChange every frame,
-// and iOS Safari throws SecurityError if replaceState exceeds 100 calls/10s.
 let hashTimer: ReturnType<typeof setTimeout> | null = null
 
 export default function App() {
@@ -226,6 +224,8 @@ export default function App() {
         controller={true}
         onViewStateChange={({viewState: vs}) => {
           setViewState(vs)
+          // Debounce hash updates: fly animations fire onViewStateChange every frame,
+          // and iOS Safari throws SecurityError if replaceState exceeds 100 calls/10s.
           if (hashTimer) clearTimeout(hashTimer)
           hashTimer = setTimeout(() => {
             updateHash({

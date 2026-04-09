@@ -10,7 +10,7 @@ def test_info_track(db):
 
     assert result == {
         "track_rowid": 1,
-        "track_name": "Blue in Green",
+        "track_name_norm": "Blue in Green",
         "artist_rowid": 10,
         "artist_name": "Miles Davis",
         "album_rowid": 20,

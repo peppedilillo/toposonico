@@ -18,7 +18,7 @@ from src.utils import LABEL
 from src.utils import TRACK
 
 INDEX_SETTINGS = {
-    "searchableAttributes": ["label", "artist_name", "album_name_norm", "track_name"],
+    "searchableAttributes": ["label", "artist_name", "album_name_norm", "track_name_norm"],
     "sortableAttributes": ["rank", "logcount"],
     "rankingRules": [
         "words",
@@ -38,7 +38,7 @@ def add_tracks(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {TRACK.key}, track_name, artist_name, logcount, lon, lat FROM {TRACK.table} WHERE searchable = 1"
+    QUERY = f"SELECT {TRACK.key}, track_name_norm, artist_name, logcount, lon, lat FROM {TRACK.table} WHERE searchable = 1"
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
@@ -49,14 +49,14 @@ def add_tracks(
         docs = [
             {
                 "id": f"{TRACK.name}_{rowid}",
-                "track_name": track_name,
+                "track_name_norm": track_name_norm,
                 "artist_name": artist_name,
                 "logcount": logcount,
                 "rank": 3,
                 "lon": lon,
                 "lat": lat,
             }
-            for (rowid, track_name, artist_name, logcount, lon, lat) in batch
+            for (rowid, track_name_norm, artist_name, logcount, lon, lat) in batch
         ]
         index.add_documents(docs, primary_key="id")
         total += len(batch)

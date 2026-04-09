@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import torch
 
+EXPECTED_AGGREGATE_LOGCOUNT = np.array([np.log10(110)], dtype=np.float32)
+
 
 def _write_tracks_db(path: Path) -> None:
     conn = sqlite3.connect(path)
@@ -190,7 +192,7 @@ def test_build_lookups_script_writes_expected_lookup_artifacts(tmp_path):
     assert artist_lookup["nalbum"].tolist() == [1]
     np.testing.assert_allclose(
         artist_lookup["logcount"].to_numpy(),
-        np.array([1.5], dtype=np.float32),
+        EXPECTED_AGGREGATE_LOGCOUNT,
     )
 
     assert list(album_lookup.columns) == [
@@ -212,7 +214,7 @@ def test_build_lookups_script_writes_expected_lookup_artifacts(tmp_path):
     assert album_lookup["artist_name"].tolist() == ["Artist One"]
     np.testing.assert_allclose(
         album_lookup["logcount"].to_numpy(),
-        np.array([1.5], dtype=np.float32),
+        EXPECTED_AGGREGATE_LOGCOUNT,
     )
 
     assert list(label_lookup.columns) == ["label_rowid", "label", "logcount", "ntrack", "nalbum", "nartist"]
@@ -220,5 +222,5 @@ def test_build_lookups_script_writes_expected_lookup_artifacts(tmp_path):
     assert label_lookup["label"].tolist() == ["Label One"]
     np.testing.assert_allclose(
         label_lookup["logcount"].to_numpy(),
-        np.array([1.5], dtype=np.float32),
+        EXPECTED_AGGREGATE_LOGCOUNT,
     )

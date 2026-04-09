@@ -177,16 +177,18 @@ CREATE INDEX idx_albums_artist ON albums(artist_rowid);
 """
 
 
-ALBUM_TITLE_VARIANT_MARKERS = ("remaster", "edition", "version", "deluxe", "expanded")
+ALBUM_TITLE_VARIANT_MARKERS = ("remaster", "edition", "version", "deluxe", "expanded", "anniversary")
 
 
 def normalize_title(name: str) -> str:
     """Strip a small set of trailing edition markers from titles."""
     s = " ".join(name.split())
-    match = re.search(r"\s*\(([^()]*)\)\s*$", s)
+    s = re.sub(r"\.{3,}", "..", s)
+    match = re.search(r"(\s*\-([^()]*)\s*$)|(\s*\[([^()]*)\]\s*$)|(\s*\(([^()]*)\)\s*$)", s)
     if not match:
         return s
-    marker = match.group(1).lower()
+
+    marker = match.group(0).lower()
     if any(token in marker for token in ALBUM_TITLE_VARIANT_MARKERS):
         return s[: match.start()].rstrip()
     return s

@@ -18,7 +18,7 @@ router = APIRouter()
 
 class TrackRepr(TypedDict):
     track_rowid: int
-    track_name: str
+    track_name_norm: str
     artist_name: str
     lon: float
     lat: float
@@ -56,7 +56,7 @@ def repr_fetch(
             query = """
                 SELECT
                     c.track_rowid,
-                    c.track_name,
+                    c.track_name_norm,
                     c.artist_name,
                     c.lon,
                     c.lat

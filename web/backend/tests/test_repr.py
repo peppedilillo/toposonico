@@ -15,14 +15,14 @@ def test_repr_album(db):
     assert results == [
         {
             "track_rowid": 1,
-            "track_name": "Blue in Green",
+            "track_name_norm": "Blue in Green",
             "artist_name": "Miles Davis",
             "lon": 1.1,
             "lat": 2.2,
         },
         {
             "track_rowid": 2,
-            "track_name": "So What",
+            "track_name_norm": "So What",
             "artist_name": "Miles Davis",
             "lon": 1.2,
             "lat": 2.3,

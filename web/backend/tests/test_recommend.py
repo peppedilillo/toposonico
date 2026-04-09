@@ -12,7 +12,7 @@ def test_recommend_track(db, faiss_indexes):
     assert len(results) == 3
     assert all(r["track_rowid"] != 1 for r in results)
     assert all(
-        set(r.keys()) == {"track_rowid", "track_name", "artist_name", "lon", "lat", "logcount", "simscore"}
+        set(r.keys()) == {"track_rowid", "track_name_norm", "artist_name", "lon", "lat", "logcount", "simscore"}
         for r in results
     )
     assert all(isinstance(r["simscore"], float) for r in results)

@@ -21,7 +21,7 @@ SEARCH_ID_RE = re.compile(rf"^({'|'.join(re.escape(e.name) for e in ENTITIES)})_
 class TrackHit(TypedDict):
     entity_type: str
     track_rowid: int
-    track_name: str
+    track_name_norm: str
     artist_name: str
     lon: float
     lat: float
@@ -72,7 +72,7 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
             return TrackHit(
                 entity_type=entity.name,
                 track_rowid=rowid,
-                track_name=hit["track_name"],
+                track_name_norm=hit["track_name_norm"],
                 artist_name=hit["artist_name"],
                 lon=hit["lon"],
                 lat=hit["lat"],

@@ -25,7 +25,7 @@ def _build_db() -> sqlite3.Connection:
     conn.execute("""
         CREATE TABLE tracks (
             track_rowid INTEGER PRIMARY KEY,
-            track_name TEXT,
+            track_name_norm TEXT,
             artist_rowid INTEGER,
             artist_name TEXT,
             album_rowid INTEGER,

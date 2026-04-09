@@ -6,7 +6,7 @@ import {makeAbortable} from "./requests.ts";
 type TrackHit = {
   entity_type: 'track';
   track_rowid: number;
-  track_name: string;
+  track_name_norm: string;
   artist_name: string;
   lon: number;
   lat: number;
@@ -70,7 +70,7 @@ function getRowid(hit: SearchHit): number {
 function getName(hit: SearchHit): string {
   switch (hit.entity_type) {
     case 'track':
-      return hit.track_name
+      return hit.track_name_norm
     case 'album':
       return hit.album_name_norm
     case 'artist':
@@ -190,26 +190,28 @@ export default function Search({navigate}: SearchProps) {
         )}
       </div>
       {query.trim() && results.length > 0 && open && (
-        <ul
-          className="bg-surface rounded-xl mt-1 py-2 max-h-[30dvh] overflow-y-auto overscroll-contain list-none">
-          {results.map((hit, i) => {
-            const subtitle = getSubtitle(hit)
-            return (
-              <li
-                key={`${hit.entity_type}-${getRowid(hit)}`}
-                ref={i === activeIdx ? activeItemRef : null}
-                onClick={() => handleSelect(hit)}
-                onMouseEnter={() => setActiveIdx(i)}
-                onMouseLeave={() => setActiveIdx(null)}
-                className={`cursor-pointer px-4 py-2 ${i === activeIdx ? 'bg-overlay' : ''}`}
-              >
-                <div className="font-medium text-white truncate">{getName(hit)}</div>
-                {subtitle && <div className="text-sm text-muted truncate">{subtitle}</div>}
-                <Badge entityType={hit.entity_type}/>
-              </li>
-            )
-          })}
-        </ul>
+        <div className="bg-surface rounded-xl mt-1 max-h-[30dvh] flex flex-col pt-4"
+             style={{paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))'}}>
+          <ul className="min-h-0 overflow-y-auto overscroll-contain no-scrollbar list-none">
+            {results.map((hit, i) => {
+              const subtitle = getSubtitle(hit)
+              return (
+                <li
+                  key={`${hit.entity_type}-${getRowid(hit)}`}
+                  ref={i === activeIdx ? activeItemRef : null}
+                  onClick={() => handleSelect(hit)}
+                  onMouseEnter={() => setActiveIdx(i)}
+                  onMouseLeave={() => setActiveIdx(null)}
+                  className={`cursor-pointer px-4 py-2 ${i === activeIdx ? 'bg-overlay' : ''}`}
+                >
+                  <div className="font-medium text-white truncate">{getName(hit)}</div>
+                  {subtitle && <div className="text-sm text-muted truncate">{subtitle}</div>}
+                  <Badge entityType={hit.entity_type}/>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
       )}
     </div>
   )
