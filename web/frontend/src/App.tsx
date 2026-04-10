@@ -9,10 +9,11 @@ import {GeoJsonLayer} from '@deck.gl/layers'
 import DeckGL from '@deck.gl/react'
 import type {FeatureCollection} from 'geojson'
 import {makeAbortable} from "./requests.ts";
+import earwaxLogo from './assets/earwax.svg'
 
 
 const INITIAL_VIEW_STATE: MapViewState = {
-  longitude: 4.28, latitude: -7.21, zoom: 5, pitch: 10, bearing: 0,
+  longitude: 9.93, latitude: -4.64, zoom: 6, pitch: 10, bearing: 0,
   minZoom: 5, maxZoom: 14,
 }
 
@@ -106,7 +107,6 @@ const tracksLayer = new MVTLayer({
   getPointRadius: getPointRadius,
   pointRadiusUnits: 'pixels',
   pointRadiusMinPixels: 1,
-  pointRadiusMaxPixels: 15,
   getFillColor: COLORS.track,
   pickable: true,
 })
@@ -119,7 +119,6 @@ const albumsLayer = new MVTLayer({
   getPointRadius: getPointRadius,
   pointRadiusUnits: 'pixels',
   pointRadiusMinPixels: 1,
-  pointRadiusMaxPixels: 15,
   getFillColor: COLORS.album,
   pickable: true,
 })
@@ -132,8 +131,11 @@ const artistsLayer = new MVTLayer({
   getPointRadius: getPointRadius,
   pointRadiusUnits: 'pixels',
   pointRadiusMinPixels: 1,
-  pointRadiusMaxPixels: 15,
-  getFillColor: COLORS.artist,
+  filled: false,
+  stroked: true,
+  getLineColor: COLORS.artist,
+  getLineWidth: 1,
+  lineWidthUnits: 'pixels',
   pickable: true,
 })
 
@@ -145,8 +147,11 @@ const labelsLayer = new MVTLayer({
   getPointRadius: getPointRadius,
   pointRadiusUnits: 'pixels',
   pointRadiusMinPixels: 1,
-  pointRadiusMaxPixels: 15,
-  getFillColor: COLORS.label,
+  filled: false,
+  stroked: true,
+  getLineColor: COLORS.label,
+  getLineWidth: 1,
+  lineWidthUnits: 'pixels',
   pickable: true,
 })
 
@@ -188,7 +193,7 @@ export default function App() {
       ...prev,
       longitude: lon,
       latitude: lat,
-      zoom: 10,
+      zoom: 8,
       transitionDuration: 1000,
       transitionInterpolator: new FlyToInterpolator(),
     }))
@@ -247,6 +252,12 @@ export default function App() {
         setSelection(null)
         updateHash({entity: null, rowid: null})
       }}/>
+      <img
+        src={earwaxLogo}
+        alt="earwax"
+        className="fixed z-5 sm:w-28 w-16 pointer-events-none
+                   bottom-4 right-4"
+      />
     </div>
   )
 }

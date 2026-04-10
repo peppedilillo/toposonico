@@ -304,6 +304,17 @@ function AlbumPanel({s, navigate}: {s: AlbumInfo; navigate: NavigateFn}) {
         {humanCount(Math.round(10 ** s.logcount))} playlists
         <DebugId id={s.album_rowid}/>
       </div>
+      {s.reprs?.length > 0 && (
+          <ReprRow>
+            <span className="text-muted mr-1.5">features:</span>
+            {s.reprs.map((r, i) => (
+                <span key={r.track_rowid}>
+              {i > 0 && <span className="text-muted mx-1">·</span>}
+                  <Link onClick={() => navigate('track', r.track_rowid, r.lon, r.lat)} color="var(--color-album)">{r.track_name_norm}</Link>
+            </span>
+            ))}
+          </ReprRow>
+      )}
     </>
   )
 }
