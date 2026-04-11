@@ -9,8 +9,11 @@ import {GeoJsonLayer} from '@deck.gl/layers'
 import DeckGL from '@deck.gl/react'
 import type {FeatureCollection} from 'geojson'
 import {makeAbortable} from "./requests.ts";
+import {getRowid} from './utils.ts'
 import earwaxLogo from './assets/earwax.svg'
 
+
+const MAX_HISTORY = 50
 
 const INITIAL_VIEW_STATE: MapViewState = {
   longitude: 9.93, latitude: -4.64, zoom: 6, pitch: 10, bearing: 0,
@@ -173,10 +176,16 @@ export default function App() {
   const {longitude, latitude, zoom, entity: initEntity, rowid: initRowid} = parseHash()
   const [viewState, setViewState] = useState<MapViewState>({...INITIAL_VIEW_STATE, longitude, latitude, zoom})
   const [selection, setSelection] = useState<Selection | null>(initEntity && initRowid ? {status: 'loading'} : null)
+  const [history, setHistory] = useState<Selection[]>([])
   const nextSelection = useRef(makeAbortable())
+  const selectionRef = useRef<Selection | null>(null)
+  selectionRef.current = selection
 
   /** Fetches entity info and updates the panel selection, without moving the map. */
   const selectEntity = useCallback((entityType: string, rowid: number) => {
+    if (selectionRef.current?.status === 'loaded')
+      setHistory(prev => [...prev.slice(-(MAX_HISTORY - 1)), selectionRef.current!])
+
     updateHash({entity: entityType, rowid})
     setSelection({status: 'loading'})
     const signal = nextSelection.current.nextSignal()
@@ -185,8 +194,8 @@ export default function App() {
       .catch(err => { if (err.name !== 'AbortError') setSelection({status: 'error'}) })
   }, [])
 
-  /** Flies the map to the given coordinates and selects the entity. */
-  const navigate = useCallback((entityType: string, rowid: number, lon: number, lat: number) => {
+  /** Animates the map camera to the given coordinates. */
+  function flyTo(lon: number, lat: number) {
     setViewState(prev => ({
       ...prev,
       longitude: lon,
@@ -195,8 +204,25 @@ export default function App() {
       transitionDuration: 1000,
       transitionInterpolator: new FlyToInterpolator(),
     }))
+  }
+
+  /** Flies the map to the given coordinates and selects the entity. */
+  const navigate = useCallback((entityType: string, rowid: number, lon: number, lat: number) => {
+    flyTo(lon, lat)
     selectEntity(entityType, rowid)
   }, [selectEntity])
+
+  /** Pops the last history entry and restores it without re-fetching. */
+  const goBack = useCallback(() => {
+    setHistory(prev => {
+      const entry = prev[prev.length - 1]
+      if (!entry || entry.status !== 'loaded') return prev
+      setSelection(entry)
+      updateHash({entity: entry.entity_type, rowid: getRowid(entry)})
+      flyTo(entry.lon, entry.lat)
+      return prev.slice(0, -1)
+    })
+  }, [])
 
   /** Fetches entity info from URL hash on initial mount, without moving the map. */
   useEffect(() => {
@@ -248,8 +274,9 @@ export default function App() {
       <Panel selection={selection} navigate={navigate} onClose={() => {
         nextSelection.current.cancel()
         setSelection(null)
+        setHistory([])
         updateHash({entity: null, rowid: null})
-      }}/>
+      }} goBack={history.length > 0 ? goBack : null}/>
       <img
         src={earwaxLogo}
         alt="earwax"

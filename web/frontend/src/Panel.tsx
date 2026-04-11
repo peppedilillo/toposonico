@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {AlbumSummary, ArtistSummary, LabelSummary, TrackSummary} from './Summary.tsx'
-import {formatPlaylistCount} from './utils.ts'
+import {formatPlaylistCount, getRowid} from './utils.ts'
 import {makeAbortable} from './requests'
 
 // --- Types mirroring backend TypedDicts ---
@@ -164,6 +164,7 @@ type PanelProps = {
   selection: Selection | null
   navigate: NavigateFn
   onClose: () => void
+  goBack: (() => void) | null
 }
 
 // --- Internal sub-components ---
@@ -367,16 +368,6 @@ function LabelPanel({s, navigate}: {s: LabelInfo; navigate: NavigateFn}) {
 
 // --- Recommendation helpers and components ---
 
-/** Extracts the rowid from any loaded entity info. */
-function getRowid(s: EntityInfo): number {
-  switch (s.entity_type) {
-    case 'track':  return s.track_rowid
-    case 'album':  return s.album_rowid
-    case 'artist': return s.artist_rowid
-    case 'label':  return s.label_rowid
-  }
-}
-
 /** Extracts navigation args from a recommendation. */
 function getRecNav(rec: Recommend, entityType: string): [string, number, number, number] {
   switch (entityType) {
@@ -481,7 +472,7 @@ function RecsSection({entity, navigate}: {entity: EntityInfo; navigate: Navigate
 // --- Main Panel ---
 
 /** Detail panel for a selected entity — bottom sheet on mobile, sidebar on desktop. */
-export default function Panel({selection, navigate, onClose}: PanelProps) {
+export default function Panel({selection, navigate, onClose, goBack}: PanelProps) {
   if (!selection) return null
 
   let body: React.ReactNode
@@ -512,6 +503,13 @@ export default function Panel({selection, navigate, onClose}: PanelProps) {
       onPointerMove={(e) => e.stopPropagation()}
     >
       <div className="relative px-4 pt-4">
+        {goBack && (
+          <button
+            onClick={goBack}
+            className="absolute top-0 right-10 text-muted hover:text-white transition-colors text-lg leading-none p-4"
+            aria-label="Go back"
+          >←</button>
+        )}
         {body}
         <button
           onClick={onClose}
