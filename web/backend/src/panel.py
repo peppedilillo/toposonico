@@ -26,7 +26,7 @@ router = APIRouter()
 
 
 class TrackPanel(TrackInfo):
-    reprs: list[TrackRepr]
+    reprs: list[None]
 
 
 class AlbumPanel(AlbumInfo):
