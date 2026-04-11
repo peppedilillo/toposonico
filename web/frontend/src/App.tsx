@@ -172,9 +172,7 @@ let hashTimer: ReturnType<typeof setTimeout> | null = null
 export default function App() {
   const {longitude, latitude, zoom, entity: initEntity, rowid: initRowid} = parseHash()
   const [viewState, setViewState] = useState<MapViewState>({...INITIAL_VIEW_STATE, longitude, latitude, zoom})
-  const [selection, setSelection] = useState<Selection | null>(
-    initEntity && initRowid ? {status: 'loading'} : null
-  )
+  const [selection, setSelection] = useState<Selection | null>(initEntity && initRowid ? {status: 'loading'} : null)
   const nextSelection = useRef(makeAbortable())
 
   /** Fetches entity info and updates the panel selection, without moving the map. */

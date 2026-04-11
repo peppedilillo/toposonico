@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import Badge from './Badge'
+import {AlbumSummary, ArtistSummary, LabelSummary, TrackSummary} from './Summary.tsx'
+import {formatPlaylistCount} from './utils.ts'
 import {makeAbortable} from "./requests.ts";
 
 /** A track search result. */
@@ -66,31 +67,29 @@ function getRowid(hit: SearchHit): number {
   }
 }
 
-/** Returns the primary display name, narrowing by entity_type. */
-function getName(hit: SearchHit): string {
+/** Returns the rendered summary component for a hit. */
+function getSummary(hit: SearchHit) {
   switch (hit.entity_type) {
     case 'track':
-      return hit.track_name_norm
+      return <TrackSummary
+        trackName={hit.track_name_norm}
+        artist={hit.artist_name}
+      />
     case 'album':
-      return hit.album_name_norm
+      return <AlbumSummary
+        albumName={hit.album_name_norm}
+        artist={hit.artist_name}
+      />
     case 'artist':
-      return hit.artist_name
+      return <ArtistSummary
+        artistName={hit.artist_name}
+        playlistCount={formatPlaylistCount(hit.logcount)}
+      />
     case 'label':
-      return hit.label
-  }
-}
-
-/** Returns the secondary line for a hit, or null if none applies. */
-function getSubtitle(hit: SearchHit): string | null {
-  switch (hit.entity_type) {
-    case 'track':
-      return hit.artist_name
-    case 'album':
-      return hit.artist_name
-    case 'artist':
-      return null
-    case 'label':
-      return null
+      return <LabelSummary
+        labelName={hit.label}
+        playlistCount={formatPlaylistCount(hit.logcount)}
+      />
   }
 }
 
@@ -180,13 +179,12 @@ export default function Search({navigate}: SearchProps) {
           className="flex-1 bg-transparent border-0 outline-none text-white placeholder:text-muted pl-4 pr-1"
         />
         {query && (
-          <div
+          <button
+            type="button"
             onClick={clearSearch}
             aria-label="Clear search"
-            role="button"
-            tabIndex={-1}
             className="text-muted hover:text-white text-lg leading-none cursor-pointer px-4 py-3"
-          >×</div>
+          >×</button>
         )}
       </div>
       {query.trim() && results.length > 0 && open && (
@@ -194,7 +192,7 @@ export default function Search({navigate}: SearchProps) {
              style={{paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))'}}>
           <ul className="min-h-0 overflow-y-auto overscroll-contain no-scrollbar list-none">
             {results.map((hit, i) => {
-              const subtitle = getSubtitle(hit)
+              const summary = getSummary(hit)
               return (
                 <li
                   key={`${hit.entity_type}-${getRowid(hit)}`}
@@ -204,9 +202,7 @@ export default function Search({navigate}: SearchProps) {
                   onMouseLeave={() => setActiveIdx(null)}
                   className={`cursor-pointer px-4 py-2 ${i === activeIdx ? 'bg-overlay' : ''}`}
                 >
-                  <div className="font-medium text-white truncate">{getName(hit)}</div>
-                  {subtitle && <div className="text-sm text-muted truncate">{subtitle}</div>}
-                  <Badge entityType={hit.entity_type}/>
+                  {summary}
                 </li>
               )
             })}

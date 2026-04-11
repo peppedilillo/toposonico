@@ -1,14 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
-import Badge from './Badge'
+import {AlbumSummary, ArtistSummary, LabelSummary, TrackSummary} from './Summary.tsx'
+import {formatPlaylistCount} from './utils.ts'
 import {makeAbortable} from './requests'
-
-/** Formats a number with K/M/B suffix (e.g. 7436313 → "7.4M"). */
-function humanCount(n: number): string {
-  if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B'
-  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
-  if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K'
-  return String(n)
-}
 
 // --- Types mirroring backend TypedDicts ---
 
@@ -192,57 +185,67 @@ function Link({onClick, color, children}: {onClick: () => void; color: string; c
 }
 
 /** Horizontal scrollable row with wheel-to-scroll and gradient overflow fades. */
-function ReprRow({children}: {children: React.ReactNode}) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
+function ReprRow({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const updateFades = useCallback(() => {
-    const el = ref.current
-    if (!el) return
-    setCanScrollLeft(el.scrollLeft > 0)
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1)
-  }, [])
+    const el = ref.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+  }, []);
 
+  // Handle Resize and Initial State
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    updateFades()
-    const observer = new ResizeObserver(updateFades)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [updateFades])
+    const el = ref.current;
+    if (!el) return;
+    updateFades();
+    const observer = new ResizeObserver(updateFades);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [updateFades]);
+
+  // Handles wheel events marking them as active.
+  // These would be passive by default. Passive events can't call `preventDefault()`.
+  // TODO: evaluate different solutions as this presently feels hackish.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY === 0) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY; // noqa
+      updateFades();
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, [updateFades]);
 
   const maskImage =
-    canScrollLeft && canScrollRight
-      ? 'linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)'
-      : canScrollRight
-        ? 'linear-gradient(to right, black calc(100% - 24px), transparent)'
-        : canScrollLeft
-          ? 'linear-gradient(to right, transparent, black 24px)'
-          : undefined
+      canScrollLeft && canScrollRight
+          ? 'linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)'
+          : canScrollRight
+              ? 'linear-gradient(to right, black calc(100% - 24px), transparent)'
+              : canScrollLeft
+                  ? 'linear-gradient(to right, transparent, black 24px)'
+                  : undefined;
 
   return (
-    <div
-      ref={ref}
-      onScroll={updateFades}
-      onWheel={(e) => {
-        const el = ref.current
-        if (!el || e.deltaY === 0) return
-        el.scrollLeft += e.deltaY
-        e.preventDefault()
-      }}
-      className="overflow-x-auto whitespace-nowrap no-scrollbar text-sm mt-1"
-      style={{maskImage, WebkitMaskImage: maskImage}}
-    >
-      {children}
-    </div>
-  )
-}
-
-/** Debug-only rowid display, right-aligned on the playlist count line. Remove for production. */
-function DebugId({id}: {id: number}) {
-  return <span className="text-[10px] text-muted/50 float-right">id:{id}</span>
+      <div
+          ref={ref}
+          onScroll={updateFades}
+          className="overflow-x-auto whitespace-nowrap no-scrollbar text-sm mt-1"
+          style={{ maskImage, WebkitMaskImage: maskImage }}
+      >
+        {children}
+      </div>
+  );
 }
 
 /** Animated placeholder shown while entity info is loading. */
@@ -260,26 +263,23 @@ function LoadingBody() {
 function TrackPanel({s, navigate}: {s: TrackInfo; navigate: NavigateFn}) {
   return (
     <>
-      <div className="mb-2"><Badge entityType="track"/></div>
-      <div className="text-lg font-semibold leading-snug truncate">{s.track_name_norm}</div>
-      <div className="italic font-medium leading-tight text-sm mt-0.5 truncate">
-        <Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)} color="var(--color-artist)">{s.artist_name}</Link>
-      </div>
-      {s.album_name && (
-        <div className="text-sm mt-1 truncate">
-          <Link onClick={() => navigate('album', s.album_rowid, s.album_lon, s.album_lat)} color="var(--color-album)">{s.album_name}</Link>
-        </div>
-      )}
+      <TrackSummary
+        trackName={s.track_name_norm}
+        artist={<Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)} color="var(--color-artist)">{s.artist_name}</Link>}
+        album={
+          s.album_name
+            ? <Link onClick={() => navigate('album', s.album_rowid, s.album_lon, s.album_lat)} color="var(--color-album)">{s.album_name}</Link>
+            : undefined
+        }
+        debugId={s.track_rowid}
+      />
       {(s.label || s.release_date) && (
-        <div className="text-sm text-muted mt-0.5 truncate">
+        <div className="text-sm text-muted mt-1 truncate">
           {s.label && <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)} color="var(--color-label)">{s.label}</Link>}
           {s.label && s.release_date && ' · '}{s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
         </div>
       )}
-      <div className="text-sm text-muted mt-0.5 truncate">
-        {humanCount(Math.round(10 ** s.logcount))} playlists
-        <DebugId id={s.track_rowid}/>
-      </div>
+      <div className="text-sm text-muted mt-0.5 truncate">{formatPlaylistCount(s.logcount)}</div>
     </>
   )
 }
@@ -287,23 +287,22 @@ function TrackPanel({s, navigate}: {s: TrackInfo; navigate: NavigateFn}) {
 function AlbumPanel({s, navigate}: {s: AlbumInfo; navigate: NavigateFn}) {
   return (
     <>
-      <div className="mb-2"><Badge entityType="album"/></div>
-      <div className="text-lg font-semibold leading-snug truncate">{s.album_name_norm}</div>
-      {s.artist_name && (
-        <div className="italic font-medium leading-tight text-sm mt-0.5 truncate">
-          <Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)} color="var(--color-artist)">{s.artist_name}</Link>
-        </div>
-      )}
+      <AlbumSummary
+        albumName={s.album_name_norm}
+        artist={
+          s.artist_name
+            ? <Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)} color="var(--color-artist)">{s.artist_name}</Link>
+            : undefined
+        }
+        debugId={s.album_rowid}
+      />
       {(s.label || s.release_date) && (
-        <div className="text-sm text-muted mt-0.5 truncate">
+        <div className="text-sm text-muted mt-1 truncate">
           {s.label && <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)} color="var(--color-label)">{s.label}</Link>}
           {s.label && s.release_date && ' · '}{s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
         </div>
       )}
-      <div className="text-sm text-muted mt-0.5 truncate">
-        {humanCount(Math.round(10 ** s.logcount))} playlists
-        <DebugId id={s.album_rowid}/>
-      </div>
+      <div className="text-sm text-muted mt-0.5 truncate">{formatPlaylistCount(s.logcount)}</div>
       {s.reprs?.length > 0 && (
           <ReprRow>
             <span className="text-muted mr-1.5">features:</span>
@@ -322,13 +321,12 @@ function AlbumPanel({s, navigate}: {s: AlbumInfo; navigate: NavigateFn}) {
 function ArtistPanel({s, navigate}: {s: ArtistInfo; navigate: NavigateFn}) {
   return (
     <>
-      <div className="mb-2"><Badge entityType="artist"/></div>
-      <div className="text-lg font-semibold leading-snug truncate">{s.artist_name}</div>
-      <div className="text-sm text-muted mt-0.5 truncate">
-        {s.artist_genre && <>{s.artist_genre} · </>}
-        {humanCount(Math.round(10 ** s.logcount))} playlists
-        <DebugId id={s.artist_rowid}/>
-      </div>
+      <ArtistSummary
+        artistName={s.artist_name}
+        genre={s.artist_genre ?? undefined}
+        playlistCount={formatPlaylistCount(s.logcount)}
+        debugId={s.artist_rowid}
+      />
       {s.reprs?.length > 0 && (
         <ReprRow>
           <span className="text-muted mr-1.5">top albums:</span>
@@ -347,12 +345,11 @@ function ArtistPanel({s, navigate}: {s: ArtistInfo; navigate: NavigateFn}) {
 function LabelPanel({s, navigate}: {s: LabelInfo; navigate: NavigateFn}) {
   return (
     <>
-      <div className="mb-2"><Badge entityType="label"/></div>
-      <div className="text-lg font-semibold leading-snug truncate">{s.label}</div>
-      <div className="text-sm text-muted mt-0.5 truncate">
-        {humanCount(Math.round(10 ** s.logcount))} playlists
-        <DebugId id={s.label_rowid}/>
-      </div>
+      <LabelSummary
+        labelName={s.label}
+        playlistCount={formatPlaylistCount(s.logcount)}
+        debugId={s.label_rowid}
+      />
       {s.reprs?.length > 0 && (
         <ReprRow>
           <span className="text-muted mr-1.5">top artists:</span>
@@ -392,7 +389,7 @@ function getRecNav(rec: Recommend, entityType: string): [string, number, number,
 
 /** Returns display name and subtitle for a recommendation. */
 function getRecDisplay(rec: Recommend, entityType: string): {name: string; sub: string} {
-  const playlists = humanCount(Math.round(10 ** rec.logcount)) + ' playlists'
+  const playlists = formatPlaylistCount(rec.logcount)
   switch (entityType) {
     case 'track':  return {name: (rec as TrackRecommend).track_name_norm, sub: (rec as TrackRecommend).artist_name + ' · ' + playlists}
     case 'album':  return {name: (rec as AlbumRecommend).album_name_norm, sub: (rec as AlbumRecommend).artist_name + ' · ' + playlists}
