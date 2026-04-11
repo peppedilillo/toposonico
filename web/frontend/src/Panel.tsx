@@ -503,19 +503,21 @@ export default function Panel({selection, navigate, onClose, goBack}: PanelProps
       onPointerMove={(e) => e.stopPropagation()}
     >
       <div className="relative px-4 pt-4">
-        {goBack && (
-          <button
-            onClick={goBack}
-            className="absolute top-0 right-10 text-muted hover:text-white transition-colors text-lg leading-none p-4"
-            aria-label="Go back"
-          >←</button>
-        )}
         {body}
-        <button
-          onClick={onClose}
-          className="absolute top-0 right-0 text-muted hover:text-white transition-colors text-lg leading-none p-4"
-          aria-label="Close"
-        >×</button>
+        <div className="absolute top-0 right-0 flex gap-1 items-center">
+          {goBack && (
+            <button
+              onClick={goBack}
+              className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
+              aria-label="Go back"
+            >&lt;</button>
+          )}
+          <button
+            onClick={onClose}
+            className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
+            aria-label="Close"
+          >×</button>
+        </div>
       </div>
       {selection.status === 'loaded' && (
         <RecsSection key={`${selection.entity_type}:${getRowid(selection)}`} entity={selection} navigate={navigate}/>

@@ -49,7 +49,7 @@ type LabelSummaryProps = {
 /** Renders the optional debug rowid shown in panel summaries. TODO: Remove in production. */
 function DebugId({debugId}: {debugId?: number}) {
   if (debugId === undefined) return null
-  return <div className="shrink-0 text-[10px] text-muted/50">id:{debugId}</div>
+  return <div className="shrink-0 text-xs text-muted/50">id:{debugId}</div>
 }
 
 /** Summary header for track entities. */
