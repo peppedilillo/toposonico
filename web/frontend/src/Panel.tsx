@@ -147,22 +147,30 @@ type ArtistRepr = {
   lat: number
 }
 
-type RecsState =
-  | {status: 'loading'}
-  | {status: 'error'}
-  | {status: 'loaded'; items: Recommend[]}
 
-/** Discriminated union representing the panel's async state. */
+/**
+ * Discriminated union representing one entry in the navigation stack.
+ * Loading/error carry entity_type + rowid so an in-flight fetch is still identifiable;
+ * loaded carries the full entity payload plus an optional cache of its recommendations.
+ */
 export type Selection =
-  | {status: 'loading'}
-  | {status: 'error'}
-  | ({status: 'loaded'} & EntityInfo)
+  | { status: 'loading' }
+  | { status: 'error' }
+  | ({ status: 'loaded'; recs?: Recommend[] } & EntityInfo)
+
+/** Shallow merge into the top of the nav stack when the target entity still matches. */
+export type UpdateFn = (
+  entityType: EntityInfo['entity_type'],
+  rowid: number,
+  patch: Partial<Selection & { recs: Recommend[] }>
+) => void
 
 type NavigateFn = (entityType: string, rowid: number, lon: number, lat: number) => void
 
 type PanelProps = {
   selection: Selection | null
   navigate: NavigateFn
+  update: UpdateFn
   onClose: () => void
   goBack: (() => void) | null
 }
@@ -170,11 +178,14 @@ type PanelProps = {
 // --- Internal sub-components ---
 
 /** Navigable inline link styled with a per-entity color on hover. */
-function Link({onClick, color, children}: {onClick: () => void; color: string; children: React.ReactNode}) {
+function Link({onClick, color, children}: { onClick: () => void; color: string; children: React.ReactNode }) {
   const [hovered, setHovered] = useState(false)
   return (
     <button
-      onClick={(e) => {e.stopPropagation(); onClick()}}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick()
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={hovered ? {color} : undefined}
@@ -186,7 +197,7 @@ function Link({onClick, color, children}: {onClick: () => void; color: string; c
 }
 
 /** Horizontal scrollable row with wheel-to-scroll and gradient overflow fades. */
-function ReprRow({ children }: { children: React.ReactNode }) {
+function ReprRow({children}: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -222,30 +233,30 @@ function ReprRow({ children }: { children: React.ReactNode }) {
       updateFades();
     };
 
-    el.addEventListener('wheel', handleWheel, { passive: false });
+    el.addEventListener('wheel', handleWheel, {passive: false});
     return () => {
       el.removeEventListener('wheel', handleWheel);
     };
   }, [updateFades]);
 
   const maskImage =
-      canScrollLeft && canScrollRight
-          ? 'linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)'
-          : canScrollRight
-              ? 'linear-gradient(to right, black calc(100% - 24px), transparent)'
-              : canScrollLeft
-                  ? 'linear-gradient(to right, transparent, black 24px)'
-                  : undefined;
+    canScrollLeft && canScrollRight
+      ? 'linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)'
+      : canScrollRight
+        ? 'linear-gradient(to right, black calc(100% - 24px), transparent)'
+        : canScrollLeft
+          ? 'linear-gradient(to right, transparent, black 24px)'
+          : undefined;
 
   return (
-      <div
-          ref={ref}
-          onScroll={updateFades}
-          className="overflow-x-auto whitespace-nowrap no-scrollbar text-sm mt-1"
-          style={{ maskImage, WebkitMaskImage: maskImage }}
-      >
-        {children}
-      </div>
+    <div
+      ref={ref}
+      onScroll={updateFades}
+      className="overflow-x-auto whitespace-nowrap no-scrollbar text-sm mt-1"
+      style={{maskImage, WebkitMaskImage: maskImage}}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -261,22 +272,25 @@ function LoadingBody() {
   )
 }
 
-function TrackPanel({s, navigate}: {s: TrackInfo; navigate: NavigateFn}) {
+function TrackPanel({s, navigate}: { s: TrackInfo; navigate: NavigateFn }) {
   return (
     <>
       <TrackSummary
         trackName={s.track_name_norm}
-        artist={<Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)} color="var(--color-artist)">{s.artist_name}</Link>}
+        artist={<Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)}
+                      color="var(--color-artist)">{s.artist_name}</Link>}
         album={
           s.album_name
-            ? <Link onClick={() => navigate('album', s.album_rowid, s.album_lon, s.album_lat)} color="var(--color-album)">{s.album_name}</Link>
+            ? <Link onClick={() => navigate('album', s.album_rowid, s.album_lon, s.album_lat)}
+                    color="var(--color-album)">{s.album_name}</Link>
             : undefined
         }
         debugId={s.track_rowid}
       />
       {(s.label || s.release_date) && (
         <div className="text-sm text-muted mt-1 truncate">
-          {s.label && <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)} color="var(--color-label)">{s.label}</Link>}
+          {s.label && <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)}
+                            color="var(--color-label)">{s.label}</Link>}
           {s.label && s.release_date && ' · '}{s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
         </div>
       )}
@@ -285,41 +299,44 @@ function TrackPanel({s, navigate}: {s: TrackInfo; navigate: NavigateFn}) {
   )
 }
 
-function AlbumPanel({s, navigate}: {s: AlbumInfo; navigate: NavigateFn}) {
+function AlbumPanel({s, navigate}: { s: AlbumInfo; navigate: NavigateFn }) {
   return (
     <>
       <AlbumSummary
         albumName={s.album_name_norm}
         artist={
           s.artist_name
-            ? <Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)} color="var(--color-artist)">{s.artist_name}</Link>
+            ? <Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)}
+                    color="var(--color-artist)">{s.artist_name}</Link>
             : undefined
         }
         debugId={s.album_rowid}
       />
       {(s.label || s.release_date) && (
         <div className="text-sm text-muted mt-1 truncate">
-          {s.label && <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)} color="var(--color-label)">{s.label}</Link>}
+          {s.label && <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)}
+                            color="var(--color-label)">{s.label}</Link>}
           {s.label && s.release_date && ' · '}{s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
         </div>
       )}
       <div className="text-sm text-muted mt-0.5 truncate">{formatPlaylistCount(s.logcount)}</div>
       {s.reprs?.length > 0 && (
-          <ReprRow>
-            <span className="text-muted mr-1.5">features:</span>
-            {s.reprs.map((r, i) => (
-                <span key={r.track_rowid}>
+        <ReprRow>
+          <span className="text-muted mr-1.5">features:</span>
+          {s.reprs.map((r, i) => (
+            <span key={r.track_rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
-                  <Link onClick={() => navigate('track', r.track_rowid, r.lon, r.lat)} color="var(--color-album)">{r.track_name_norm}</Link>
+              <Link onClick={() => navigate('track', r.track_rowid, r.lon, r.lat)}
+                    color="var(--color-album)">{r.track_name_norm}</Link>
             </span>
-            ))}
-          </ReprRow>
+          ))}
+        </ReprRow>
       )}
     </>
   )
 }
 
-function ArtistPanel({s, navigate}: {s: ArtistInfo; navigate: NavigateFn}) {
+function ArtistPanel({s, navigate}: { s: ArtistInfo; navigate: NavigateFn }) {
   return (
     <>
       <ArtistSummary
@@ -334,7 +351,8 @@ function ArtistPanel({s, navigate}: {s: ArtistInfo; navigate: NavigateFn}) {
           {s.reprs.map((r, i) => (
             <span key={r.album_rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
-              <Link onClick={() => navigate('album', r.album_rowid, r.lon, r.lat)} color="var(--color-album)">{r.album_name_norm}</Link>
+              <Link onClick={() => navigate('album', r.album_rowid, r.lon, r.lat)}
+                    color="var(--color-album)">{r.album_name_norm}</Link>
             </span>
           ))}
         </ReprRow>
@@ -343,7 +361,7 @@ function ArtistPanel({s, navigate}: {s: ArtistInfo; navigate: NavigateFn}) {
   )
 }
 
-function LabelPanel({s, navigate}: {s: LabelInfo; navigate: NavigateFn}) {
+function LabelPanel({s, navigate}: { s: LabelInfo; navigate: NavigateFn }) {
   return (
     <>
       <LabelSummary
@@ -357,7 +375,8 @@ function LabelPanel({s, navigate}: {s: LabelInfo; navigate: NavigateFn}) {
           {s.reprs.map((r, i) => (
             <span key={r.artist_rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
-              <Link onClick={() => navigate('artist', r.artist_rowid, r.lon, r.lat)} color="var(--color-artist)">{r.artist_name}</Link>
+              <Link onClick={() => navigate('artist', r.artist_rowid, r.lon, r.lat)}
+                    color="var(--color-artist)">{r.artist_name}</Link>
             </span>
           ))}
         </ReprRow>
@@ -371,36 +390,60 @@ function LabelPanel({s, navigate}: {s: LabelInfo; navigate: NavigateFn}) {
 /** Extracts navigation args from a recommendation. */
 function getRecNav(rec: Recommend, entityType: string): [string, number, number, number] {
   switch (entityType) {
-    case 'track':  { const r = rec as TrackRecommend;  return ['track',  r.track_rowid,  r.lon, r.lat] }
-    case 'album':  { const r = rec as AlbumRecommend;  return ['album',  r.album_rowid,  r.lon, r.lat] }
-    case 'artist': { const r = rec as ArtistRecommend; return ['artist', r.artist_rowid, r.lon, r.lat] }
-    default:       { const r = rec as LabelRecommend;  return ['label',  r.label_rowid,  r.lon, r.lat] }
+    case 'track': {
+      const r = rec as TrackRecommend;
+      return ['track', r.track_rowid, r.lon, r.lat]
+    }
+    case 'album': {
+      const r = rec as AlbumRecommend;
+      return ['album', r.album_rowid, r.lon, r.lat]
+    }
+    case 'artist': {
+      const r = rec as ArtistRecommend;
+      return ['artist', r.artist_rowid, r.lon, r.lat]
+    }
+    default: {
+      const r = rec as LabelRecommend;
+      return ['label', r.label_rowid, r.lon, r.lat]
+    }
   }
 }
 
 /** Returns display name and subtitle for a recommendation. */
-function getRecDisplay(rec: Recommend, entityType: string): {name: string; sub: string} {
+function getRecDisplay(rec: Recommend, entityType: string): { name: string; sub: string } {
   const playlists = formatPlaylistCount(rec.logcount)
   switch (entityType) {
-    case 'track':  return {name: (rec as TrackRecommend).track_name_norm, sub: (rec as TrackRecommend).artist_name + ' · ' + playlists}
-    case 'album':  return {name: (rec as AlbumRecommend).album_name_norm, sub: (rec as AlbumRecommend).artist_name + ' · ' + playlists}
+    case 'track':
+      return {
+        name: (rec as TrackRecommend).track_name_norm,
+        sub: (rec as TrackRecommend).artist_name + ' · ' + playlists
+      }
+    case 'album':
+      return {
+        name: (rec as AlbumRecommend).album_name_norm,
+        sub: (rec as AlbumRecommend).artist_name + ' · ' + playlists
+      }
     case 'artist': {
       const r = rec as ArtistRecommend
       const parts = [r.artist_genre, playlists].filter(Boolean)
       return {name: r.artist_name, sub: parts.join(' · ')}
     }
-    default:       return {name: (rec as LabelRecommend).label, sub: playlists}
+    default:
+      return {name: (rec as LabelRecommend).label, sub: playlists}
   }
 }
 
 /** Single recommendation row — full-width clickable button. */
-function RecItem({rec, entityType, navigate}: {rec: Recommend; entityType: string; navigate: NavigateFn}) {
+function RecItem({rec, entityType, navigate}: { rec: Recommend; entityType: string; navigate: NavigateFn }) {
   const {name, sub} = getRecDisplay(rec, entityType)
   const [et, rowid, lon, lat] = getRecNav(rec, entityType)
   return (
     <li>
       <button
-        onClick={(e) => { e.stopPropagation(); navigate(et, rowid, lon, lat) }}
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate(et, rowid, lon, lat)
+        }}
         className="text-left w-full cursor-pointer hover:bg-overlay py-1.5 px-4"
       >
         <div className="text-sm font-medium truncate">{name}</div>
@@ -410,44 +453,70 @@ function RecItem({rec, entityType, navigate}: {rec: Recommend; entityType: strin
   )
 }
 
+type FetchStatus = 'idle' | 'loading' | 'error'
+
 /** Renders loading/error/empty/list states for recommendations. */
-function RecBody({recs, entityType, navigate}: {recs: RecsState | null; entityType: string; navigate: NavigateFn}) {
-  if (!recs || recs.status === 'loading')
-    return <div className="text-muted text-xs py-2 animate-pulse px-4">Loading...</div>
-  if (recs.status === 'error')
+function RecBody({recs, fetchStatus, entityType, navigate}: {
+  recs: Recommend[] | undefined;
+  fetchStatus: FetchStatus;
+  entityType: string;
+  navigate: NavigateFn
+}) {
+  if (recs) {
+    if (recs.length === 0)
+      return <div className="text-muted text-xs py-2 px-4">No recommendations.</div>
+    return (
+      <ol className="mt-1">
+        {recs.map((rec, i) => (
+          <RecItem key={i} rec={rec} entityType={entityType} navigate={navigate}/>
+        ))}
+      </ol>
+    )
+  }
+  if (fetchStatus === 'error')
     return <div className="text-muted text-xs py-2 px-4">Failed to load.</div>
-  if (recs.items.length === 0)
-    return <div className="text-muted text-xs py-2 px-4">No recommendations.</div>
-  return (
-    <ol className="mt-1">
-      {recs.items.map((rec, i) => (
-        <RecItem key={i} rec={rec} entityType={entityType} navigate={navigate}/>
-      ))}
-    </ol>
-  )
+  return <div className="text-muted text-xs py-2 animate-pulse px-4">Loading...</div>
 }
 
 /**
- * Collapsible recommendations section with fetch-on-open and caching.
+ * Collapsible recommendations section. Recommendations are cached on the nav-stack
+ * entry via `update({recs})` so going back preserves them without re-fetching.
+ * Local `open` defaults to true when recs are already cached. Local `fetchStatus`
+ * covers the transient loading/error UI for an in-flight fetch only.
  * Keyed by entity identity in the parent — remounts on entity change.
  */
-function RecsSection({entity, navigate}: {entity: EntityInfo; navigate: NavigateFn}) {
-  const [open, setOpen] = useState(false)
-  const [recs, setRecs] = useState<RecsState | null>(null)
+function RecsSection({entity, navigate, update}: {
+  entity: EntityInfo & { recs?: Recommend[] };
+  navigate: NavigateFn;
+  update: UpdateFn
+}) {
+  const [open, setOpen] = useState(entity.recs != null)
+  const [fetchStatus, setFetchStatus] = useState<FetchStatus>('idle')
   const aborter = useRef(makeAbortable())
   const rowid = getRowid(entity)
   const RECSNUMBER = 10
 
   const handleToggle = () => {
-    if (open) { setOpen(false); return }
+    if (open) {
+      setOpen(false);
+      return
+    }
     setOpen(true)
-    if (recs !== null) return
-    setRecs({status: 'loading'})
+    if (entity.recs != null || fetchStatus === 'loading') return
+    setFetchStatus('loading')
     const signal = aborter.current.nextSignal()
     fetch(`/api/recommend?rowid=${rowid}&entity_name=${entity.entity_type}&limit=${RECSNUMBER}&diverse=true`, {signal})
-      .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
-      .then((data: Recommend[]) => setRecs({status: 'loaded', items: data}))
-      .catch(err => { if (err.name !== 'AbortError') setRecs({status: 'error'}) })
+      .then(r => {
+        if (!r.ok) throw new Error(r.statusText);
+        return r.json()
+      })
+      .then((data: Recommend[]) => {
+        update(entity.entity_type, rowid, {recs: data});
+        setFetchStatus('idle')
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') setFetchStatus('error')
+      })
   }
 
   return (
@@ -462,7 +531,7 @@ function RecsSection({entity, navigate}: {entity: EntityInfo; navigate: Navigate
       </div>
       {open && (
         <div className="max-h-40 overflow-y-auto overscroll-contain no-scrollbar">
-          <RecBody recs={recs} entityType={entity.entity_type} navigate={navigate}/>
+          <RecBody recs={entity.recs} fetchStatus={fetchStatus} entityType={entity.entity_type} navigate={navigate}/>
         </div>
       )}
     </div>
@@ -472,7 +541,7 @@ function RecsSection({entity, navigate}: {entity: EntityInfo; navigate: Navigate
 // --- Main Panel ---
 
 /** Detail panel for a selected entity — bottom sheet on mobile, sidebar on desktop. */
-export default function Panel({selection, navigate, onClose, goBack}: PanelProps) {
+export default function Panel({selection, navigate, update, onClose, goBack}: PanelProps) {
   if (!selection) return null
 
   let body: React.ReactNode
@@ -516,11 +585,13 @@ export default function Panel({selection, navigate, onClose, goBack}: PanelProps
             onClick={onClose}
             className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
             aria-label="Close"
-          >×</button>
+          >×
+          </button>
         </div>
       </div>
       {selection.status === 'loaded' && (
-        <RecsSection key={`${selection.entity_type}:${getRowid(selection)}`} entity={selection} navigate={navigate}/>
+        <RecsSection key={`${selection.entity_type}:${getRowid(selection)}`} entity={selection} navigate={navigate}
+                     update={update}/>
       )}
     </div>
   )
