@@ -2,8 +2,11 @@ import {useEffect, useRef, useState} from 'react'
 import {AlbumSummary, ArtistSummary, LabelSummary, TrackSummary} from './Summary.tsx'
 import {formatPlaylistCount} from './utils.ts'
 import {makeAbortable} from "./requests.ts";
+import {getRowid} from "./utils.ts";
 
-/** A track search result. */
+
+// --- Search types mirroring backend TypedDicts ---
+
 type TrackHit = {
   entity_type: 'track';
   track_rowid: number;
@@ -14,7 +17,6 @@ type TrackHit = {
   logcount: number
 }
 
-/** An album search result. */
 type AlbumHit = {
   entity_type: 'album';
   album_rowid: number;
@@ -25,7 +27,6 @@ type AlbumHit = {
   logcount: number
 }
 
-/** An artist search result. */
 type ArtistHit = {
   entity_type: 'artist';
   artist_rowid: number;
@@ -35,7 +36,6 @@ type ArtistHit = {
   logcount: number
 }
 
-/** A label search result. */
 type LabelHit = {
   entity_type: 'label';
   label_rowid: number;
@@ -51,20 +51,6 @@ type SearchHit = TrackHit | AlbumHit | ArtistHit | LabelHit
 /** Props for the Search component. */
 type SearchProps = {
   navigate: (entityType: string, rowid: number, lon: number, lat: number) => void
-}
-
-/** Extracts the numeric rowid, narrowing by entity_type. */
-function getRowid(hit: SearchHit): number {
-  switch (hit.entity_type) {
-    case 'track':
-      return hit.track_rowid
-    case 'album':
-      return hit.album_rowid
-    case 'artist':
-      return hit.artist_rowid
-    case 'label':
-      return hit.label_rowid
-  }
 }
 
 /** Returns the rendered summary component for a hit. */

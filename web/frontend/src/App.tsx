@@ -1,13 +1,13 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import type {FeatureCollection} from 'geojson'
 import Search from './Search.tsx'
-import type {Selection, UpdateFn} from './Panel.tsx'
 import Panel from './Panel.tsx'
 import {makeAbortable} from './requests.ts'
 import {getRowid} from './utils.ts'
 import earwaxLogo from './assets/earwax_simple.svg'
+import type {Selection, UpdateFn} from './Panel.tsx'
+import type {FeatureCollection} from 'geojson'
 
 
 const MAX_HISTORY = 20
@@ -158,6 +158,7 @@ export default function App() {
       // invariant: only `loaded` info can get under top of the stack.
       // guaranteed by `push`
       const next = prev[prev.length - 2] as Extract<Selection, { status: 'loaded' }>
+      // these are side effects it would be best not to call here.
       updateHash({entity: next.entity_type, rowid: getRowid(next)})
       mapRef.current?.flyTo({center: [next.lon, next.lat], zoom: 8})
       return prev.slice(0, -1)
@@ -173,10 +174,23 @@ export default function App() {
 
   /** Fetches entity info from URL hash on initial mount, without moving the map. */
   useEffect(() => {
-    const {entityType, rowid} = initHash
+    const entityType = initHash.entityType;
+    const rowid = initHash.rowid;
     if (!entityType || !rowid) return
-    push(entityType, Number(rowid))
-  }, [])
+
+    const signal = nextSelection.current.nextSignal()
+    fetchEntityInfo(entityType, Number(rowid), signal)
+      .then((data) =>
+        setStack([
+          { status: 'loaded', entity_type: entityType, ...data },
+        ])
+      )
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          setStack([{ status: 'error' }])
+        }
+      })
+  }, [initHash.entityType, initHash.rowid])
 
   /** Initializes the MapLibre map, adds layers, and wires interaction handlers. */
   useEffect(() => {
@@ -301,7 +315,7 @@ export default function App() {
     })
 
     return () => map.remove()
-  }, [push])
+  }, [push, initHash.center, initHash.zoom])
 
   return (
     <div className="relative w-screen h-screen">

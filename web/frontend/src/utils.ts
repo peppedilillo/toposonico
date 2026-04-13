@@ -1,20 +1,16 @@
 /** Extracts the numeric rowid from any loaded entity. */
-export function getRowid(entity: {
-  entity_type: 'track' | 'album' | 'artist' | 'label'
-  track_rowid?: number
-  album_rowid?: number
-  artist_rowid?: number
-  label_rowid?: number
-}): number {
-  switch (entity.entity_type) {
-    case 'track':
-      return entity.track_rowid!
-    case 'album':
-      return entity.album_rowid!
-    case 'artist':
-      return entity.artist_rowid!
-    case 'label':
-      return entity.label_rowid!
+type RowidCarrier =
+  | { entity_type: 'track';  track_rowid: number }
+  | { entity_type: 'album';  album_rowid: number }
+  | { entity_type: 'artist'; artist_rowid: number }
+  | { entity_type: 'label';  label_rowid: number }
+
+export function getRowid(e: RowidCarrier): number {
+  switch (e.entity_type) {
+    case 'track':  return e.track_rowid
+    case 'album':  return e.album_rowid
+    case 'artist': return e.artist_rowid
+    case 'label':  return e.label_rowid
   }
 }
 
