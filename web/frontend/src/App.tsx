@@ -1,66 +1,72 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
-import Search from './Search'
-import type {Selection} from './Panel'
-import Panel from './Panel'
-import type {MapViewState, PickingInfo} from '@deck.gl/core'
-import {FlyToInterpolator, MapView} from '@deck.gl/core'
-import {MVTLayer} from '@deck.gl/geo-layers'
-import {GeoJsonLayer} from '@deck.gl/layers'
-import DeckGL from '@deck.gl/react'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import type {FeatureCollection} from 'geojson'
-import {makeAbortable} from "./requests.ts";
+import Search from './Search.tsx'
+import type {Selection} from './Panel.tsx'
+import Panel from './Panel.tsx'
+import {makeAbortable} from './requests.ts'
 import {getRowid} from './utils.ts'
-import earwaxLogo from './assets/earwax.svg'
+import earwaxLogo from './assets/earwax_simple.svg'
 
 
 const MAX_HISTORY = 20
 
-const INITIAL_VIEW_STATE: MapViewState = {
-  longitude: 9.93,
-  latitude: -4.64,
+const INITIAL_VIEW = {
+  center: [9.93, -4.64] as [number, number],
   zoom: 6,
-  pitch: 10,
-  bearing: 0,
   minZoom: 5,
   maxZoom: 14,
+  pitch: 10,
 }
 
-const TILES = '/tiles/{z}/{x}/{y}.pbf'
+// MapLibre requires absolute URLs for tile sources. In dev the env var is a relative path
+// and we prepend the page origin so it works on both localhost and LAN.
+// TODO: set VITE_TILES_URL to the full CDN URL in production (e.g. https://cdn.example.com/tiles/{z}/{x}/{y}.pbf)
+const TILE_URL_RAW = import.meta.env.VITE_TILES_URL as string
+const TILE_URL = TILE_URL_RAW.startsWith('http') ? TILE_URL_RAW : window.location.origin + TILE_URL_RAW
 
-
-/** Reads a CSS custom property and returns a deck.gl-compatible [r, g, b, a] color array. */
-function cssColor(variable: string, alpha = 255): [number, number, number, number] {
-  const hex = getComputedStyle(document.documentElement).getPropertyValue(variable).trim()
-  const n = parseInt(hex.slice(1), 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255, alpha]
+/** Reads a CSS custom property value (e.g. "#3bda28") from :root. */
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-/** Entity colors. Needed as we can't read CSS from layers. **/
-const COLORS = {
-  border: cssColor('--color-border'),
-  track: cssColor('--color-track', 180),
-  album: cssColor('--color-album', 180),
-  artist: cssColor('--color-artist', 180),
-  label: cssColor('--color-label', 180),
+/** 5-degree lat/lon graticule rendered below entity layers. */
+const GRID_LINES: FeatureCollection = {type: 'FeatureCollection', features: []}
+for (let lon = -180; lon <= 180; lon += 5) {
+  GRID_LINES.features.push({
+    type: 'Feature',
+    geometry: {type: 'LineString', coordinates: [[lon, -90], [lon, 90]]},
+    properties: {},
+  })
+}
+for (let lat = -90; lat <= 90; lat += 5) {
+  GRID_LINES.features.push({
+    type: 'Feature',
+    geometry: {type: 'LineString', coordinates: [[-180, lat], [180, lat]]},
+    properties: {},
+  })
 }
 
 
-/** Reads map state from the URL hash. Missing keys fall back to INITIAL_VIEW_STATE defaults. */
+/** Reads map state from the URL hash. Missing keys fall back to INITIAL_VIEW defaults. */
 function parseHash() {
   const p = new URLSearchParams(window.location.hash.slice(1))
   const lon = parseFloat(p.get('lon') ?? '')
   const lat = parseFloat(p.get('lat') ?? '')
   const z = parseFloat(p.get('z') ?? '')
   return {
-    longitude: isNaN(lon) ? INITIAL_VIEW_STATE.longitude : lon,
-    latitude: isNaN(lat) ? INITIAL_VIEW_STATE.latitude : lat,
-    zoom: isNaN(z) ? INITIAL_VIEW_STATE.zoom : z,
+    center: [
+      isNaN(lon) ? INITIAL_VIEW.center[0] : lon,
+      isNaN(lat) ? INITIAL_VIEW.center[1] : lat,
+    ] as [number, number],
+    zoom: isNaN(z) ? INITIAL_VIEW.zoom : z,
     entity: p.get('entity'),
     rowid: p.get('rowid'),
   }
 }
 
-/** Merges updates into the current URL. **/
+/** Merges updates into the current URL hash. */
 function updateHash(updates: Record<string, string | number | null>) {
   const p = new URLSearchParams(window.location.hash.slice(1))
   for (const [k, v] of Object.entries(updates))
@@ -68,96 +74,6 @@ function updateHash(updates: Record<string, string | number | null>) {
     else p.set(k, String(v))
   history.replaceState(null, '', '#' + p.toString())
 }
-
-
-/** Renders the lat/lon graticule as a GeoJSON line layer. */
-const gridLines: FeatureCollection = {type: 'FeatureCollection', features: []}
-for (let lon = -180; lon <= 180; lon += 5) {
-  gridLines.features.push({
-    type: 'Feature',
-    geometry: {type: 'LineString', coordinates: [[lon, -90], [lon, 90]]},
-    properties: {},
-  })
-}
-for (let lat = -90; lat <= 90; lat += 5) {
-  gridLines.features.push({
-    type: 'Feature',
-    geometry: {type: 'LineString', coordinates: [[-180, lat], [180, lat]]},
-    properties: {},
-  })
-}
-
-const gridLayer = new GeoJsonLayer({
-  id: 'grid',
-  data: gridLines,
-  getLineColor: COLORS.border,
-  getLineWidth: 1,
-  lineWidthUnits: 'pixels',
-})
-
-/** Maps a tile feature's logcount to a pixel radius. */
-function getPointRadius(feature: { properties: { logcount: number } }) {
-  return feature.properties.logcount
-}
-
-/** MVT layers — one per entity type. */
-const tracksLayer = new MVTLayer({
-  id: 'tracks',
-  data: TILES,
-  loadOptions: {mvt: {layers: ['tracks']}},
-  pointType: 'circle',
-  getPointRadius: getPointRadius,
-  pointRadiusUnits: 'pixels',
-  pointRadiusMinPixels: 1,
-  getFillColor: COLORS.track,
-  pickable: true,
-})
-
-const albumsLayer = new MVTLayer({
-  id: 'albums',
-  data: TILES,
-  loadOptions: {mvt: {layers: ['albums']}},
-  pointType: 'circle',
-  getPointRadius: getPointRadius,
-  pointRadiusUnits: 'pixels',
-  pointRadiusMinPixels: 1,
-  getFillColor: COLORS.album,
-  pickable: true,
-})
-
-const artistsLayer = new MVTLayer({
-  id: 'artists',
-  data: TILES,
-  loadOptions: {mvt: {layers: ['artists']}},
-  pointType: 'circle',
-  getPointRadius: getPointRadius,
-  pointRadiusUnits: 'pixels',
-  pointRadiusMinPixels: 1,
-  filled: false,
-  stroked: true,
-  getLineColor: COLORS.artist,
-  getLineWidth: 1,
-  lineWidthUnits: 'pixels',
-  pickable: true,
-})
-
-const labelsLayer = new MVTLayer({
-  id: 'labels',
-  data: TILES,
-  loadOptions: {mvt: {layers: ['labels']}},
-  pointType: 'circle',
-  getPointRadius: getPointRadius,
-  pointRadiusUnits: 'pixels',
-  pointRadiusMinPixels: 1,
-  filled: false,
-  stroked: true,
-  getLineColor: COLORS.label,
-  getLineWidth: 1,
-  lineWidthUnits: 'pixels',
-  pickable: true,
-})
-
-const LAYERS = [gridLayer, tracksLayer, albumsLayer, artistsLayer, labelsLayer]
 
 
 /** Fetches entity info from the API, validating the response status. */
@@ -170,22 +86,21 @@ function fetchEntityInfo(entityType: string, rowid: number | string, signal: Abo
 }
 
 /** Root application component — owns view state, selection, and wires navigation to the map. */
-let hashTimer: ReturnType<typeof setTimeout> | null = null
-const MAP_VIEW = new MapView({repeat: false})
 export default function App() {
-  const {longitude, latitude, zoom, entity: initEntity, rowid: initRowid} = parseHash()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<maplibregl.Map | null>(null)
+  const [initHash] = useState(parseHash)
 
-  const [viewState, setViewState] = useState<MapViewState>({...INITIAL_VIEW_STATE, longitude, latitude, zoom})
-  const [selection, setSelection] = useState<Selection | null>(initEntity && initRowid ? {status: 'loading'} : null)
-  const [history, setHistory] = useState<Selection[]>([])
+  const [selection, setSelection] = useState<Selection | null>(initHash.entity && initHash.rowid ? {status: 'loading'} : null)
+  const [navHistory, setNavHistory] = useState<Selection[]>([])
   const nextSelection = useRef(makeAbortable())
   const selectionRef = useRef<Selection | null>(null)
   selectionRef.current = selection
 
-  /** Fetches entity info and updates the panel selection, without moving the map. */
+  /** Fetches entity info and updates panel selection and navigation history, without moving the map. */
   const selectEntity = useCallback((entityType: string, rowid: number) => {
     if (selectionRef.current?.status === 'loaded')
-      setHistory(prev => [...prev.slice(-(MAX_HISTORY - 1)), selectionRef.current!])
+      setNavHistory(prev => [...prev.slice(-(MAX_HISTORY - 1)), selectionRef.current!])
 
     updateHash({entity: entityType, rowid})
     setSelection({status: 'loading'})
@@ -197,64 +112,35 @@ export default function App() {
       })
   }, [])
 
-  /** Animates the map camera to the given coordinates. */
-  function flyTo(lon: number, lat: number) {
-    setViewState(prev => ({
-      ...prev,
-      longitude: lon,
-      latitude: lat,
-      zoom: 8,
-      transitionDuration: 1000,
-      transitionInterpolator: new FlyToInterpolator(),
-    }))
-  }
-
   /** Flies the map to the given coordinates and selects the entity. */
-  const navigate = useCallback(
-      (entityType: string, rowid: number, lon: number, lat: number) => {
-      flyTo(lon, lat)
+  const navigate = useCallback((entityType: string, rowid: number, lon: number, lat: number) => {
+      mapRef.current?.flyTo({center: [lon, lat]})
       selectEntity(entityType, rowid)
-    }, [selectEntity]
-  )
+    }, [])
 
-  /** Pops the last history entry and restores it without re-fetching, then fly to its lcoation. */
-  const goBack = useCallback(() => {
-    setHistory(prev => {
+  /** Pops the last history entry and restores it without re-fetching, then flies to its location. */
+  function goBack() {
+    setNavHistory(prev => {
       const entry = prev[prev.length - 1]
       if (!entry || entry.status !== 'loaded') return prev
       setSelection(entry)
       updateHash({entity: entry.entity_type, rowid: getRowid(entry)})
-      flyTo(entry.lon, entry.lat)
+      mapRef.current?.flyTo({center: [entry.lon, entry.lat], zoom: 8, duration: 1000})
       return prev.slice(0, -1)
     })
-  }, [])
-
-  /** Debounces URL hash updates from the current map view state. */
-  function debounceHashUpdate(vs: MapViewState) {
-    // Debounce hash updates: fly animations fire onViewStateChange every frame,
-    // and iOS Safari throws SecurityError if replaceState exceeds 100 calls/10s.
-    if (hashTimer) clearTimeout(hashTimer)
-    hashTimer = setTimeout(() => {
-      updateHash({
-        lon: vs.longitude.toFixed(4),
-        lat: vs.latitude.toFixed(4),
-        z: vs.zoom.toFixed(2),
-      })
-      hashTimer = null
-    }, 100)
   }
 
-  /** Closes the panel and clears selection-related local state. */
+  /** Closes the panel and clears selection-related state. */
   function handlePanelClose() {
     nextSelection.current.cancel()
     setSelection(null)
-    setHistory([])
+    setNavHistory([])
     updateHash({entity: null, rowid: null})
   }
 
   /** Fetches entity info from URL hash on initial mount, without moving the map. */
   useEffect(() => {
-    const {entity, rowid} = parseHash()
+    const {entity, rowid} = initHash
     if (!entity || !rowid) return
     const signal = nextSelection.current.nextSignal()
     fetchEntityInfo(entity, rowid, signal)
@@ -264,42 +150,136 @@ export default function App() {
       })
   }, [])
 
-  /** Handles clicks on pickable map dots — selects the entity without moving the map. */
-  function handleMapClick(info: PickingInfo) {
-    if (!info.object || !info.layer) return
-    const p = (info.object as { properties: Record<string, number> }).properties
-    switch (info.layer.id) {
-      case 'tracks':
-        return selectEntity('track', p.track_rowid)
-      case 'albums':
-        return selectEntity('album', p.album_rowid)
-      case 'artists':
-        return selectEntity('artist', p.artist_rowid)
-      case 'labels':
-        return selectEntity('label', p.label_rowid)
-    }
-  }
+  /** Initializes the MapLibre map, adds layers, and wires interaction handlers. */
+  useEffect(() => {
+    const map = new maplibregl.Map({
+      container: containerRef.current!,
+      style: {
+        version: 8,
+        sources: {},
+        layers: [{id: 'background', type: 'background', paint: {'background-color': '#0d0d12'}}],
+      },
+      center: initHash.center,
+      zoom: initHash.zoom,
+      minZoom: INITIAL_VIEW.minZoom,
+      maxZoom: INITIAL_VIEW.maxZoom,
+      pitch: INITIAL_VIEW.pitch,
+      renderWorldCopies: false,
+      attributionControl: false,
+    })
+    mapRef.current = map
+
+    map.on('load', () => {
+      // Grid layer — below all entity layers
+      map.addSource('grid', {type: 'geojson', data: GRID_LINES})
+      map.addLayer({
+        id: 'grid',
+        type: 'line',
+        source: 'grid',
+        paint: {
+          'line-color': cssVar('--color-border'),
+          'line-width': 1,
+        },
+      })
+
+      // Single vector source carrying all four entity layers from the tileset
+      map.addSource('entities', {
+        type: 'vector',
+        tiles: [TILE_URL],
+        minzoom: INITIAL_VIEW.minZoom,
+        maxzoom: INITIAL_VIEW.maxZoom,
+      })
+
+      map.addLayer({
+        id: 'labels', type: 'circle', source: 'entities', 'source-layer': 'labels',
+        paint: {
+          'circle-radius': ['max', 1, ['get', 'logcount']],
+          'circle-color': 'transparent',
+          'circle-stroke-color': cssVar('--color-label'),
+          'circle-stroke-opacity': 0.7,
+          'circle-stroke-width': 1,
+        },
+      })
+      map.addLayer({
+        id: 'albums', type: 'circle', source: 'entities', 'source-layer': 'albums',
+        paint: {
+          'circle-radius': ['max', 1, ['get', 'logcount']],
+          'circle-color': cssVar('--color-album'),
+          'circle-opacity': 0.7,
+        },
+      })
+      map.addLayer({
+        id: 'artists', type: 'circle', source: 'entities', 'source-layer': 'artists',
+        paint: {
+          'circle-radius': ['max', 1, ['get', 'logcount']],
+          'circle-color': 'transparent',
+          'circle-stroke-color': cssVar('--color-artist'),
+          'circle-stroke-opacity': 0.7,
+          'circle-stroke-width': 1,
+        },
+      })
+      map.addLayer({
+        id: 'tracks', type: 'circle', source: 'entities', 'source-layer': 'tracks',
+        paint: {
+          'circle-radius': ['max', 1, ['get', 'logcount']],
+          'circle-color': cssVar('--color-track'),
+          'circle-opacity': 0.7,
+        },
+      })
+
+
+      // Click handlers — each layer dispatches to selectEntity with its rowid property
+      map.on('click', 'tracks', (e) => {
+        const rowid = e.features?.[0]?.properties.track_rowid
+        if (rowid != null) selectEntity('track', rowid)
+      })
+      map.on('click', 'albums', (e) => {
+        const rowid = e.features?.[0]?.properties.album_rowid
+        if (rowid != null) selectEntity('album', rowid)
+      })
+      map.on('click', 'artists', (e) => {
+        const rowid = e.features?.[0]?.properties.artist_rowid
+        if (rowid != null) selectEntity('artist', rowid)
+      })
+      map.on('click', 'labels', (e) => {
+        const rowid = e.features?.[0]?.properties.label_rowid
+        if (rowid != null) selectEntity('label', rowid)
+      })
+
+      // Pointer cursor on hover for all pickable layers
+      for (const id of ['tracks', 'albums', 'artists', 'labels']) {
+        map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer' })
+        map.on('mouseleave', id, () => { map.getCanvas().style.cursor = '' })
+      }
+    })
+
+    /** Debounced URL hash sync — avoids iOS Safari replaceState rate-limit during flyTo. */
+    let hashTimer: ReturnType<typeof setTimeout> | null = null
+    map.on('moveend', () => {
+      if (hashTimer) clearTimeout(hashTimer)
+      hashTimer = setTimeout(() => {
+        const c = map.getCenter()
+        updateHash({
+          lon: c.lng.toFixed(4),
+          lat: c.lat.toFixed(4),
+          z: map.getZoom().toFixed(2),
+        })
+        hashTimer = null
+      }, 100)
+    })
+
+    return () => map.remove()
+  }, [selectEntity])
 
   return (
     <div className="relative w-screen h-screen">
-      <DeckGL
-        viewState={viewState}
-        controller={true}
-        onViewStateChange={({viewState: vs}) => {
-          setViewState(vs)
-          debounceHashUpdate(vs)
-        }}
-        layers={LAYERS}
-        views={MAP_VIEW}
-        onClick={handleMapClick}
-        getCursor={({isHovering}) => isHovering ? 'pointer' : 'default'}
-      />
+      <div ref={containerRef} className="w-full h-full"/>
       <Search navigate={navigate}/>
       <Panel
         selection={selection}
         navigate={navigate}
         onClose={handlePanelClose}
-        goBack={history.length > 0 ? goBack : null}
+        goBack={navHistory.length > 0 ? goBack : null}
       />
       <img
         src={earwaxLogo}
