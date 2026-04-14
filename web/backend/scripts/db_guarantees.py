@@ -6,12 +6,13 @@ import os
 import sqlite3
 from typing import Any
 
-from src.utils import ALBUM, TRACK
+from src.utils import ALBUM
 from src.utils import ARTIST
 from src.utils import ENTITIES
 from src.utils import Entity
 from src.utils import entity_child
 from src.utils import LABEL
+from src.utils import TRACK
 
 
 @cache
@@ -97,7 +98,10 @@ def main():
             searchable_ids = get_searchable_ids(conn, entity.repr_entity.key, entity.repr_entity.table)
             repr_ids = get_entity_ids(conn, entity.repr_entity.key, entity.repr)
             ok = set(repr_ids).issubset(searchable_ids)
-            report(f"{entity.repr}.{entity.repr_entity.key} ⊆ {entity.repr_entity.table}[searchable].{entity.repr_entity.key}", ok)
+            report(
+                f"{entity.repr}.{entity.repr_entity.key} ⊆ {entity.repr_entity.table}[searchable].{entity.repr_entity.key}",
+                ok,
+            )
 
         print("nrepr consistency")
         for entity in (ALBUM, ARTIST, LABEL):

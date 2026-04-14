@@ -16,7 +16,6 @@ from src.utils import LabelEntity
 from src.utils import NAME2ENTITY
 from src.utils import TrackEntity
 
-
 router = APIRouter()
 
 
@@ -62,11 +61,18 @@ class LabelRecommend(TypedDict):
 Recommend = TrackRecommend | AlbumRecommend | ArtistRecommend | LabelRecommend
 
 
+class RecommendMeta(TypedDict, total=False):
+    rowid: int
+    logcount: float
+    artist_rowid: int
+
+
 def recommend_fetch(
     entity: Entity,
     rowid: int,
     limit: int,
     diverse: bool,
+    popfloor: float,
     db: sqlite3.Connection,
     indexes: FaissIndexes,
 ) -> list[Recommend] | None:
@@ -74,7 +80,15 @@ def recommend_fetch(
         case TrackEntity():
             rec_cls = TrackRecommend
             index = indexes.track
-            query = """
+            meta_query = """
+                SELECT
+                    track_rowid AS rowid,
+                    logcount,
+                    artist_rowid
+                FROM tracks
+                WHERE track_rowid IN ({placeholders})
+            """
+            payload_query = """
                 SELECT
                     track_rowid,
                     track_name_norm,
@@ -88,7 +102,15 @@ def recommend_fetch(
         case AlbumEntity():
             rec_cls = AlbumRecommend
             index = indexes.album
-            query = """
+            meta_query = """
+                SELECT
+                    album_rowid AS rowid,
+                    logcount,
+                    artist_rowid
+                FROM albums
+                WHERE album_rowid IN ({placeholders})
+            """
+            payload_query = """
                 SELECT
                     album_rowid,
                     album_name_norm,
@@ -102,7 +124,14 @@ def recommend_fetch(
         case ArtistEntity():
             rec_cls = ArtistRecommend
             index = indexes.artist
-            query = """
+            meta_query = """
+                SELECT
+                    artist_rowid AS rowid,
+                    logcount
+                FROM artists
+                WHERE artist_rowid IN ({placeholders})
+            """
+            payload_query = """
                 SELECT
                     artist_rowid,
                     artist_name,
@@ -116,7 +145,14 @@ def recommend_fetch(
         case LabelEntity():
             rec_cls = LabelRecommend
             index = indexes.label
-            query = """
+            meta_query = """
+                SELECT
+                    label_rowid AS rowid,
+                    logcount
+                FROM labels
+                WHERE label_rowid IN ({placeholders})
+            """
+            payload_query = """
                 SELECT
                     label_rowid,
                     label,
@@ -135,48 +171,53 @@ def recommend_fetch(
 
     emb = np.frombuffer(emb[0], dtype=np.float32).reshape(1, -1)
     diversifiable = diverse and isinstance(entity, (TrackEntity, AlbumEntity))
-    fetch_k = 10 * limit + 1 if diversifiable else limit + 1
+    # oversample when post-search filtering is active so we can still surface
+    # enough valid rows after applying popularity and diversity constraints.
+    fetch_k = 20 * limit + 1 if diversifiable or popfloor > 0.0 else limit + 1
+    fetch_k = min(fetch_k, index.ntotal)
     sims, ids = index.search(emb, fetch_k)  # noqa
     sim_map = {int(nid): float(sim) for sim, nid in zip(sims[0], ids[0]) if nid != -1 and nid != rowid}
     neighbor_ids = list(sim_map)
     if not neighbor_ids:
         return []
 
-    if diversifiable:
-        placeholders = ", ".join("?" * len(neighbor_ids))
-        artist_rows = db.execute(
-            f"SELECT {entity.key}, artist_rowid FROM {entity.table} " f"WHERE {entity.key} IN ({placeholders})",
-            neighbor_ids,
-        ).fetchall()
-        artist_map = {row[0]: row[1] for row in artist_rows}
-        seen_artists: set[int] = set()
-        diverse_ids: list[int] = []
-        for nid in neighbor_ids:
-            aid = artist_map.get(nid)
-            if aid is not None and aid not in seen_artists:
-                seen_artists.add(aid)
-                diverse_ids.append(nid)
-                if len(diverse_ids) == limit:
-                    break
-        neighbor_ids = diverse_ids
-    else:
-        neighbor_ids = neighbor_ids[:limit]
-    if not neighbor_ids:
-        # this shall IN PRINCIPLE not happen, so it will happen.
-        return []
-
     placeholders = ", ".join("?" * len(neighbor_ids))
-    rec_rows = db.execute(
-        query.format(placeholders=placeholders),
+    meta_rows = db.execute(
+        meta_query.format(placeholders=placeholders),
         neighbor_ids,
     ).fetchall()
-    # returns recommends in neighbour order
+
+    meta_map: dict[int, RecommendMeta] = {int(row["rowid"]): RecommendMeta(**dict(row)) for row in meta_rows}
+    selected_ids: list[int] = []
+    seen_artists: set[int] = set()
+    for nid in neighbor_ids:
+        meta = meta_map.get(nid)
+        if meta is None or meta["logcount"] <= popfloor:
+            continue
+        if diversifiable:
+            artist_rowid = meta["artist_rowid"]
+            if artist_rowid in seen_artists:
+                continue
+            seen_artists.add(artist_rowid)
+        selected_ids.append(nid)
+        if len(selected_ids) == limit:
+            break
+
+    if not selected_ids:
+        return []
+
+    placeholders = ", ".join("?" * len(selected_ids))
+    rec_rows = db.execute(
+        payload_query.format(placeholders=placeholders),
+        selected_ids,
+    ).fetchall()
+
     rec_map = {}
     for rec in rec_rows:
         rec_data = dict(rec)
         rec_data["simscore"] = sim_map[rec[0]]
         rec_map[rec[0]] = rec_cls(**rec_data)
-    return [rec_map[nid] for nid in neighbor_ids if nid in rec_map]
+    return [rec_map[nid] for nid in selected_ids if nid in rec_map]
 
 
 @router.get("/api/recommend")
@@ -185,11 +226,12 @@ async def recommend(
     entity_name: str,
     limit: int = Query(10, ge=1, le=50),
     diverse: bool = True,
+    popfloor: int = Query(0, ge=0),
 ) -> list[Recommend]:
     if entity_name not in NAME2ENTITY:
         raise HTTPException(status_code=404, detail="Entity not found")
     entity = NAME2ENTITY[entity_name]
-    results = recommend_fetch(entity, rowid, limit, diverse, get_db(), get_faiss_indexes())
+    results = recommend_fetch(entity, rowid, limit, diverse, popfloor, get_db(), get_faiss_indexes())
     if results is None:
         raise HTTPException(status_code=404, detail="Row not found")
     return results

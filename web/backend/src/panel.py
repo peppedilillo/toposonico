@@ -11,8 +11,8 @@ from src.info import info_fetch
 from src.info import LabelInfo
 from src.info import TrackInfo
 from src.repr import AlbumRepr
-from src.repr import repr_fetch
 from src.repr import ArtistRepr
+from src.repr import repr_fetch
 from src.repr import TrackRepr
 from src.shared import get_db
 from src.utils import AlbumEntity

@@ -37,7 +37,9 @@ def add_tracks(
     index: Index,
     batch_size: int = 10_000,
 ):
-    QUERY = f"SELECT {TRACK.key}, track_name_norm, artist_name, logcount, lon, lat FROM {TRACK.table} WHERE searchable = 1"
+    QUERY = (
+        f"SELECT {TRACK.key}, track_name_norm, artist_name, logcount, lon, lat FROM {TRACK.table} WHERE searchable = 1"
+    )
     cursor = conn.execute(QUERY)
     total = 0
     t0 = time.time()
