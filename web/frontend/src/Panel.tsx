@@ -498,7 +498,8 @@ function RecsSection({entity, navigate, update}: {
     if (entity.recs != null || fetchStatus === 'loading') return
     setFetchStatus('loading')
     const signal = aborter.current.nextSignal()
-    fetch(`/api/recommend?rowid=${rowid}&entity_name=${entity.entity_type}&limit=${RECSNUMBER}&diverse=true`, {signal})
+    const popfloor = Math.max(Math.round(entity.logcount - 2.), 0)
+    fetch(`/api/recommend?rowid=${rowid}&entity_name=${entity.entity_type}&limit=${RECSNUMBER}&diverse=true&popfloor=${popfloor}`, {signal})
       .then(r => {
         if (!r.ok) throw new Error(r.statusText);
         return r.json()
