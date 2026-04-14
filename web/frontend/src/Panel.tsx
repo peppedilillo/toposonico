@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {AlbumSummary, ArtistSummary, LabelSummary, TrackSummary} from './Summary.tsx'
-import {formatPlaylistCount, getRowid} from './utils.ts'
+import {type EntityType, formatPlaylistCount, getRowid} from './utils.ts'
 import {makeAbortable} from './requests'
 
 // --- Types mirroring backend TypedDicts ---
@@ -148,20 +148,23 @@ type ArtistRepr = {
 }
 
 
-/** Discriminated union representing one entry in the navigation stack. */
+/**
+ * Discriminated union representing one entry in the navigation stack.
+ * Loading/error keep entity identity so hash sync can stay declarative.
+ */
 export type Selection =
-  | { status: 'loading' }
-  | { status: 'error' }
+  | { status: 'loading'; entity_type: EntityType; rowid: number }
+  | { status: 'error'; entity_type: EntityType; rowid: number }
   | ({ status: 'loaded'; recs?: Recommend[] } & EntityInfo)
 
 /** Shallow merge into the top of the nav stack when the target entity still matches. */
 export type UpdateFn = (
-  entityType: EntityInfo['entity_type'],
+  entityType: EntityType,
   rowid: number,
   patch: Partial<Selection & { recs: Recommend[] }>
 ) => void
 
-type NavigateFn = (entityType: string, rowid: number, lon: number, lat: number) => void
+type NavigateFn = (entityType: EntityType, rowid: number, lon: number, lat: number) => void
 
 type PanelProps = {
   selection: Selection | null
@@ -384,7 +387,7 @@ function LabelPanel({s, navigate}: { s: LabelInfo; navigate: NavigateFn }) {
 // --- Recommendation helpers and components ---
 
 /** Extracts navigation args from a recommendation. */
-function getRecNav(rec: Recommend, entityType: string): [string, number, number, number] {
+function getRecNav(rec: Recommend, entityType: EntityType): [EntityType, number, number, number] {
   switch (entityType) {
     case 'track': {
       const r = rec as TrackRecommend;
@@ -406,7 +409,7 @@ function getRecNav(rec: Recommend, entityType: string): [string, number, number,
 }
 
 /** Returns display name and subtitle for a recommendation. */
-function getRecDisplay(rec: Recommend, entityType: string): { name: string; sub: string } {
+function getRecDisplay(rec: Recommend, entityType: EntityType): { name: string; sub: string } {
   const playlists = formatPlaylistCount(rec.logcount)
   switch (entityType) {
     case 'track':
@@ -430,7 +433,7 @@ function getRecDisplay(rec: Recommend, entityType: string): { name: string; sub:
 }
 
 /** Single recommendation row — full-width clickable button. */
-function RecItem({rec, entityType, navigate}: { rec: Recommend; entityType: string; navigate: NavigateFn }) {
+function RecItem({rec, entityType, navigate}: { rec: Recommend; entityType: EntityType; navigate: NavigateFn }) {
   const {name, sub} = getRecDisplay(rec, entityType)
   const [et, rowid, lon, lat] = getRecNav(rec, entityType)
   return (
@@ -455,7 +458,7 @@ type FetchStatus = 'idle' | 'loading' | 'error'
 function RecBody({recs, fetchStatus, entityType, navigate}: {
   recs: Recommend[] | undefined;
   fetchStatus: FetchStatus;
-  entityType: string;
+  entityType: EntityType;
   navigate: NavigateFn
 }) {
   if (recs) {
@@ -510,7 +513,7 @@ function RecsSection({entity, navigate, update}: {
   }
 
   return (
-    <div className="mt-3 border-t border-muted/20 pt-2">
+    <div className="mt-3 border-t border-muted/20 pt-2 overflow-y-auto overscroll-contain no-scrollbar">
       <div
         onClick={handleToggle}
         className={`text-xs flex items-center gap-1 cursor-pointer w-full px-4 py-1 -my-1 select-none
@@ -520,7 +523,7 @@ function RecsSection({entity, navigate, update}: {
         More like this..
       </div>
       {open && (
-        <div className="max-h-40 overflow-y-auto overscroll-contain no-scrollbar">
+        <div className="max-h-40 ">
           <RecBody recs={entity.recs} fetchStatus={fetchStatus} entityType={entity.entity_type} navigate={navigate}/>
         </div>
       )}

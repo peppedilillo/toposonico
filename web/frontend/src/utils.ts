@@ -26,3 +26,5 @@ export function humanCount(n: number): string {
 export function formatPlaylistCount(logcount: number): string {
   return `${humanCount(Math.round(10 ** logcount))} playlists`
 }
+
+export type EntityType = 'track' | 'album' | 'artist' | 'label'

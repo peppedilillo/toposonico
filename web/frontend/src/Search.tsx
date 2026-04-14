@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import {AlbumSummary, ArtistSummary, LabelSummary, TrackSummary} from './Summary.tsx'
-import {formatPlaylistCount} from './utils.ts'
+import {type EntityType, formatPlaylistCount} from './utils.ts'
 import {makeAbortable} from "./requests.ts";
 import {getRowid} from "./utils.ts";
 
@@ -50,7 +50,7 @@ type SearchHit = TrackHit | AlbumHit | ArtistHit | LabelHit
 
 /** Props for the Search component. */
 type SearchProps = {
-  navigate: (entityType: string, rowid: number, lon: number, lat: number) => void
+  navigate: (entityType: EntityType, rowid: number, lon: number, lat: number) => void
 }
 
 /** Returns the rendered summary component for a hit. */
