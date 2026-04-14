@@ -148,11 +148,7 @@ type ArtistRepr = {
 }
 
 
-/**
- * Discriminated union representing one entry in the navigation stack.
- * Loading/error carry entity_type + rowid so an in-flight fetch is still identifiable;
- * loaded carries the full entity payload plus an optional cache of its recommendations.
- */
+/** Discriminated union representing one entry in the navigation stack. */
 export type Selection =
   | { status: 'loading' }
   | { status: 'error' }
@@ -478,13 +474,7 @@ function RecBody({recs, fetchStatus, entityType, navigate}: {
   return <div className="text-muted text-xs py-2 animate-pulse px-4">Loading...</div>
 }
 
-/**
- * Collapsible recommendations section. Recommendations are cached on the nav-stack
- * entry via `update({recs})` so going back preserves them without re-fetching.
- * Local `open` defaults to true when recs are already cached. Local `fetchStatus`
- * covers the transient loading/error UI for an in-flight fetch only.
- * Keyed by entity identity in the parent — remounts on entity change.
- */
+/** A collapsible recommendations section, cachine recommendations on the nav-stack. **/
 function RecsSection({entity, navigate, update}: {
   entity: EntityInfo & { recs?: Recommend[] };
   navigate: NavigateFn;
