@@ -187,5 +187,5 @@ export default function MapView({initialView, command, onMoveEnd, onFeatureSelec
     mapRef.current?.flyTo({center: command.center, zoom: command.zoom})
   }, [command])
 
-  return <div ref={containerRef} className="w-full h-full"/>
+  return <div ref={containerRef} className="w-full h-full select-none"/>
 }
