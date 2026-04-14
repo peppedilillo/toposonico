@@ -126,14 +126,14 @@ def recommend_fetch(
                 FROM labels
                 WHERE label_rowid IN ({placeholders})
             """
-    row = db.execute(
+    emb = db.execute(
         f"SELECT embedding FROM {entity.embedding} WHERE {entity.key} = ?",
         (rowid,),
     ).fetchone()
-    if row is None:
+    if emb is None:
         return None
 
-    emb = np.frombuffer(row[0], dtype=np.float32).reshape(1, -1)
+    emb = np.frombuffer(emb[0], dtype=np.float32).reshape(1, -1)
     diversifiable = diverse and isinstance(entity, (TrackEntity, AlbumEntity))
     fetch_k = 10 * limit + 1 if diversifiable else limit + 1
     sims, ids = index.search(emb, fetch_k)  # noqa

@@ -24,7 +24,6 @@ INDEX_SETTINGS = {
         "words",
         "typo",
         "proximity",
-        "rank:asc",
         "logcount:desc",
         "sort",
         "attribute",
@@ -52,7 +51,6 @@ def add_tracks(
                 "track_name_norm": track_name_norm,
                 "artist_name": artist_name,
                 "logcount": logcount,
-                "rank": 3,
                 "lon": lon,
                 "lat": lat,
             }
@@ -87,7 +85,6 @@ def add_albums(
                 "album_name_norm": album_name_norm,
                 "artist_name": artist_name,
                 "logcount": logcount,
-                "rank": 2,
                 "lon": lon,
                 "lat": lat,
             }
@@ -119,7 +116,6 @@ def add_artists(
                 "id": f"{ARTIST.name}_{rowid}",
                 "artist_name": artist_name,
                 "logcount": logcount,
-                "rank": 1,
                 "lon": lon,
                 "lat": lat,
             }
@@ -151,7 +147,6 @@ def add_labels(
                 "id": f"{LABEL.name}_{rowid}",
                 "label": label,
                 "logcount": logcount,
-                "rank": 0,
                 "lon": lon,
                 "lat": lat,
             }
