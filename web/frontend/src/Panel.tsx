@@ -1,202 +1,223 @@
-import {useCallback, useEffect, useRef, useState} from 'react'
-import {AlbumSummary, ArtistSummary, LabelSummary, TrackSummary} from './Summary.tsx'
-import {type EntityType, formatPlaylistCount, getRowid} from './utils.ts'
-import {makeAbortable} from './requests'
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  AlbumSummary,
+  ArtistSummary,
+  LabelSummary,
+  TrackSummary,
+} from "./Summary.tsx";
+import { type EntityType, formatPlaylistCount, getRowid } from "./utils.ts";
+import { makeAbortable } from "./requests";
 
 // --- Types mirroring backend TypedDicts ---
 
 type TrackInfo = {
-  entity_type: 'track'
-  track_rowid: number
-  track_name_norm: string
-  artist_rowid: number
-  artist_name: string
-  album_rowid: number
-  album_name: string
-  label_rowid: number
-  label: string
-  lon: number
-  lat: number
-  album_lon: number
-  album_lat: number
-  artist_lon: number
-  artist_lat: number
-  label_lon: number
-  label_lat: number
-  logcount: number
-  release_date: string | null
-}
+  entity_type: "track";
+  track_rowid: number;
+  track_name_norm: string;
+  artist_rowid: number;
+  artist_name: string;
+  album_rowid: number;
+  album_name: string;
+  label_rowid: number;
+  label: string;
+  lon: number;
+  lat: number;
+  album_lon: number;
+  album_lat: number;
+  artist_lon: number;
+  artist_lat: number;
+  label_lon: number;
+  label_lat: number;
+  logcount: number;
+  release_date: string | null;
+};
 
 type AlbumInfo = {
-  entity_type: 'album'
-  album_rowid: number
-  album_name_norm: string
-  artist_rowid: number
-  artist_name: string
-  label_rowid: number
-  label: string
-  lon: number
-  lat: number
-  artist_lon: number
-  artist_lat: number
-  label_lon: number
-  label_lat: number
-  logcount: number
-  nrepr: number
-  total_tracks: number | null
-  release_date: string | null
-  album_type: string | null
-  reprs: TrackRepr[]
-}
+  entity_type: "album";
+  album_rowid: number;
+  album_name_norm: string;
+  artist_rowid: number;
+  artist_name: string;
+  label_rowid: number;
+  label: string;
+  lon: number;
+  lat: number;
+  artist_lon: number;
+  artist_lat: number;
+  label_lon: number;
+  label_lat: number;
+  logcount: number;
+  nrepr: number;
+  total_tracks: number | null;
+  release_date: string | null;
+  album_type: string | null;
+  reprs: TrackRepr[];
+};
 
 type ArtistInfo = {
-  entity_type: 'artist'
-  artist_rowid: number
-  artist_name: string
-  lon: number
-  lat: number
-  logcount: number
-  ntrack: number
-  nalbum: number
-  nrepr: number
-  artist_genre: string | null
-  reprs: AlbumRepr[]
-}
+  entity_type: "artist";
+  artist_rowid: number;
+  artist_name: string;
+  lon: number;
+  lat: number;
+  logcount: number;
+  ntrack: number;
+  nalbum: number;
+  nrepr: number;
+  artist_genre: string | null;
+  reprs: AlbumRepr[];
+};
 
 type LabelInfo = {
-  entity_type: 'label'
-  label_rowid: number
-  label: string
-  lon: number
-  lat: number
-  logcount: number
-  ntrack: number
-  nalbum: number
-  nartist: number
-  nrepr: number
-  reprs: ArtistRepr[]
-}
+  entity_type: "label";
+  label_rowid: number;
+  label: string;
+  lon: number;
+  lat: number;
+  logcount: number;
+  ntrack: number;
+  nalbum: number;
+  nartist: number;
+  nrepr: number;
+  reprs: ArtistRepr[];
+};
 
-type EntityInfo = TrackInfo | AlbumInfo | ArtistInfo | LabelInfo
+type EntityInfo = TrackInfo | AlbumInfo | ArtistInfo | LabelInfo;
 
 // --- Recommendation types mirroring backend TypedDicts ---
 
 type TrackRecommend = {
-  track_rowid: number
-  track_name_norm: string
-  artist_name: string
-  lon: number
-  lat: number
-  logcount: number
-  simscore: number
-}
+  track_rowid: number;
+  track_name_norm: string;
+  artist_name: string;
+  lon: number;
+  lat: number;
+  logcount: number;
+  simscore: number;
+};
 
 type AlbumRecommend = {
-  album_rowid: number
-  album_name_norm: string
-  artist_name: string
-  lon: number
-  lat: number
-  logcount: number
-  simscore: number
-}
+  album_rowid: number;
+  album_name_norm: string;
+  artist_name: string;
+  lon: number;
+  lat: number;
+  logcount: number;
+  simscore: number;
+};
 
 type ArtistRecommend = {
-  artist_rowid: number
-  artist_name: string
-  lon: number
-  lat: number
-  logcount: number
-  simscore: number
-  artist_genre: string | null
-}
+  artist_rowid: number;
+  artist_name: string;
+  lon: number;
+  lat: number;
+  logcount: number;
+  simscore: number;
+  artist_genre: string | null;
+};
 
 type LabelRecommend = {
-  label_rowid: number
-  label: string
-  lon: number
-  lat: number
-  logcount: number
-  simscore: number
-}
+  label_rowid: number;
+  label: string;
+  lon: number;
+  lat: number;
+  logcount: number;
+  simscore: number;
+};
 
-type Recommend = TrackRecommend | AlbumRecommend | ArtistRecommend | LabelRecommend
+type Recommend =
+  | TrackRecommend
+  | AlbumRecommend
+  | ArtistRecommend
+  | LabelRecommend;
 
 // --- Repr types mirroring backend TypedDicts ---
 
 type TrackRepr = {
-  track_rowid: number
-  track_name_norm: string
-  artist_name: string
-  lon: number
-  lat: number
-}
+  track_rowid: number;
+  track_name_norm: string;
+  artist_name: string;
+  lon: number;
+  lat: number;
+};
 
 type AlbumRepr = {
-  album_rowid: number
-  album_name_norm: string
-  artist_name: string
-  lon: number
-  lat: number
-}
+  album_rowid: number;
+  album_name_norm: string;
+  artist_name: string;
+  lon: number;
+  lat: number;
+};
 
 type ArtistRepr = {
-  artist_rowid: number
-  artist_name: string
-  lon: number
-  lat: number
-}
-
+  artist_rowid: number;
+  artist_name: string;
+  lon: number;
+  lat: number;
+};
 
 /**
  * Discriminated union representing one entry in the navigation stack.
  * Loading/error keep entity identity so hash sync can stay declarative.
  */
 export type Selection =
-  | { status: 'loading'; entity_type: EntityType; rowid: number }
-  | { status: 'error'; entity_type: EntityType; rowid: number }
-  | ({ status: 'loaded'; recs?: Recommend[] } & EntityInfo)
+  | { status: "loading"; entity_type: EntityType; rowid: number }
+  | { status: "error"; entity_type: EntityType; rowid: number }
+  | ({ status: "loaded"; recs?: Recommend[] } & EntityInfo);
 
 /** Shallow merge into the top of the nav stack when the target entity still matches. */
 export type UpdateFn = (
   entityType: EntityType,
   rowid: number,
-  patch: Partial<Selection & { recs: Recommend[] }>
-) => void
+  patch: Partial<Selection & { recs: Recommend[] }>,
+) => void;
 
-type NavigateFn = (entityType: EntityType, rowid: number, lon: number, lat: number) => void
+type NavigateFn = (
+  entityType: EntityType,
+  rowid: number,
+  lon: number,
+  lat: number,
+) => void;
 
 type PanelProps = {
-  selection: Selection | null
-  navigate: NavigateFn
-  update: UpdateFn
-  onClose: () => void
-  goBack: (() => void) | null
-}
+  selection: Selection | null;
+  navigate: NavigateFn;
+  update: UpdateFn;
+  onClose: () => void;
+  goBack: (() => void) | null;
+};
 
 // --- Internal sub-components ---
 
 /** Navigable inline link styled with a per-entity color on hover. */
-function Link({onClick, color, children}: { onClick: () => void; color: string; children: React.ReactNode }) {
-  const [hovered, setHovered] = useState(false)
+function Link({
+  onClick,
+  color,
+  children,
+}: {
+  onClick: () => void;
+  color: string;
+  children: React.ReactNode;
+}) {
+  const [hovered, setHovered] = useState(false);
   return (
     <button
       onClick={(e) => {
         e.stopPropagation();
-        onClick()
+        onClick();
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={hovered ? {color} : undefined}
+      style={hovered ? { color } : undefined}
       className="cursor-pointer text-left max-w-full truncate transition-colors"
     >
       {children}
     </button>
-  )
+  );
 }
 
 /** Horizontal scrollable row with wheel-to-scroll and gradient overflow fades. */
-function ReprRow({children}: { children: React.ReactNode }) {
+function ReprRow({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -232,19 +253,19 @@ function ReprRow({children}: { children: React.ReactNode }) {
       updateFades();
     };
 
-    el.addEventListener('wheel', handleWheel, {passive: false});
+    el.addEventListener("wheel", handleWheel, { passive: false });
     return () => {
-      el.removeEventListener('wheel', handleWheel);
+      el.removeEventListener("wheel", handleWheel);
     };
   }, [updateFades]);
 
   const maskImage =
     canScrollLeft && canScrollRight
-      ? 'linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)'
+      ? "linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)"
       : canScrollRight
-        ? 'linear-gradient(to right, black calc(100% - 24px), transparent)'
+        ? "linear-gradient(to right, black calc(100% - 24px), transparent)"
         : canScrollLeft
-          ? 'linear-gradient(to right, transparent, black 24px)'
+          ? "linear-gradient(to right, transparent, black 24px)"
           : undefined;
 
   return (
@@ -252,7 +273,7 @@ function ReprRow({children}: { children: React.ReactNode }) {
       ref={ref}
       onScroll={updateFades}
       className="overflow-x-auto whitespace-nowrap no-scrollbar text-sm mt-1"
-      style={{maskImage, WebkitMaskImage: maskImage}}
+      style={{ maskImage, WebkitMaskImage: maskImage }}
     >
       {children}
     </div>
@@ -263,79 +284,125 @@ function ReprRow({children}: { children: React.ReactNode }) {
 function LoadingBody() {
   return (
     <div className="space-y-2 animate-pulse mt-1">
-      <div className="h-5 bg-muted/20 rounded w-3/4"/>
-      <div className="h-4 bg-muted/20 rounded w-1/2"/>
-      <div className="h-3 bg-muted/20 rounded w-2/3"/>
-      <div className="h-3 bg-muted/20 rounded w-1/3"/>
+      <div className="h-5 bg-muted/20 rounded w-3/4" />
+      <div className="h-4 bg-muted/20 rounded w-1/2" />
+      <div className="h-3 bg-muted/20 rounded w-2/3" />
+      <div className="h-3 bg-muted/20 rounded w-1/3" />
     </div>
-  )
+  );
 }
 
-function TrackPanel({s, navigate}: { s: TrackInfo; navigate: NavigateFn }) {
+function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
   return (
     <>
       <TrackSummary
         trackName={s.track_name_norm}
-        artist={<Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)}
-                      color="var(--color-artist)">{s.artist_name}</Link>}
+        artist={
+          <Link
+            onClick={() =>
+              navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)
+            }
+            color="var(--color-artist)"
+          >
+            {s.artist_name}
+          </Link>
+        }
         album={
-          s.album_name
-            ? <Link onClick={() => navigate('album', s.album_rowid, s.album_lon, s.album_lat)}
-                    color="var(--color-album)">{s.album_name}</Link>
-            : undefined
+          s.album_name ? (
+            <Link
+              onClick={() =>
+                navigate("album", s.album_rowid, s.album_lon, s.album_lat)
+              }
+              color="var(--color-album)"
+            >
+              {s.album_name}
+            </Link>
+          ) : undefined
         }
         debugId={s.track_rowid}
       />
       {(s.label || s.release_date) && (
         <div className="text-sm text-muted mt-1 truncate">
-          {s.label && <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)}
-                            color="var(--color-label)">{s.label}</Link>}
-          {s.label && s.release_date && ' · '}{s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
+          {s.label && (
+            <Link
+              onClick={() =>
+                navigate("label", s.label_rowid, s.label_lon, s.label_lat)
+              }
+              color="var(--color-label)"
+            >
+              {s.label}
+            </Link>
+          )}
+          {s.label && s.release_date && " · "}
+          {s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
         </div>
       )}
-      <div className="text-sm text-muted mt-0.5 truncate">{formatPlaylistCount(s.logcount)}</div>
+      <div className="text-sm text-muted mt-0.5 truncate">
+        {formatPlaylistCount(s.logcount)}
+      </div>
     </>
-  )
+  );
 }
 
-function AlbumPanel({s, navigate}: { s: AlbumInfo; navigate: NavigateFn }) {
+function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
   return (
     <>
       <AlbumSummary
         albumName={s.album_name_norm}
         artist={
-          s.artist_name
-            ? <Link onClick={() => navigate('artist', s.artist_rowid, s.artist_lon, s.artist_lat)}
-                    color="var(--color-artist)">{s.artist_name}</Link>
-            : undefined
+          s.artist_name ? (
+            <Link
+              onClick={() =>
+                navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)
+              }
+              color="var(--color-artist)"
+            >
+              {s.artist_name}
+            </Link>
+          ) : undefined
         }
         debugId={s.album_rowid}
       />
       {(s.label || s.release_date) && (
         <div className="text-sm text-muted mt-1 truncate">
-          {s.label && <Link onClick={() => navigate('label', s.label_rowid, s.label_lon, s.label_lat)}
-                            color="var(--color-label)">{s.label}</Link>}
-          {s.label && s.release_date && ' · '}{s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
+          {s.label && (
+            <Link
+              onClick={() =>
+                navigate("label", s.label_rowid, s.label_lon, s.label_lat)
+              }
+              color="var(--color-label)"
+            >
+              {s.label}
+            </Link>
+          )}
+          {s.label && s.release_date && " · "}
+          {s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
         </div>
       )}
-      <div className="text-sm text-muted mt-0.5 truncate">{formatPlaylistCount(s.logcount)}</div>
+      <div className="text-sm text-muted mt-0.5 truncate">
+        {formatPlaylistCount(s.logcount)}
+      </div>
       {s.reprs?.length > 0 && (
         <ReprRow>
           <span className="text-muted mr-1.5">features:</span>
           {s.reprs.map((r, i) => (
             <span key={r.track_rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
-              <Link onClick={() => navigate('track', r.track_rowid, r.lon, r.lat)}
-                    color="var(--color-album)">{r.track_name_norm}</Link>
+              <Link
+                onClick={() => navigate("track", r.track_rowid, r.lon, r.lat)}
+                color="var(--color-album)"
+              >
+                {r.track_name_norm}
+              </Link>
             </span>
           ))}
         </ReprRow>
       )}
     </>
-  )
+  );
 }
 
-function ArtistPanel({s, navigate}: { s: ArtistInfo; navigate: NavigateFn }) {
+function ArtistPanel({ s, navigate }: { s: ArtistInfo; navigate: NavigateFn }) {
   return (
     <>
       <ArtistSummary
@@ -350,17 +417,21 @@ function ArtistPanel({s, navigate}: { s: ArtistInfo; navigate: NavigateFn }) {
           {s.reprs.map((r, i) => (
             <span key={r.album_rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
-              <Link onClick={() => navigate('album', r.album_rowid, r.lon, r.lat)}
-                    color="var(--color-album)">{r.album_name_norm}</Link>
+              <Link
+                onClick={() => navigate("album", r.album_rowid, r.lon, r.lat)}
+                color="var(--color-album)"
+              >
+                {r.album_name_norm}
+              </Link>
             </span>
           ))}
         </ReprRow>
       )}
     </>
-  )
+  );
 }
 
-function LabelPanel({s, navigate}: { s: LabelInfo; navigate: NavigateFn }) {
+function LabelPanel({ s, navigate }: { s: LabelInfo; navigate: NavigateFn }) {
   return (
     <>
       <LabelSummary
@@ -374,74 +445,92 @@ function LabelPanel({s, navigate}: { s: LabelInfo; navigate: NavigateFn }) {
           {s.reprs.map((r, i) => (
             <span key={r.artist_rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
-              <Link onClick={() => navigate('artist', r.artist_rowid, r.lon, r.lat)}
-                    color="var(--color-artist)">{r.artist_name}</Link>
+              <Link
+                onClick={() => navigate("artist", r.artist_rowid, r.lon, r.lat)}
+                color="var(--color-artist)"
+              >
+                {r.artist_name}
+              </Link>
             </span>
           ))}
         </ReprRow>
       )}
     </>
-  )
+  );
 }
 
 // --- Recommendation helpers and components ---
 
 /** Extracts navigation args from a recommendation. */
-function getRecNav(rec: Recommend, entityType: EntityType): [EntityType, number, number, number] {
+function getRecNav(
+  rec: Recommend,
+  entityType: EntityType,
+): [EntityType, number, number, number] {
   switch (entityType) {
-    case 'track': {
+    case "track": {
       const r = rec as TrackRecommend;
-      return ['track', r.track_rowid, r.lon, r.lat]
+      return ["track", r.track_rowid, r.lon, r.lat];
     }
-    case 'album': {
+    case "album": {
       const r = rec as AlbumRecommend;
-      return ['album', r.album_rowid, r.lon, r.lat]
+      return ["album", r.album_rowid, r.lon, r.lat];
     }
-    case 'artist': {
+    case "artist": {
       const r = rec as ArtistRecommend;
-      return ['artist', r.artist_rowid, r.lon, r.lat]
+      return ["artist", r.artist_rowid, r.lon, r.lat];
     }
     default: {
       const r = rec as LabelRecommend;
-      return ['label', r.label_rowid, r.lon, r.lat]
+      return ["label", r.label_rowid, r.lon, r.lat];
     }
   }
 }
 
 /** Returns display name and subtitle for a recommendation. */
-function getRecDisplay(rec: Recommend, entityType: EntityType): { name: string; sub: string } {
-  const playlists = formatPlaylistCount(rec.logcount)
+function getRecDisplay(
+  rec: Recommend,
+  entityType: EntityType,
+): { name: string; sub: string } {
+  const playlists = formatPlaylistCount(rec.logcount);
   switch (entityType) {
-    case 'track':
+    case "track":
       return {
         name: (rec as TrackRecommend).track_name_norm,
-        sub: (rec as TrackRecommend).artist_name + ' · ' + playlists
-      }
-    case 'album':
+        sub: (rec as TrackRecommend).artist_name + " · " + playlists,
+      };
+    case "album":
       return {
         name: (rec as AlbumRecommend).album_name_norm,
-        sub: (rec as AlbumRecommend).artist_name + ' · ' + playlists
-      }
-    case 'artist': {
-      const r = rec as ArtistRecommend
-      const parts = [r.artist_genre, playlists].filter(Boolean)
-      return {name: r.artist_name, sub: parts.join(' · ')}
+        sub: (rec as AlbumRecommend).artist_name + " · " + playlists,
+      };
+    case "artist": {
+      const r = rec as ArtistRecommend;
+      const parts = [r.artist_genre, playlists].filter(Boolean);
+      return { name: r.artist_name, sub: parts.join(" · ") };
     }
     default:
-      return {name: (rec as LabelRecommend).label, sub: playlists}
+      return { name: (rec as LabelRecommend).label, sub: playlists };
   }
 }
 
 /** Single recommendation row — full-width clickable button. */
-function RecItem({rec, entityType, navigate}: { rec: Recommend; entityType: EntityType; navigate: NavigateFn }) {
-  const {name, sub} = getRecDisplay(rec, entityType)
-  const [et, rowid, lon, lat] = getRecNav(rec, entityType)
+function RecItem({
+  rec,
+  entityType,
+  navigate,
+}: {
+  rec: Recommend;
+  entityType: EntityType;
+  navigate: NavigateFn;
+}) {
+  const { name, sub } = getRecDisplay(rec, entityType);
+  const [et, rowid, lon, lat] = getRecNav(rec, entityType);
   return (
     <li>
       <button
         onClick={(e) => {
           e.stopPropagation();
-          navigate(et, rowid, lon, lat)
+          navigate(et, rowid, lon, lat);
         }}
         className="text-left w-full cursor-pointer hover:bg-overlay py-1.5 px-4"
       >
@@ -449,69 +538,90 @@ function RecItem({rec, entityType, navigate}: { rec: Recommend; entityType: Enti
         <div className="text-xs text-muted truncate">{sub}</div>
       </button>
     </li>
-  )
+  );
 }
 
-type FetchStatus = 'idle' | 'loading' | 'error'
+type FetchStatus = "idle" | "loading" | "error";
 
 /** Renders loading/error/empty/list states for recommendations. */
-function RecBody({recs, fetchStatus, entityType, navigate}: {
+function RecBody({
+  recs,
+  fetchStatus,
+  entityType,
+  navigate,
+}: {
   recs: Recommend[] | undefined;
   fetchStatus: FetchStatus;
   entityType: EntityType;
-  navigate: NavigateFn
+  navigate: NavigateFn;
 }) {
   if (recs) {
     if (recs.length === 0)
-      return <div className="text-muted text-xs py-2 px-4">No recommendations.</div>
+      return (
+        <div className="text-muted text-xs py-2 px-4">No recommendations.</div>
+      );
     return (
       <ol className="mt-1">
         {recs.map((rec, i) => (
-          <RecItem key={i} rec={rec} entityType={entityType} navigate={navigate}/>
+          <RecItem
+            key={i}
+            rec={rec}
+            entityType={entityType}
+            navigate={navigate}
+          />
         ))}
       </ol>
-    )
+    );
   }
-  if (fetchStatus === 'error')
-    return <div className="text-muted text-xs py-2 px-4">Failed to load.</div>
-  return <div className="text-muted text-xs py-2 animate-pulse px-4">Loading...</div>
+  if (fetchStatus === "error")
+    return <div className="text-muted text-xs py-2 px-4">Failed to load.</div>;
+  return (
+    <div className="text-muted text-xs py-2 animate-pulse px-4">Loading...</div>
+  );
 }
 
 /** A collapsible recommendations section, cachine recommendations on the nav-stack. **/
-function RecsSection({entity, navigate, update}: {
+function RecsSection({
+  entity,
+  navigate,
+  update,
+}: {
   entity: EntityInfo & { recs?: Recommend[] };
   navigate: NavigateFn;
-  update: UpdateFn
+  update: UpdateFn;
 }) {
-  const [open, setOpen] = useState(entity.recs != null)
-  const [fetchStatus, setFetchStatus] = useState<FetchStatus>('idle')
-  const aborter = useRef(makeAbortable())
-  const rowid = getRowid(entity)
-  const RECSNUMBER = 10
+  const [open, setOpen] = useState(entity.recs != null);
+  const [fetchStatus, setFetchStatus] = useState<FetchStatus>("idle");
+  const aborter = useRef(makeAbortable());
+  const rowid = getRowid(entity);
+  const RECSNUMBER = 10;
 
   const handleToggle = () => {
     if (open) {
       setOpen(false);
-      return
+      return;
     }
-    setOpen(true)
-    if (entity.recs != null || fetchStatus === 'loading') return
-    setFetchStatus('loading')
-    const signal = aborter.current.nextSignal()
-    const popfloor = Math.max(Math.round(entity.logcount - 2.), 0)
-    fetch(`/api/recommend?rowid=${rowid}&entity_name=${entity.entity_type}&limit=${RECSNUMBER}&diverse=true&popfloor=${popfloor}`, {signal})
-      .then(r => {
+    setOpen(true);
+    if (entity.recs != null || fetchStatus === "loading") return;
+    setFetchStatus("loading");
+    const signal = aborter.current.nextSignal();
+    const popfloor = Math.max(Math.round(entity.logcount - 2), 0);
+    fetch(
+      `/api/recommend?rowid=${rowid}&entity_name=${entity.entity_type}&limit=${RECSNUMBER}&diverse=true&popfloor=${popfloor}`,
+      { signal },
+    )
+      .then((r) => {
         if (!r.ok) throw new Error(r.statusText);
-        return r.json()
+        return r.json();
       })
       .then((data: Recommend[]) => {
-        update(entity.entity_type, rowid, {recs: data});
-        setFetchStatus('idle')
+        update(entity.entity_type, rowid, { recs: data });
+        setFetchStatus("idle");
       })
-      .catch(err => {
-        if (err.name !== 'AbortError') setFetchStatus('error')
-      })
-  }
+      .catch((err) => {
+        if (err.name !== "AbortError") setFetchStatus("error");
+      });
+  };
 
   return (
     <div className="mt-3 border-t border-muted/20 pt-2 overflow-y-auto overscroll-contain no-scrollbar">
@@ -519,38 +629,49 @@ function RecsSection({entity, navigate, update}: {
         onClick={handleToggle}
         className={`text-xs flex items-center gap-1 cursor-pointer w-full px-4 py-1 -my-1 select-none
         bg-linear-to-r from-gray-500 via-gray-50 to-gray-500 bg-size-[200%_auto] bg-clip-text text-transparent
-        ${!open ? 'animate-sweep' : ''}`}
+        ${!open ? "animate-sweep" : ""}`}
       >
         More like this..
       </div>
       {open && (
         <div className="max-h-40 ">
-          <RecBody recs={entity.recs} fetchStatus={fetchStatus} entityType={entity.entity_type} navigate={navigate}/>
+          <RecBody
+            recs={entity.recs}
+            fetchStatus={fetchStatus}
+            entityType={entity.entity_type}
+            navigate={navigate}
+          />
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // --- Main Panel ---
 
 /** Detail panel for a selected entity — bottom sheet on mobile, sidebar on desktop. */
-export default function Panel({selection, navigate, update, onClose, goBack}: PanelProps) {
-  if (!selection) return null
+export default function Panel({
+  selection,
+  navigate,
+  update,
+  onClose,
+  goBack,
+}: PanelProps) {
+  if (!selection) return null;
 
-  let body: React.ReactNode
-  if (selection.status === 'loading') {
-    body = <LoadingBody/>
-  } else if (selection.status === 'error') {
-    body = <div className="text-muted text-sm mt-1">Failed to load.</div>
-  } else if (selection.entity_type === 'track') {
-    body = <TrackPanel s={selection} navigate={navigate}/>
-  } else if (selection.entity_type === 'album') {
-    body = <AlbumPanel s={selection} navigate={navigate}/>
-  } else if (selection.entity_type === 'artist') {
-    body = <ArtistPanel s={selection} navigate={navigate}/>
+  let body: React.ReactNode;
+  if (selection.status === "loading") {
+    body = <LoadingBody />;
+  } else if (selection.status === "error") {
+    body = <div className="text-muted text-sm mt-1">Failed to load.</div>;
+  } else if (selection.entity_type === "track") {
+    body = <TrackPanel s={selection} navigate={navigate} />;
+  } else if (selection.entity_type === "album") {
+    body = <AlbumPanel s={selection} navigate={navigate} />;
+  } else if (selection.entity_type === "artist") {
+    body = <ArtistPanel s={selection} navigate={navigate} />;
   } else {
-    body = <LabelPanel s={selection} navigate={navigate}/>
+    body = <LabelPanel s={selection} navigate={navigate} />;
   }
 
   return (
@@ -561,7 +682,7 @@ export default function Panel({selection, navigate, update, onClose, goBack}: Pa
                  overflow-y-auto overscroll-contain
                  bg-surface font-sans text-base text-white
                  rounded-t-2xl sm:rounded-xl shadow-xl touch-auto"
-      style={{paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))'}}
+      style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={(e) => e.stopPropagation()}
     >
@@ -573,20 +694,27 @@ export default function Panel({selection, navigate, update, onClose, goBack}: Pa
               onClick={goBack}
               className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
               aria-label="Go back"
-            >&lt;</button>
+            >
+              &lt;
+            </button>
           )}
           <button
             onClick={onClose}
             className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
             aria-label="Close"
-          >×
+          >
+            ×
           </button>
         </div>
       </div>
-      {selection.status === 'loaded' && (
-        <RecsSection key={`${selection.entity_type}:${getRowid(selection)}`} entity={selection} navigate={navigate}
-                     update={update}/>
+      {selection.status === "loaded" && (
+        <RecsSection
+          key={`${selection.entity_type}:${getRowid(selection)}`}
+          entity={selection}
+          navigate={navigate}
+          update={update}
+        />
       )}
     </div>
-  )
+  );
 }

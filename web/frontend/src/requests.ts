@@ -11,16 +11,16 @@
  * Pass the signal to `fetch`; in the catch, filter out `AbortError`.
  */
 export function makeAbortable() {
-  let controller: AbortController | null = null
+  let controller: AbortController | null = null;
   return {
     nextSignal() {
-      controller?.abort()
-      controller = new AbortController()
-      return controller.signal
+      controller?.abort();
+      controller = new AbortController();
+      return controller.signal;
     },
     cancel() {
-      controller?.abort()
-      controller = null
+      controller?.abort();
+      controller = null;
     },
-  }
+  };
 }

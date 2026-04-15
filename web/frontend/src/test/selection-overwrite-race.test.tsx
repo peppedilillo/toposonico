@@ -1,91 +1,95 @@
-import {act, render, screen} from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import App from '../App.tsx'
+import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import App from "../App.tsx";
 
-vi.mock('../MapView.tsx', () => ({
-  default: ({onFeatureSelect}: {onFeatureSelect: (entityType: 'artist', rowid: number) => void}) => (
+vi.mock("../MapView.tsx", () => ({
+  default: ({
+    onFeatureSelect,
+  }: {
+    onFeatureSelect: (entityType: "artist", rowid: number) => void;
+  }) => (
     <>
-      <button type="button" onClick={() => onFeatureSelect('artist', 1)}>
+      <button type="button" onClick={() => onFeatureSelect("artist", 1)}>
         Select artist 1
       </button>
-      <button type="button" onClick={() => onFeatureSelect('artist', 2)}>
+      <button type="button" onClick={() => onFeatureSelect("artist", 2)}>
         Select artist 2
       </button>
     </>
   ),
-}))
+}));
 
 // Lets the test release each response payload at a specific moment, so we can
 // force one selection to settle after a newer one has already become current.
 function deferred<T>() {
-  let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
   const promise = new Promise<T>((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return {promise, resolve, reject}
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 type ArtistPayload = {
-  artist_rowid: number
-  artist_name: string
-  lon: number
-  lat: number
-  logcount: number
-  ntrack: number
-  nalbum: number
-  nrepr: number
-  artist_genre: string | null
-  reprs: []
-}
+  artist_rowid: number;
+  artist_name: string;
+  lon: number;
+  lat: number;
+  logcount: number;
+  ntrack: number;
+  nalbum: number;
+  nrepr: number;
+  artist_genre: string | null;
+  reprs: [];
+};
 
-describe('App', () => {
+describe("App", () => {
   beforeEach(() => {
-    window.location.hash = ''
-  })
+    window.location.hash = "";
+  });
 
   afterEach(() => {
-    vi.unstubAllGlobals()
-  })
+    vi.unstubAllGlobals();
+  });
 
-  it('does not let a late selection overwrite a newer one', async () => {
-    const user = userEvent.setup()
-    const firstJson = deferred<ArtistPayload>()
-    const secondJson = deferred<ArtistPayload>()
+  it("does not let a late selection overwrite a newer one", async () => {
+    const user = userEvent.setup();
+    const firstJson = deferred<ArtistPayload>();
+    const secondJson = deferred<ArtistPayload>();
 
     const fetchMock = vi.fn((input: string | URL | Request) => {
-      const url = String(input)
-      if (url.includes('rowid=1')) {
+      const url = String(input);
+      if (url.includes("rowid=1")) {
         return Promise.resolve({
           ok: true,
-          statusText: 'OK',
+          statusText: "OK",
           json: () => firstJson.promise,
-        })
+        });
       }
-      if (url.includes('rowid=2')) {
+      if (url.includes("rowid=2")) {
         return Promise.resolve({
           ok: true,
-          statusText: 'OK',
+          statusText: "OK",
           json: () => secondJson.promise,
-        })
+        });
       }
-      throw new Error(`Unexpected fetch: ${url}`)
-    })
-    vi.stubGlobal('fetch', fetchMock)
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
-    render(<App/>)
+    render(<App />);
 
     // Start selection 1, then replace it with selection 2 before selection 1's
     // delayed JSON payload is allowed to settle.
-    await user.click(screen.getByRole('button', {name: 'Select artist 1'}))
-    await user.click(screen.getByRole('button', {name: 'Select artist 2'}))
+    await user.click(screen.getByRole("button", { name: "Select artist 1" }));
+    await user.click(screen.getByRole("button", { name: "Select artist 2" }));
 
     // Selection 2 settles first and becomes the visible current selection.
     await act(async () => {
       secondJson.resolve({
         artist_rowid: 2,
-        artist_name: 'Current Artist',
+        artist_name: "Current Artist",
         lon: 20,
         lat: 30,
         logcount: 4,
@@ -94,19 +98,19 @@ describe('App', () => {
         nrepr: 0,
         artist_genre: null,
         reprs: [],
-      })
-      await secondJson.promise
-    })
+      });
+      await secondJson.promise;
+    });
 
-    expect(screen.getByText('Current Artist')).toBeInTheDocument()
-    expect(screen.queryByText('Stale Artist')).not.toBeInTheDocument()
+    expect(screen.getByText("Current Artist")).toBeInTheDocument();
+    expect(screen.queryByText("Stale Artist")).not.toBeInTheDocument();
 
     // A late settlement from selection 1 must not overwrite the already-visible
     // newer selection.
     await act(async () => {
       firstJson.resolve({
         artist_rowid: 1,
-        artist_name: 'Stale Artist',
+        artist_name: "Stale Artist",
         lon: 10,
         lat: 15,
         logcount: 3,
@@ -115,11 +119,11 @@ describe('App', () => {
         nrepr: 0,
         artist_genre: null,
         reprs: [],
-      })
-      await firstJson.promise
-    })
+      });
+      await firstJson.promise;
+    });
 
-    expect(screen.getByText('Current Artist')).toBeInTheDocument()
-    expect(screen.queryByText('Stale Artist')).not.toBeInTheDocument()
-  })
-})
+    expect(screen.getByText("Current Artist")).toBeInTheDocument();
+    expect(screen.queryByText("Stale Artist")).not.toBeInTheDocument();
+  });
+});

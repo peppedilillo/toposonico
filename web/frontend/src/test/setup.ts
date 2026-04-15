@@ -1,6 +1,6 @@
-import '@testing-library/jest-dom'
+import "@testing-library/jest-dom";
 
-Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
   value: () => {},
   writable: true,
-})
+});

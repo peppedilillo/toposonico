@@ -1,34 +1,39 @@
-import {useCallback, useEffect, useRef, useState} from 'react'
-import Search from './Search.tsx'
-import Panel from './Panel.tsx'
-import MapView, {type MapCommand, type ViewState} from './MapView.tsx'
-import {makeAbortable} from './requests.ts'
-import {type EntityType, getRowid} from './utils.ts'
-import earwaxLogo from './assets/earwax_simple.svg'
-import type {Selection, UpdateFn} from './Panel.tsx'
+import { useCallback, useEffect, useRef, useState } from "react";
+import Search from "./Search.tsx";
+import Panel from "./Panel.tsx";
+import MapView, { type MapCommand, type ViewState } from "./MapView.tsx";
+import { makeAbortable } from "./requests.ts";
+import { type EntityType, getRowid } from "./utils.ts";
+import earwaxLogo from "./assets/earwax_simple.svg";
+import type { Selection, UpdateFn } from "./Panel.tsx";
 
-const MAX_HISTORY = 20
+const MAX_HISTORY = 20;
 
 const INITIAL_VIEW: ViewState = {
   lon: 9.93,
   lat: -4.64,
   zoom: 6,
-}
-const FLYTO_ZOOM_DEFAULT = 8
+};
+const FLYTO_ZOOM_DEFAULT = 8;
 
 /** Returns true when the parsed hash entity matches one of the supported entities. */
 function isEntityType(value: string | null): value is EntityType {
-  return value === 'track' || value === 'album' || value === 'artist' || value === 'label'
+  return (
+    value === "track" ||
+    value === "album" ||
+    value === "artist" ||
+    value === "label"
+  );
 }
 
 /** Reads map state from the URL hash. Missing keys fall back to INITIAL_VIEW defaults. */
 function parseHash() {
-  const params = new URLSearchParams(window.location.hash.slice(1))
-  const lon = parseFloat(params.get('lon') ?? '')
-  const lat = parseFloat(params.get('lat') ?? '')
-  const zoom = parseFloat(params.get('z') ?? '')
-  const rowid = parseInt(params.get('rowid') ?? '', 10)
-  const entity = params.get('entity')
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const lon = parseFloat(params.get("lon") ?? "");
+  const lat = parseFloat(params.get("lat") ?? "");
+  const zoom = parseFloat(params.get("z") ?? "");
+  const rowid = parseInt(params.get("rowid") ?? "", 10);
+  const entity = params.get("entity");
 
   return {
     view: {
@@ -39,145 +44,180 @@ function parseHash() {
     // invalid entity type and rowids in URL are dropped.
     entityType: isEntityType(entity) ? entity : null,
     rowid: Number.isNaN(rowid) ? null : rowid,
-  }
+  };
 }
 
 /** Merges updates into the current URL hash. */
 function updateHash(updates: Record<string, string | number | null>) {
-  const params = new URLSearchParams(window.location.hash.slice(1))
+  const params = new URLSearchParams(window.location.hash.slice(1));
   for (const [key, value] of Object.entries(updates)) {
-    if (value == null) params.delete(key)
-    else params.set(key, String(value))
+    if (value == null) params.delete(key);
+    else params.set(key, String(value));
   }
-  history.replaceState(null, '', '#' + params.toString())
+  history.replaceState(null, "", "#" + params.toString());
 }
 
 /** Root application component — owns navigation state, hash sync, and fetch coordination. */
 export default function App() {
-  const [initHash] = useState(parseHash)
-  const [viewState, setViewState] = useState<ViewState>(initHash.view)
+  const [initHash] = useState(parseHash);
+  const [viewState, setViewState] = useState<ViewState>(initHash.view);
   const [stack, setStack] = useState<Selection[]>(() =>
     initHash.entityType && initHash.rowid != null
-      ? [{status: 'loading', entity_type: initHash.entityType, rowid: initHash.rowid}]
-      : []
-  )
-  const [mapCommand, setMapCommand] = useState<MapCommand>(null)
-  const nextSelection = useRef(makeAbortable())
-  const current = stack.length > 0 ? stack[stack.length - 1] : null
+      ? [
+          {
+            status: "loading",
+            entity_type: initHash.entityType,
+            rowid: initHash.rowid,
+          },
+        ]
+      : [],
+  );
+  const [mapCommand, setMapCommand] = useState<MapCommand>(null);
+  const nextSelection = useRef(makeAbortable());
+  const current = stack.length > 0 ? stack[stack.length - 1] : null;
 
   /** Replaces the pending top entry when its identity still matches the finished request. */
-  const resolveTop = useCallback((entityType: EntityType, rowid: number, next: Selection) => {
-    setStack(prev => {
-      const top = prev[prev.length - 1]
-      // without this guard, a late selection can pop over an already closed panel
-      if (!top) return prev
-      // without this guard, select A and then B could still result in A being top of the stack
-      if (top.status === 'loaded') return prev
-      if (top.entity_type !== entityType) return prev
-      if (top.rowid !== rowid) return prev
-      return [...prev.slice(0, -1), next]
-    })
-  }, [])
+  const resolveTop = useCallback(
+    (entityType: EntityType, rowid: number, next: Selection) => {
+      setStack((prev) => {
+        const top = prev[prev.length - 1];
+        // without this guard, a late selection can pop over an already closed panel
+        if (!top) return prev;
+        // without this guard, select A and then B could still result in A being top of the stack
+        if (top.status === "loaded") return prev;
+        if (top.entity_type !== entityType) return prev;
+        if (top.rowid !== rowid) return prev;
+        return [...prev.slice(0, -1), next];
+      });
+    },
+    [],
+  );
 
   /** Loads entity details for the current top-of-stack identity. */
-  const loadSelection = useCallback((entityType: EntityType, rowid: number) => {
-    const signal = nextSelection.current.nextSignal()
-    fetch(`/api/panel?rowid=${rowid}&entity_name=${entityType}`, {signal})
-      .then(response => {
-        if (!response.ok) throw new Error(response.statusText)
-        return response.json()
-      })
-      .then(data => {
-        resolveTop(entityType, rowid, {status: 'loaded', entity_type: entityType, ...data})
-      })
-      .catch(err => {
-        if (err.name !== 'AbortError') {
-          resolveTop(entityType, rowid, {status: 'error', entity_type: entityType, rowid})
-        }
-      })
-  }, [resolveTop])
+  const loadSelection = useCallback(
+    (entityType: EntityType, rowid: number) => {
+      const signal = nextSelection.current.nextSignal();
+      fetch(`/api/panel?rowid=${rowid}&entity_name=${entityType}`, { signal })
+        .then((response) => {
+          if (!response.ok) throw new Error(response.statusText);
+          return response.json();
+        })
+        .then((data) => {
+          resolveTop(entityType, rowid, {
+            status: "loaded",
+            entity_type: entityType,
+            ...data,
+          });
+        })
+        .catch((err) => {
+          if (err.name !== "AbortError") {
+            resolveTop(entityType, rowid, {
+              status: "error",
+              entity_type: entityType,
+              rowid,
+            });
+          }
+        });
+    },
+    [resolveTop],
+  );
 
   /** Fetches entity info and pushes it onto the nav stack, without moving the map. */
-  const push = useCallback((entityType: EntityType, rowid: number) => {
-    setStack(prev => {
-      const pending: Selection = {status: 'loading', entity_type: entityType, rowid}
-      const top = prev[prev.length - 1]
-      if (!top || top.status === 'loaded')
-        return [...prev.slice(-(MAX_HISTORY - 1)), pending]
-      // guarantees error/loading selection can only be on top of the stack
-      return [...prev.slice(0, -1), pending]
-    })
-    loadSelection(entityType, rowid)
-  }, [loadSelection])
+  const push = useCallback(
+    (entityType: EntityType, rowid: number) => {
+      setStack((prev) => {
+        const pending: Selection = {
+          status: "loading",
+          entity_type: entityType,
+          rowid,
+        };
+        const top = prev[prev.length - 1];
+        if (!top || top.status === "loaded")
+          return [...prev.slice(-(MAX_HISTORY - 1)), pending];
+        // guarantees error/loading selection can only be on top of the stack
+        return [...prev.slice(0, -1), pending];
+      });
+      loadSelection(entityType, rowid);
+    },
+    [loadSelection],
+  );
 
   /** Shallow-merges a patch into the current top entry when it still matches the target entity. */
   const update = useCallback<UpdateFn>((entityType, rowid, patch) => {
-    setStack(prev => {
-      const index = prev.length - 1
-      if (index < 0) return prev
+    setStack((prev) => {
+      const index = prev.length - 1;
+      if (index < 0) return prev;
 
-      const selection = prev[index]
+      const selection = prev[index];
       // this protects against 1. attempting attaching recs to an unloaded Selection; and
       // 2. obsolete recs getting attached to latest selection in a race.
-      if (selection.status !== 'loaded') return prev
-      if (selection.entity_type !== entityType) return prev
-      if (getRowid(selection) !== rowid) return prev
+      if (selection.status !== "loaded") return prev;
+      if (selection.entity_type !== entityType) return prev;
+      if (getRowid(selection) !== rowid) return prev;
 
-      return [...prev.slice(0, index), {...selection, ...patch} as Selection]
-    })
-  }, [])
+      return [...prev.slice(0, index), { ...selection, ...patch } as Selection];
+    });
+  }, []);
 
   /** Pops the top entry and flies back to the one beneath it (already loaded, no refetch). */
   const pop = useCallback(() => {
-    if (stack.length < 2) return
+    if (stack.length < 2) return;
 
-    nextSelection.current.cancel()
-    const next = stack[stack.length - 2] as Extract<Selection, {status: 'loaded'}>
-    setStack(prev => prev.slice(0, -1))
+    nextSelection.current.cancel();
+    const next = stack[stack.length - 2] as Extract<
+      Selection,
+      { status: "loaded" }
+    >;
+    setStack((prev) => prev.slice(0, -1));
     setMapCommand({
-      type: 'flyTo',
+      type: "flyTo",
       center: [next.lon, next.lat],
       zoom: FLYTO_ZOOM_DEFAULT,
-    })
-  }, [stack])
+    });
+  }, [stack]);
 
   /** Closes the panel and clears the nav stack. */
   const handlePanelClose = useCallback(() => {
-    nextSelection.current.cancel()
-    setStack([])
-  }, [])
+    nextSelection.current.cancel();
+    setStack([]);
+  }, []);
 
   /** Flies the map to the given coordinates and pushes a new selection. */
-  const navigate = useCallback((entityType: EntityType, rowid: number, lon: number, lat: number) => {
-    setMapCommand({
-      type: 'flyTo',
-      center: [lon, lat],
-      zoom: FLYTO_ZOOM_DEFAULT,
-    })
-    push(entityType, rowid)
-  }, [push])
+  const navigate = useCallback(
+    (entityType: EntityType, rowid: number, lon: number, lat: number) => {
+      setMapCommand({
+        type: "flyTo",
+        center: [lon, lat],
+        zoom: FLYTO_ZOOM_DEFAULT,
+      });
+      push(entityType, rowid);
+    },
+    [push],
+  );
 
   /** Handles map feature clicks, which select without issuing a redundant fly-to. */
-  const select = useCallback((entityType: EntityType, rowid: number) => {
-    push(entityType, rowid)
-  }, [push])
+  const select = useCallback(
+    (entityType: EntityType, rowid: number) => {
+      push(entityType, rowid);
+    },
+    [push],
+  );
 
   /** Fetches entity info from URL hash on initial mount, without moving the map. */
   useEffect(() => {
-    if (!initHash.entityType || initHash.rowid == null) return
-    loadSelection(initHash.entityType, initHash.rowid)
-  }, [initHash.entityType, initHash.rowid, loadSelection])
+    if (!initHash.entityType || initHash.rowid == null) return;
+    loadSelection(initHash.entityType, initHash.rowid);
+  }, [initHash.entityType, initHash.rowid, loadSelection]);
 
   /** Debounced URL hash sync — avoids iOS Safari replaceState rate-limit during flyTo. */
-  const hashEntity =
-    current == null ? null : current.entity_type
+  const hashEntity = current == null ? null : current.entity_type;
 
   const hashRowid =
     current == null
       ? null
-      : current.status === 'loaded'
+      : current.status === "loaded"
         ? getRowid(current)
-        : current.rowid
+        : current.rowid;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -187,11 +227,11 @@ export default function App() {
         z: viewState.zoom.toFixed(2),
         entity: hashEntity,
         rowid: hashRowid,
-      })
-    }, 100)
+      });
+    }, 100);
 
-    return () => clearTimeout(timer)
-  }, [hashEntity, hashRowid, viewState.lat, viewState.lon, viewState.zoom])
+    return () => clearTimeout(timer);
+  }, [hashEntity, hashRowid, viewState.lat, viewState.lon, viewState.zoom]);
 
   return (
     <div className="relative w-screen h-screen">
@@ -201,7 +241,7 @@ export default function App() {
         onMoveEnd={setViewState}
         onFeatureSelect={select}
       />
-      <Search navigate={navigate}/>
+      <Search navigate={navigate} />
       <Panel
         selection={current}
         navigate={navigate}
@@ -216,5 +256,5 @@ export default function App() {
                    bottom-4 right-4 select-none"
       />
     </div>
-  )
+  );
 }
