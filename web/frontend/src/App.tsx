@@ -213,7 +213,7 @@ export default function App() {
         src={earwaxLogo}
         alt="earwax"
         className="fixed z-5 sm:w-28 w-16 pointer-events-none
-                   bottom-4 right-4"
+                   bottom-4 right-4 select-none"
       />
     </div>
   )
