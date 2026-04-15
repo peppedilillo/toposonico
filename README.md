@@ -2,7 +2,7 @@
 
 Welcome!
 
-This monorepo contains all code used for _sick_, a recommender and navigable map of ~17M entities between tracks, albums, artists and labels. The project is structured in three main sections:
+This monorepo contains all code used for _sick_, a recommender and navigable map for 17M discographic entities. The project is structured in three main sections:
 
 * `ml` contains all things necessary to train the recommender model, export its embeddings and UMAP representation, and to build lookup tables.
 * `db` implements a pipeline transforming the previous data products into a proper database and a collection of GEOJson.
