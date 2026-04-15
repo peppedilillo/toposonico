@@ -1,20 +1,8 @@
-#!/usr/bin/env python3
 """Poll Lambda Labs for GPU availability and launch as soon as capacity opens up.
 
 Prints a catalog of all available instance types (with prices and regional
 availability) before entering the polling loop, so you can immediately see
 whether your targets are listed and what they cost.
-
-Usage:
-    python scripts/lambda_sniper.py [--instances TYPE [TYPE ...]]
-                                   [--regions PREFIX [PREFIX ...]]
-                                   [--poll-interval SECS] [--api-key KEY]
-                                   [--ssh-key NAME] [--dry-run]
-
-Examples:
-    python scripts/lambda_sniper.py
-    python scripts/lambda_sniper.py --instances gpu_1x_a100_sxm4 --regions us
-    python scripts/lambda_sniper.py --dry-run
 """
 
 import argparse
@@ -27,13 +15,16 @@ from requests.auth import HTTPBasicAuth
 API_BASE = "https://cloud.lambda.ai/api/v1"
 DEFAULT_INSTANCES = ["gpu_1x_a100_sxm4", "gpu_1x_a100_pcie"]
 DEFAULT_REGIONS = ["us", "eu"]
+DEFAULT_POLLING_INTERVAL = 12.01
 
 
 def auth(api_key):
+    """Return HTTP Basic auth credentials for the Lambda API."""
     return HTTPBasicAuth(api_key, "")
 
 
 def ts():
+    """Return the current time as HH:MM:SS."""
     return time.strftime("%H:%M:%S")
 
 
@@ -77,6 +68,7 @@ def fetch_catalog(api_key):
 
 
 def region_matches(name, prefixes):
+    """Check whether a region name starts with any of the given prefixes."""
     return any(name.startswith(p) for p in prefixes)
 
 
@@ -215,28 +207,28 @@ def main():
     parser.add_argument(
         "--api-key",
         default=os.environ.get("LAMBDA_API_KEY"),
-        help="Lambda Labs API key. Set to `LAMBDA_API_KEY` by default.",
+        help="Lambda Labs API key. $LAMBDA_API_KEY",
     )
     parser.add_argument(
         "--instances",
         nargs="+",
         default=DEFAULT_INSTANCES,
         metavar="TYPE",
-        help=f"Instance type(s) to snipe (default: {' '.join(DEFAULT_INSTANCES)})",
+        help=f"Instance type(s) to snipe (default: {' '.join(DEFAULT_INSTANCES)}).",
     )
     parser.add_argument(
         "--regions",
         nargs="+",
         default=DEFAULT_REGIONS,
         metavar="PREFIX",
-        help=f"Region prefix(es) to snipe in (default: {' '.join(DEFAULT_REGIONS)})",
+        help=f"Region prefix(es) to snipe in (default: {' '.join(DEFAULT_REGIONS)}).",
     )
     parser.add_argument(
         "--poll-interval",
         type=float,
-        default=12.01,  # slightly non-round to reduce collision with round-interval rate limits
+        default=DEFAULT_POLLING_INTERVAL,
         metavar="SECS",
-        help="Seconds between polls (default: 12.01)",
+        help=f"Seconds between polls (default: {DEFAULT_POLLING_INTERVAL}).",
     )
     parser.add_argument(
         "--ssh-key",
@@ -252,10 +244,7 @@ def main():
     args = parser.parse_args()
 
     if not args.api_key:
-        raise ValueError(
-            "No `LAMBDA_API_KEY` environment variable set. "
-            "Either run with --api-key or define the environment variable."
-        )
+        raise ValueError("--api-key / $LAMBDA_API_KEY not set.")
 
     try:
         snipe(args.api_key, args.instances, args.regions, args.poll_interval, args.dry_run, args.ssh_key)

@@ -1,17 +1,8 @@
-#!/usr/bin/env python3
 """Build embedding parquets from the enriched training vocab and model checkpoint.
 
 Writes one parquet per entity type (track, artist, album, label). Track embeddings
 are written directly from the checkpoint; artist/album/label embeddings are
 mean-pooled from their constituent track embeddings via the entity classes.
-
-Usage:
-    python scripts/build_embeddings.py MODEL [--input PATH] [--track-output PATH]
-                                             [--artist-output PATH] [--album-output PATH]
-                                             [--label-output PATH] [--chunk-size N]
-
-Example:
-    python scripts/build_embeddings.py outs/magic_falcon_model_t11M_ep8_v1d3279.pt
 """
 
 import argparse
@@ -114,48 +105,45 @@ def write_track_embeddings(t1_df: pd.DataFrame, model_dict: dict, output_path: P
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Build embedding parquets from t1 vocab and model checkpoint",
+        description="Build embedding parquets from t1 vocab and model checkpoint.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("model", type=Path, help="Path to .pt model checkpoint file")
     parser.add_argument(
         "--input",
         default=os.environ.get("SICK_T1_VOCAB"),
-        help="Enriched training vocab path. Defaults to `SICK_T1_VOCAB`.",
+        help="Enriched training vocab path. $SICK_T1_VOCAB",
     )
     parser.add_argument(
         "--track-output",
         default=os.environ.get("SICK_EMBEDDING_TRACK"),
-        help="Track embedding output path. Defaults to `SICK_EMBEDDING_TRACK`.",
+        help="Track embedding output path. $SICK_EMBEDDING_TRACK",
     )
     parser.add_argument(
         "--artist-output",
         default=os.environ.get("SICK_EMBEDDING_ARTIST"),
-        help="Artist embedding output path. Defaults to `SICK_EMBEDDING_ARTIST`.",
+        help="Artist embedding output path. $SICK_EMBEDDING_ARTIST",
     )
     parser.add_argument(
         "--album-output",
         default=os.environ.get("SICK_EMBEDDING_ALBUM"),
-        help="Album embedding output path. Defaults to `SICK_EMBEDDING_ALBUM`.",
+        help="Album embedding output path. $SICK_EMBEDDING_ALBUM",
     )
     parser.add_argument(
         "--label-output",
         default=os.environ.get("SICK_EMBEDDING_LABEL"),
-        help="Label embedding output path. Defaults to `SICK_EMBEDDING_LABEL`.",
+        help="Label embedding output path. $SICK_EMBEDDING_LABEL",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
         default=CHUNK_SIZE_DEFAULT,
-        help=f"Rows per parquet row group (default: {CHUNK_SIZE_DEFAULT:,})",
+        help=f"Rows per parquet row group (default: {CHUNK_SIZE_DEFAULT:,}).",
     )
     args = parser.parse_args()
 
     if args.input is None:
-        raise ValueError(
-            "No `SICK_T1_VOCAB` environment variable set. "
-            "Either run with --input argument or define the environment variable."
-        )
+        raise ValueError("--input / $SICK_T1_VOCAB not set.")
     for path, envvar in [
         (args.track_output, "SICK_EMBEDDING_TRACK"),
         (args.artist_output, "SICK_EMBEDDING_ARTIST"),
@@ -164,7 +152,7 @@ def main():
     ]:
         if path is None:
             raise ValueError(
-                f"No `{envvar}` environment variable set. "
+                f"${envvar} not set. "
                 f"Either run with the matching output argument or define the environment variable."
             )
 

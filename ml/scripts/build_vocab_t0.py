@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Build the base training vocabulary from the playlist SQLite database.
 
 Counts distinct playlist appearances per track (full table scan of ~1.7B rows),
@@ -6,12 +5,6 @@ filters by --min-count, then assigns contiguous track_ids (0..vocab_size-1)
 sorted by track_rowid. Output parquet contains track_rowid, track_id, and
 playlist_count only. Metadata enrichment happens in a second stage via
 `build_vocab_t1.py`.
-
-Usage:
-    python scripts/build_vocab_t0.py [--database DB] [--output OUTPUT] [--min-count N]
-
-Example:
-    python scripts/build_vocab_t0.py --min-count 2
 """
 
 import argparse
@@ -22,6 +15,9 @@ import time
 
 import numpy as np
 import pandas as pd
+
+
+MIN_COUNT = 5
 
 QUERY = """
     SELECT track_rowid, COUNT(*) AS playlist_count
@@ -39,22 +35,24 @@ QUERY = """
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Build training vocabulary from playlist database",
+        description="Build training vocabulary from playlist database.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--database",
         default=os.environ.get("SICK_PLAYLIST_DB"),
-        help="Path to playlist SQLite database. Set to `SICK_PLAYLIST_DB` by default.",
+        help="Path to playlist SQLite database. $SICK_PLAYLIST_DB",
     )
     parser.add_argument(
-        "--output", default=os.environ.get("SICK_T0_VOCAB"), help="Output parquet path. Defaults to `SICK_T0_VOCAB`."
+        "--output",
+        default=os.environ.get("SICK_T0_VOCAB"),
+        help="Output parquet path. $SICK_T0_VOCAB",
     )
     parser.add_argument(
         "--min-count",
         type=int,
-        default=5,
-        help="Minimum playlist count to include a track (default: 5)",
+        default=MIN_COUNT,
+        help=f"Minimum playlist count to include a track (default: {MIN_COUNT}).",
     )
     args = parser.parse_args()
 
@@ -62,19 +60,13 @@ def main():
         raise ValueError("Argument --min-count must be >= 1.")
 
     if args.database is None:
-        raise ValueError(
-            "No `SICK_PLAYLIST_DB` environment variable set. "
-            "Either run with --database argument or define the environment variable."
-        )
+        raise ValueError("--database / $SICK_PLAYLIST_DB not set.")
     db_path = Path(args.database)
     if not db_path.exists():
-        raise FileNotFoundError(f"Database not found: {db_path}")
+        raise FileNotFoundError(f"Database not found: {db_path}.")
 
     if args.output is None:
-        raise ValueError(
-            "No `SICK_T0_VOCAB` environment variable set. "
-            "Either run with --output argument or define the environment variable."
-        )
+        raise ValueError("--output / $SICK_T0_VOCAB not set.")
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -83,7 +75,7 @@ def main():
     print(f"Min count : {args.min_count}")
     print()
     print("Counting distinct playlists per track...")
-    print("(Full table scan of ~1.7B rows — this will take a while on HDD.)")
+    print("(Full table scan of ~1.7B rows — this will take a while on HDD)")
 
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     t0 = time.time()

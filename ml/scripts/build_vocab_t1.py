@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Enrich the base training vocabulary with stable entity ids from metadata.
 
 The base vocabulary defines trainable track membership via playlist evidence.
@@ -148,41 +147,38 @@ def validate_metadata_coverage(vocab: pd.DataFrame, metadata: pd.DataFrame) -> N
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Enrich the base training vocabulary with metadata ids",
+        description="Enrich the base training vocabulary with metadata ids.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--database",
         default=os.environ.get("SICK_TRACKS_DB"),
-        help="Path to track SQLite database. Set to `SICK_TRACKS_DB` by default.",
+        help="Path to track SQLite database. $SICK_TRACKS_DB",
     )
     parser.add_argument(
         "--input",
         default=os.environ.get("SICK_T0_VOCAB"),
-        help="Base training vocab path. Defaults to `SICK_T0_VOCAB`.",
+        help="Base training vocab path. $SICK_T0_VOCAB",
     )
     parser.add_argument(
         "--output",
         default=os.environ.get("SICK_T1_VOCAB"),
-        help="Output path for enriched training vocab. Set to `SICK_T1_VOCAB` by default.",
+        help="Output path for enriched training vocab. $SICK_T1_VOCAB",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
         default=CHUNK_SIZE_DEFAULT,
-        help=f"Rows per temp-table insert batch (default: {CHUNK_SIZE_DEFAULT:,})",
+        help=f"Rows per temp-table insert batch (default: {CHUNK_SIZE_DEFAULT:,}).",
     )
     args = parser.parse_args()
 
     if args.database is None:
-        raise ValueError(
-            "No `SICK_TRACKS_DB` environment variable set. "
-            "Either run with --database argument or define the environment variable."
-        )
+        raise ValueError("--database / $SICK_TRACKS_DB not set.")
     if args.input is None:
-        raise ValueError("No base training vocab path set. Use --input or set `SICK_T0_VOCAB`.")
+        raise ValueError("--input / $SICK_T0_VOCAB not set.")
     if args.output is None:
-        raise ValueError("No output path set. Use --output or set `SICK_T1_VOCAB`.")
+        raise ValueError("--output / $SICK_T1_VOCAB not set.")
 
     db_path = Path(args.database)
     if not db_path.exists():

@@ -1,24 +1,9 @@
-#!/usr/bin/env python3
 """Export playlist_tracks to parquet chunks for full-scale training.
 
-Streams playlist_tracks in batches of N playlists (filtered: no episodes, no
-local files, no null track_rowids) and writes one parquet chunk per batch.
-Chunks store raw track_rowids — remapping to track_id happens at training time
-via training_vocab.parquet, keeping chunks valid across vocab choices.
-
---offset slices the playlist list with Python semantics before chunking:
-0 = all, K > 0 = skip first K, -K = last K only.
-
-Usage:
-    python scripts/build_playlist_chunks.py output_dir [--database DB]
-                                             [--chunk-size N] [--offset K]
-                                             [--overwrite]
-
-Examples:
-    python scripts/build_playlist_chunks.py ./chunks --chunk-size 100000
-
-    python scripts/build_playlist_chunks.py ./mini_chunks \\
-        --offset -40000 --chunk-size 15000
+Splits playlist_tracks in N batches of playlists (filtered: no episodes, no
+local files, no null track_rowids), one parquet chunk per batch.
+Flag --offset slices the playlist list with Python semantics before chunking:
+--offset=0 implies all, --offset=K > 0 = skip first K, --offset=-K = last K only.
 """
 
 import argparse
@@ -31,6 +16,9 @@ import sqlite3
 import time
 
 import pandas as pd
+
+
+DEFAULT_CHUNK_SIZE = 100_000
 
 PLAYLIST_ROWIDS_QUERY = "SELECT rowid FROM playlists ORDER BY rowid"
 
@@ -58,20 +46,24 @@ def get_connection(database_path: Path) -> sqlite3.Connection:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Export playlist_tracks to parquet chunks for training",
+        description="Export playlist_tracks to parquet chunks for training.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("output_dir", type=Path, help="Output directory for chunks")
+    parser.add_argument(
+        "output_dir",
+        type=Path,
+        help="Output directory for chunks.",
+    )
     parser.add_argument(
         "--database",
         default=os.environ.get("SICK_PLAYLIST_DB"),
-        help="Path to playlist SQLite database. Set to `SICK_PLAYLIST_DB` by default.",
+        help="Path to playlist SQLite database. $SICK_PLAYLIST_DB",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=100_000,
-        help="Number of playlists per chunk (default: 100,000)",
+        default=DEFAULT_CHUNK_SIZE,
+        help="Number of playlists per chunk (default: 100,000).",
     )
     parser.add_argument(
         "--offset",
@@ -86,18 +78,15 @@ def main():
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Overwrite existing chunk files (default: skip existing)",
+        help="Overwrite existing chunk files (default: skip existing).",
     )
     args = parser.parse_args()
 
     if args.database is None:
-        raise ValueError(
-            "No `SICK_PLAYLIST_DB` environment variable set. "
-            "Either run with --database argument or define the environment variable."
-        )
+        raise ValueError("--database / $SICK_PLAYLIST_DB not set.")
     db_path = Path(args.database)
     if not db_path.exists():
-        raise FileNotFoundError(f"Database not found: {db_path}")
+        raise FileNotFoundError(f"Database not found: {db_path}.")
 
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)

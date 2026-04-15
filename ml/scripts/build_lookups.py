@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Build enriched lookup tables from the training vocab and model checkpoint.
 
 This script uses the checkpoint-scoped entity logic from ``src.entities`` to
@@ -20,6 +19,7 @@ from src.entities import Albums
 from src.entities import Artists
 from src.entities import Labels
 from src.entities import Tracks
+
 
 TEMP_TABLE_NAME = "build_lookups_tracks_tmp"
 CHUNK_SIZE_DEFAULT = 50_000
@@ -156,6 +156,7 @@ def build_track_lookup(
     model_dict: dict,
     track_meta: pd.DataFrame,
 ) -> pd.DataFrame:
+    """Build the track lookup table with metadata, label ids, and logcount."""
     track_lookup = Tracks.lookup(t1_df, model_dict)
     label_ids = t1_df[t1_df["track_rowid"].isin(track_lookup["track_rowid"])][["track_rowid", "label_rowid"]].copy()
     label_ids["track_rowid"] = label_ids["track_rowid"].astype("int64")
@@ -189,6 +190,7 @@ def build_artist_lookup(
     model_dict: dict,
     track_meta: pd.DataFrame,
 ) -> pd.DataFrame:
+    """Build the artist lookup table with names, genres, and logcount."""
     artist_lookup = Artists.lookup(t1_df, model_dict)
     artist_meta = (
         track_meta.groupby("artist_rowid", as_index=False)
@@ -220,6 +222,7 @@ def build_album_lookup(
     model_dict: dict,
     track_meta: pd.DataFrame,
 ) -> pd.DataFrame:
+    """Build the album lookup table with metadata, label, and logcount."""
     album_lookup = Albums.lookup(t1_df, model_dict)
     enriched = track_meta.merge(
         t1_df[["track_rowid", "label_rowid"]].drop_duplicates("track_rowid"),
@@ -268,6 +271,7 @@ def build_label_lookup(
     model_dict: dict,
     track_meta: pd.DataFrame,
 ) -> pd.DataFrame:
+    """Build the label lookup table with name, logcount, and entity counts."""
     label_lookup = Labels.lookup(t1_df, model_dict)
     label_meta = (
         t1_df[["track_rowid", "label_rowid"]]
@@ -287,58 +291,56 @@ def build_label_lookup(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Build enriched lookup parquets from t1 vocab and model checkpoint",
+        description="Build enriched lookup parquets from t1 vocab and model checkpoint.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("model", type=Path, help="Path to .pt model checkpoint file")
+    parser.add_argument(
+        "model",
+        type=Path,
+        help="Path to .pt model checkpoint file",
+    )
     parser.add_argument(
         "--database",
         default=os.environ.get("SICK_TRACKS_DB"),
-        help="Path to track SQLite database. Set to `SICK_TRACKS_DB` by default.",
+        help="Path to track SQLite database. $SICK_TRACKS_DB",
     )
     parser.add_argument(
         "--input",
         default=os.environ.get("SICK_T1_VOCAB"),
-        help="Enriched training vocab path. Defaults to `SICK_T1_VOCAB`.",
+        help="Enriched training vocab path. $SICK_T1_VOCAB",
     )
     parser.add_argument(
         "--track-output",
         default=os.environ.get("SICK_LOOKUP_TRACK"),
-        help="Track lookup output path. Defaults to `SICK_LOOKUP_TRACK`.",
+        help="Track lookup output path. $SICK_LOOKUP_TRACK",
     )
     parser.add_argument(
         "--artist-output",
         default=os.environ.get("SICK_LOOKUP_ARTIST"),
-        help="Artist lookup output path. Defaults to `SICK_LOOKUP_ARTIST`.",
+        help="Artist lookup output path. $SICK_LOOKUP_ARTIST",
     )
     parser.add_argument(
         "--album-output",
         default=os.environ.get("SICK_LOOKUP_ALBUM"),
-        help="Album lookup output path. Defaults to `SICK_LOOKUP_ALBUM`.",
+        help="Album lookup output path. $SICK_LOOKUP_ALBUM",
     )
     parser.add_argument(
         "--label-output",
         default=os.environ.get("SICK_LOOKUP_LABEL"),
-        help="Label lookup output path. Defaults to `SICK_LOOKUP_LABEL`.",
+        help="Label lookup output path. $SICK_LOOKUP_LABEL",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
         default=CHUNK_SIZE_DEFAULT,
-        help=f"Rows per temp-table insert batch (default: {CHUNK_SIZE_DEFAULT:,})",
+        help=f"Rows per temp-table insert batch (default: {CHUNK_SIZE_DEFAULT:,}).",
     )
     args = parser.parse_args()
 
     if args.database is None:
-        raise ValueError(
-            "No `SICK_TRACKS_DB` environment variable set. "
-            "Either run with --database argument or define the environment variable."
-        )
+        raise ValueError("--database / $SICK_TRACKS_DB not set.")
     if args.input is None:
-        raise ValueError(
-            "No `SICK_T1_VOCAB` environment variable set. "
-            "Either run with --input argument or define the environment variable."
-        )
+        raise ValueError("--input / $SICK_T1_VOCAB not set.")
     for path, envvar in [
         (args.track_output, "SICK_LOOKUP_TRACK"),
         (args.artist_output, "SICK_LOOKUP_ARTIST"),
@@ -347,7 +349,7 @@ def main():
     ]:
         if path is None:
             raise ValueError(
-                f"No `{envvar}` environment variable set. "
+                f"${envvar} not set. "
                 f"Either run with the matching output argument or define the environment variable."
             )
 
