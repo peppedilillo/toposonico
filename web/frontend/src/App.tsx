@@ -12,9 +12,8 @@ const MAX_HISTORY = 20;
 const INITIAL_VIEW: ViewState = {
   lon: 9.93,
   lat: -4.64,
-  zoom: 6,
+  zoom: 8,
 };
-const FLYTO_ZOOM_DEFAULT = 8;
 
 /** Returns true when the parsed hash entity matches one of the supported entities. */
 function isEntityType(value: string | null): value is EntityType {
@@ -172,7 +171,6 @@ export default function App() {
     setMapCommand({
       type: "flyTo",
       center: [next.lon, next.lat],
-      zoom: FLYTO_ZOOM_DEFAULT,
     });
   }, [stack]);
 
@@ -188,7 +186,6 @@ export default function App() {
       setMapCommand({
         type: "flyTo",
         center: [lon, lat],
-        zoom: FLYTO_ZOOM_DEFAULT,
       });
       push(entityType, rowid);
     },
