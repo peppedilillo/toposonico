@@ -96,17 +96,29 @@ function parseNumber(value: unknown): number | null {
 
 /** Base visual radius shared by all entity layers. */
 function getVisualRadiusExpression() {
-  return ["max", MIN_VISUAL_RADIUS, ["get", "logcount"]] as ExpressionSpecification;
+  return [
+    "max",
+    MIN_VISUAL_RADIUS,
+    ["get", "logcount"],
+  ] as ExpressionSpecification;
 }
 
 /** Stroke width needed to pad a visible circle out to the minimum hit radius. */
 function getHitStrokeWidthExpression() {
-  return ["max", 0, ["-", MIN_HIT_RADIUS, getVisualRadiusExpression()]] as ExpressionSpecification;
+  return [
+    "max",
+    0,
+    ["-", MIN_HIT_RADIUS, getVisualRadiusExpression()],
+  ] as ExpressionSpecification;
 }
 
 /** Radius used by ghost layers so small circles remain easy to hit. */
 function getHitRadiusExpression() {
-  return ["max", MIN_HIT_RADIUS, ["get", "logcount"]] as ExpressionSpecification;
+  return [
+    "max",
+    MIN_HIT_RADIUS,
+    ["get", "logcount"],
+  ] as ExpressionSpecification;
 }
 
 /** MapLibre wrapper responsible only for map rendering and imperative camera commands. */
@@ -292,20 +304,24 @@ export default function MapView({
 
           const logcount = parseNumber(feature.properties?.logcount);
           if (rowid == null || logcount == null) continue;
-          if (bestSelection != null && logcount <= bestSelection.logcount) continue;
+          if (bestSelection != null && logcount <= bestSelection.logcount)
+            continue;
 
           bestSelection = { entityType, rowid, logcount };
         }
 
         if (bestSelection != null) {
-          onFeatureSelectRef.current(bestSelection.entityType, bestSelection.rowid);
+          onFeatureSelectRef.current(
+            bestSelection.entityType,
+            bestSelection.rowid,
+          );
         }
       });
 
       map.on("mousemove", (e) => {
         const hasInteractiveFeature =
-          map.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYER_IDS }).length >
-          0;
+          map.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYER_IDS })
+            .length > 0;
         map.getCanvas().style.cursor = hasInteractiveFeature ? "pointer" : "";
       });
 
