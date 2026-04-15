@@ -58,7 +58,7 @@ echo "Output: $SICK_TILES_DIR"
 
 tippecanoe -e "$SICK_TILES_DIR" \
     --full-detail=7 --low-detail=7 \
-    --maximum-zoom=14 --minimum-zoom=5 --drop-rate=1.7 \
+    --maximum-zoom=14 --minimum-zoom=5 --drop-rate=1.75 \
     --drop-densest-as-needed \
     --read-parallel --force \
     --named-layer=tracks:"$SICK_JSON_TRACK" \
