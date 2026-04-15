@@ -2,6 +2,7 @@
 
 @theme {
   --font-sans: "Roboto", sans-serif;
+  --color-background: #0d0d12;
   --color-surface: #303030;
   --color-muted: #7e7d7d;
   --color-overlay: rgba(25, 25, 25, 0.8);
@@ -27,6 +28,10 @@
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+#root {
+  --color-background: #0d0d12;
 }
 
 html,

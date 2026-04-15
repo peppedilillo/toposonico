@@ -139,7 +139,7 @@ export default function MapView({
           {
             id: "background",
             type: "background",
-            paint: { "background-color": "#0d0d12" },
+            paint: { "background-color": cssVar("--color-background") },
           },
         ],
       },
