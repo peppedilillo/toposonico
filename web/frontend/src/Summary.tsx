@@ -71,14 +71,18 @@ export function TrackSummary({
         </div>
         <DebugId debugId={debugId} />
       </div>
-      <div className="text-sm text-muted leading-tight truncate">
+      <div className="flex items-center gap-1 min-w-0">
+        <div className="min-w-0 text-sm text-muted leading-tight truncate">
+          {artist}
+        </div>
         {album ? (
           <>
-            {artist} · {album}
+            <span className="shrink-0 text-muted">·</span>
+            <div className="min-w-0 text-sm text-muted leading-tight truncate">
+              {album}
+            </div>
           </>
-        ) : (
-          artist
-        )}
+        ) : null}
       </div>
     </div>
   );

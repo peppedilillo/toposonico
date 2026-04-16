@@ -209,7 +209,7 @@ function Link({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={hovered ? { color } : undefined}
-      className="cursor-pointer text-left max-w-full truncate transition-colors"
+      className="max-w-full truncate text-left cursor-pointer transition-colors"
     >
       {children}
     </button>
@@ -322,7 +322,7 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
         debugId={s.track_rowid}
       />
       {(s.label || s.release_date) && (
-        <div className="text-sm text-muted mt-1 truncate">
+        <div className="text-sm text-muted truncate">
           {s.label && (
             <Link
               onClick={() =>
@@ -364,7 +364,7 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
         debugId={s.album_rowid}
       />
       {(s.label || s.release_date) && (
-        <div className="text-sm text-muted mt-1 truncate">
+        <div className="text-sm text-muted truncate">
           {s.label && (
             <Link
               onClick={() =>
