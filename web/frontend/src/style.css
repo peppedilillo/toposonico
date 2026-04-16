@@ -24,6 +24,19 @@
   --animate-sweep: sweep 8s linear infinite;
 }
 
+:root {
+  --ui-edge-gap: 0.75rem;
+  --ui-between-gap: 1rem;
+  --panel-bottom-gap: 0rem;
+  --panel-expanded-height: 20rem;
+  --search-input-height: 3rem;
+  --search-dropdown-gap: 0.25rem;
+  --search-with-panel-max-height: min(
+    var(--panel-expanded-height),
+    calc(50dvh - var(--ui-between-gap))
+  );
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }
@@ -35,6 +48,59 @@
 .ui-no-pinch,
 .ui-no-pinch * {
   touch-action: pan-y pan-x;
+}
+
+.search-dropdown-with-panel {
+  max-height: calc(
+    var(--search-with-panel-max-height) - var(--search-input-height) -
+      var(--search-dropdown-gap)
+  );
+}
+
+.panel-safe-bottom {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+.panel-with-search {
+  max-height: calc(
+    50dvh - var(--ui-between-gap) - var(--panel-bottom-gap)
+  );
+}
+
+@media (width >= 40rem) {
+  :root {
+    --panel-bottom-gap: 1rem;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 900px) {
+  .phone-landscape-hidden {
+    display: none;
+  }
+
+  .phone-landscape-panel {
+    top: auto;
+    left: var(--ui-edge-gap);
+    bottom: var(--ui-edge-gap);
+    right: auto;
+    width: min(
+      var(--container-md),
+      calc(100vw - var(--ui-edge-gap) - var(--ui-edge-gap))
+    );
+    max-height: calc(100dvh - var(--ui-edge-gap) - var(--ui-edge-gap));
+    border-radius: var(--radius-xl);
+  }
+
+  .phone-landscape-panel.panel-with-search {
+    max-height: calc(100dvh - var(--ui-edge-gap) - var(--ui-edge-gap));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 520px) {
+  .phone-landscape-panel {
+    right: var(--ui-edge-gap);
+    width: auto;
+  }
 }
 
 html,

@@ -60,6 +60,8 @@ type SearchProps = {
     lon: number,
     lat: number,
   ) => void;
+  panelOpen: boolean;
+  onDropdownChange: (open: boolean) => void;
 };
 
 /** Returns the rendered summary component for a hit. */
@@ -100,6 +102,7 @@ type SearchDropdownProps = {
   listboxId: string;
   results: SearchHit[];
   open: boolean;
+  constrainedByPanel: boolean;
   activeIdx: number | null;
   getOptionId: (hit: SearchHit) => string;
   onActivate: (index: number | null) => void;
@@ -111,6 +114,7 @@ function SearchDropdown({
   listboxId,
   results,
   open,
+  constrainedByPanel,
   activeIdx,
   getOptionId,
   onActivate,
@@ -126,13 +130,13 @@ function SearchDropdown({
 
   return (
     <div
-      className="bg-surface rounded-xl mt-1 max-h-[30dvh] flex flex-col pt-4"
-      style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+      className={`bg-surface rounded-xl mt-1 max-h-[30dvh] flex flex-col pt-4 pb-4
+      ${constrainedByPanel ? "search-dropdown-with-panel" : ""}`}
     >
       <ul
         id={listboxId}
         role="listbox"
-        className="min-h-0 overflow-y-auto overscroll-contain no-scrollbar list-none"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar list-none"
       >
         {results.map((hit, i) => (
           <li
@@ -156,10 +160,14 @@ function SearchDropdown({
 }
 
 /** Search input with debounced API calls, a results dropdown, and keyboard navigation. */
-export default function Search({ navigate }: SearchProps) {
+export default function Search({
+  navigate,
+  panelOpen,
+  onDropdownChange,
+}: SearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
-  const [open, setOpen] = useState(false);
+  const [canOpen, setCanOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const nextSearch = useRef(makeAbortable());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -181,7 +189,7 @@ export default function Search({ navigate }: SearchProps) {
         })
         .then((hits: SearchHit[]) => {
           setResults(hits);
-          setOpen(true);
+          setCanOpen(true);
           setActiveIdx(null);
         })
         .catch((err) => {
@@ -196,7 +204,7 @@ export default function Search({ navigate }: SearchProps) {
     nextSearch.current.cancel();
     setQuery("");
     setResults([]);
-    setOpen(false);
+    setCanOpen(false);
     setActiveIdx(null);
   }
 
@@ -204,7 +212,7 @@ export default function Search({ navigate }: SearchProps) {
   function handleSelect(hit: SearchHit) {
     navigate(hit.entity_type, getRowid(hit), hit.lon, hit.lat);
     setResults([]);
-    setOpen(false);
+    setCanOpen(false);
     setActiveIdx(null);
   }
 
@@ -214,7 +222,7 @@ export default function Search({ navigate }: SearchProps) {
 
   /** Handles arrow key navigation, Enter to select, and Escape to clear. */
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (!open || results.length === 0) {
+    if (!canOpen || results.length === 0) {
       if (e.key === "Escape") clearSearch();
       return;
     }
@@ -251,19 +259,24 @@ export default function Search({ navigate }: SearchProps) {
     ) {
       return;
     }
-    setOpen(false);
+    setCanOpen(false);
     setActiveIdx(null);
   }
 
   const activeDescendant =
-    open && activeIdx != null && results[activeIdx]
+    canOpen && activeIdx != null && results[activeIdx]
       ? getOptionId(results[activeIdx])
       : undefined;
+  const dropdownOpen = query.trim() !== "" && canOpen && results.length > 0;
+
+  useEffect(() => {
+    onDropdownChange(dropdownOpen);
+  }, [dropdownOpen, onDropdownChange]);
 
   return (
     <div
       ref={containerRef}
-      className="absolute top-3 z-100 w-[90%] left-1/2 -translate-x-1/2
+      className="absolute top-3 z-100 w-[90%] left-1/2 -translate-x-1/2 phone-landscape-hidden
       sm:w-md sm:left-3 sm:translate-x-0 ui-no-pinch"
       onBlur={handleBlur}
       // these will prevent UI interaction to bubble up to the map
@@ -274,16 +287,16 @@ export default function Search({ navigate }: SearchProps) {
         <input
           role="combobox"
           aria-autocomplete="list"
-          aria-expanded={query.trim() !== "" && open && results.length > 0}
+          aria-expanded={dropdownOpen}
           aria-controls={listboxId}
           aria-activedescendant={activeDescendant}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             setActiveIdx(null);
-            if (!e.target.value.trim()) setOpen(false);
+            if (!e.target.value.trim()) setCanOpen(false);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => setCanOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="search…"
           className="flex-1 bg-transparent border-0 outline-none text-white placeholder:text-muted pl-4 pr-1"
@@ -302,7 +315,8 @@ export default function Search({ navigate }: SearchProps) {
       <SearchDropdown
         listboxId={listboxId}
         results={results}
-        open={query.trim() !== "" && open}
+        open={dropdownOpen}
+        constrainedByPanel={panelOpen}
         activeIdx={activeIdx}
         getOptionId={getOptionId}
         onActivate={setActiveIdx}

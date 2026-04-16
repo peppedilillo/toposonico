@@ -185,6 +185,7 @@ type PanelProps = {
   update: UpdateFn;
   onClose: () => void;
   goBack: (() => void) | null;
+  constrainedBySearch: boolean;
 };
 
 // --- Internal sub-components ---
@@ -202,9 +203,6 @@ function Link({
   className: string;
 }) {
   const [hovered, setHovered] = useState(false);
-  const handleNavigate = () => {
-    onClick();
-  };
 
   return (
     <span
@@ -212,13 +210,13 @@ function Link({
       tabIndex={0}
       onClick={(e) => {
         e.stopPropagation();
-        handleNavigate();
+        onClick();
       }}
       onKeyDown={(e) => {
         if (e.key !== "Enter" && e.key !== " ") return;
         e.preventDefault();
         e.stopPropagation();
-        handleNavigate();
+        onClick();
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -648,7 +646,7 @@ function RecsSection({
   };
 
   return (
-    <div className="mt-3 border-t border-muted/20 pt-2 overflow-y-auto overscroll-contain no-scrollbar">
+    <div className="mt-3 border-t border-muted/20 pt-2 min-h-0 flex flex-col overflow-hidden">
       <div
         onClick={handleToggle}
         className={`text-xs flex items-center gap-1 cursor-pointer w-full px-4 py-1 -my-1 select-none
@@ -658,7 +656,7 @@ function RecsSection({
         More like this..
       </div>
       {open && (
-        <div className="max-h-40 ">
+        <div className="min-h-0 flex-1 max-h-40 overflow-y-auto overscroll-contain no-scrollbar">
           <RecBody
             recs={entity.recs}
             fetchStatus={fetchStatus}
@@ -680,6 +678,7 @@ export default function Panel({
   update,
   onClose,
   goBack,
+  constrainedBySearch,
 }: PanelProps) {
   if (!selection) return null;
 
@@ -700,17 +699,17 @@ export default function Panel({
 
   return (
     <div
-      className="fixed z-10 bottom-0 left-0 right-0
+      className={`fixed z-10 bottom-0 left-0 right-0 phone-landscape-panel
       sm:bottom-4 sm:left-3 sm:top-auto sm:right-auto sm:w-md
       max-h-[60dvh] sm:max-h-[calc(100vh-6rem)]
-      overflow-y-auto overscroll-contain
+      flex flex-col overflow-hidden
       bg-surface font-sans text-base text-white
-      rounded-t-2xl sm:rounded-xl shadow-xl ui-no-pinch"
-      style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+      rounded-t-2xl sm:rounded-xl shadow-xl ui-no-pinch panel-safe-bottom
+      ${constrainedBySearch ? "panel-with-search" : ""}`}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={(e) => e.stopPropagation()}
     >
-      <div className="relative px-4 pt-4">
+      <div className="relative px-4 pt-4 shrink-0">
         {body}
         <div className="absolute top-0 right-0 flex gap-1 items-center">
           {goBack && (

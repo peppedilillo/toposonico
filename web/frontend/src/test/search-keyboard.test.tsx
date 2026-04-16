@@ -49,7 +49,13 @@ describe("Search", () => {
     const navigate = vi.fn();
     stubSearchFetch();
 
-    render(<Search navigate={navigate} />);
+    render(
+      <Search
+        navigate={navigate}
+        panelOpen={false}
+        onDropdownChange={vi.fn()}
+      />,
+    );
 
     const input = screen.getByRole("combobox");
     fireEvent.change(input, { target: { value: "res" } });
