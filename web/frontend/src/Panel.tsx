@@ -194,27 +194,43 @@ function Link({
   onClick,
   color,
   children,
+  className,
 }: {
   onClick: () => void;
   color: string;
   children: React.ReactNode;
+  className: string;
 }) {
   const [hovered, setHovered] = useState(false);
+  const handleNavigate = () => {
+    onClick();
+  };
+
   return (
-    <button
+    <span
+      role="button"
+      tabIndex={0}
       onClick={(e) => {
         e.stopPropagation();
-        onClick();
+        handleNavigate();
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        e.stopPropagation();
+        handleNavigate();
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={hovered ? { color } : undefined}
-      className="max-w-full truncate text-left cursor-pointer transition-colors"
+      className={className}
     >
       {children}
-    </button>
+    </span>
   );
 }
+
+const INLINE_LINK_CLASS = "inline cursor-pointer text-left transition-colors";
 
 /** Horizontal scrollable row with wheel-to-scroll and gradient overflow fades. */
 function ReprRow({ children }: { children: React.ReactNode }) {
@@ -303,6 +319,7 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
               navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)
             }
             color="var(--color-artist)"
+            className={INLINE_LINK_CLASS}
           >
             {s.artist_name}
           </Link>
@@ -314,6 +331,7 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
                 navigate("album", s.album_rowid, s.album_lon, s.album_lat)
               }
               color="var(--color-album)"
+              className={INLINE_LINK_CLASS}
             >
               {s.album_name}
             </Link>
@@ -329,6 +347,7 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
                 navigate("label", s.label_rowid, s.label_lon, s.label_lat)
               }
               color="var(--color-label)"
+              className={INLINE_LINK_CLASS}
             >
               {s.label}
             </Link>
@@ -356,6 +375,7 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
                 navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)
               }
               color="var(--color-artist)"
+              className={INLINE_LINK_CLASS}
             >
               {s.artist_name}
             </Link>
@@ -371,6 +391,7 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
                 navigate("label", s.label_rowid, s.label_lon, s.label_lat)
               }
               color="var(--color-label)"
+              className={INLINE_LINK_CLASS}
             >
               {s.label}
             </Link>
@@ -391,6 +412,7 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
               <Link
                 onClick={() => navigate("track", r.track_rowid, r.lon, r.lat)}
                 color="var(--color-album)"
+                className={INLINE_LINK_CLASS}
               >
                 {r.track_name_norm}
               </Link>
@@ -420,6 +442,7 @@ function ArtistPanel({ s, navigate }: { s: ArtistInfo; navigate: NavigateFn }) {
               <Link
                 onClick={() => navigate("album", r.album_rowid, r.lon, r.lat)}
                 color="var(--color-album)"
+                className={INLINE_LINK_CLASS}
               >
                 {r.album_name_norm}
               </Link>
@@ -448,6 +471,7 @@ function LabelPanel({ s, navigate }: { s: LabelInfo; navigate: NavigateFn }) {
               <Link
                 onClick={() => navigate("artist", r.artist_rowid, r.lon, r.lat)}
                 color="var(--color-artist)"
+                className={INLINE_LINK_CLASS}
               >
                 {r.artist_name}
               </Link>
