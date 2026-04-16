@@ -31,6 +31,12 @@
   display: none;
 }
 
+/* disables pinch-to-zoom over UI elements keeping pan for horizontal and vertical scrolling.*/
+.ui-no-pinch,
+.ui-no-pinch * {
+  touch-action: pan-y pan-x;
+}
+
 html,
 body {
   /* `background-color` and `color-scheme` are set in index.html, preventing bright flashes at start-up. */

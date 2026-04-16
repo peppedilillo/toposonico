@@ -263,11 +263,8 @@ export default function Search({ navigate }: SearchProps) {
   return (
     <div
       ref={containerRef}
-      // touch-auto re-enables touch interactions with the search UI elements
-      className="
-      absolute top-3 z-100 w-[90%] left-1/2 -translate-x-1/2 sm:w-md sm:left-3 sm:translate-x-0
-      touch-auto
-      "
+      className="absolute top-3 z-100 w-[90%] left-1/2 -translate-x-1/2
+      sm:w-md sm:left-3 sm:translate-x-0 ui-no-pinch"
       onBlur={handleBlur}
       // these will prevent UI interaction to bubble up to the map
       onPointerDown={(e) => e.stopPropagation()}
