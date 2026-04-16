@@ -185,7 +185,6 @@ type PanelProps = {
   update: UpdateFn;
   onClose: () => void;
   goBack: (() => void) | null;
-  constrainedBySearch: boolean;
 };
 
 // --- Internal sub-components ---
@@ -678,7 +677,6 @@ export default function Panel({
   update,
   onClose,
   goBack,
-  constrainedBySearch,
 }: PanelProps) {
   if (!selection) return null;
 
@@ -704,8 +702,7 @@ export default function Panel({
       max-h-[60dvh] sm:max-h-[calc(100vh-6rem)]
       flex flex-col overflow-hidden
       bg-surface font-sans text-base text-white
-      rounded-t-2xl sm:rounded-xl shadow-xl ui-no-pinch panel-safe-bottom
-      ${constrainedBySearch ? "panel-with-search" : ""}`}
+      rounded-t-2xl sm:rounded-xl shadow-xl ui-no-pinch safe-bottom`}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={(e) => e.stopPropagation()}
     >

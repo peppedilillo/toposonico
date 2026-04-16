@@ -61,7 +61,6 @@ type SearchProps = {
     lat: number,
   ) => void;
   panelOpen: boolean;
-  onDropdownChange: (open: boolean) => void;
 };
 
 /** Returns the rendered summary component for a hit. */
@@ -130,7 +129,7 @@ function SearchDropdown({
 
   return (
     <div
-      className={`bg-surface rounded-xl mt-1 max-h-[30dvh] flex flex-col pt-4 pb-4
+      className={`bg-surface rounded-xl mt-1 flex flex-col pt-4 pb-4 search-dropdown
       ${constrainedByPanel ? "search-dropdown-with-panel" : ""}`}
     >
       <ul
@@ -163,7 +162,6 @@ function SearchDropdown({
 export default function Search({
   navigate,
   panelOpen,
-  onDropdownChange,
 }: SearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
@@ -268,10 +266,6 @@ export default function Search({
       ? getOptionId(results[activeIdx])
       : undefined;
   const dropdownOpen = query.trim() !== "" && canOpen && results.length > 0;
-
-  useEffect(() => {
-    onDropdownChange(dropdownOpen);
-  }, [dropdownOpen, onDropdownChange]);
 
   return (
     <div

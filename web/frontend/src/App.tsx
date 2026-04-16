@@ -72,7 +72,6 @@ export default function App() {
       : [],
   );
   const [mapCommand, setMapCommand] = useState<MapCommand>(null);
-  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const nextSelection = useRef(makeAbortable());
   const current = stack.length > 0 ? stack[stack.length - 1] : null;
 
@@ -239,18 +238,13 @@ export default function App() {
         onMoveEnd={setViewState}
         onFeatureSelect={select}
       />
-      <Search
-        navigate={navigate}
-        panelOpen={current != null}
-        onDropdownChange={setSearchDropdownOpen}
-      />
+      <Search navigate={navigate} panelOpen={current != null} />
       <Panel
         selection={current}
         navigate={navigate}
         update={update}
         onClose={handlePanelClose}
         goBack={stack.length > 1 ? pop : null}
-        constrainedBySearch={searchDropdownOpen}
       />
       <img
         src={earwaxLogo}
