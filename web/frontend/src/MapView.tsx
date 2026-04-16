@@ -163,7 +163,10 @@ export default function MapView({
       renderWorldCopies: false,
       attributionControl: false,
     });
-    mapRef.current = map;
+    mapRef.current = map
+
+    // locks bearing/rotation on mobile, where it's often applied by mistake.
+    map.touchZoomRotate.disableRotation();
 
     map.on("load", () => {
       map.addSource("grid", { type: "geojson", data: GRID_LINES });
