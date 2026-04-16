@@ -159,10 +159,7 @@ function SearchDropdown({
 }
 
 /** Search input with debounced API calls, a results dropdown, and keyboard navigation. */
-export default function Search({
-  navigate,
-  panelOpen,
-}: SearchProps) {
+export default function Search({ navigate, panelOpen }: SearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [canOpen, setCanOpen] = useState(false);
