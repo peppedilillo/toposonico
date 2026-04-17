@@ -697,12 +697,9 @@ export default function Panel({
 
   return (
     <div
-      className={`fixed z-10 bottom-0 left-0 right-0 phone-landscape-panel
-      sm:bottom-4 sm:left-3 sm:top-auto sm:right-auto sm:w-md
-      max-h-[60dvh] sm:max-h-[calc(100vh-6rem)]
-      flex flex-col overflow-hidden
+      className="panel z-10 flex flex-col overflow-hidden
       bg-surface font-sans text-base text-white
-      rounded-t-2xl sm:rounded-xl shadow-xl ui-no-pinch safe-bottom`}
+      shadow-xl ui-no-pinch safe-bottom"
       onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={(e) => e.stopPropagation()}
     >

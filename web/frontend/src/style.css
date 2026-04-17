@@ -24,75 +24,99 @@
   --animate-sweep: sweep 8s linear infinite;
 }
 
+/* Shared layout constants — single source of truth for panel/dropdown sizing math. */
 :root {
+  /* Margins between UI elements and the viewport edge. */
   --ui-edge-gap: 0.75rem;
+  /* Vertical breathing room between stacked UI elements (e.g. dropdown ↔ panel). */
   --ui-between-gap: 1rem;
+  /* Target height of the panel; also the budget the dropdown subtracts for it. */
   --panel-expanded-height: 20rem;
   --search-input-height: 3rem;
+  /* Gap between the search input and its dropdown. */
   --search-dropdown-gap: 0.25rem;
+  /* Dropdown's own preferred cap (independent of whether a panel is open). */
   --search-dropdown-max-height: calc(
     var(--panel-expanded-height) - var(--search-input-height) -
       var(--search-dropdown-gap)
   );
+  /* Distance from the panel's bottom edge to the viewport bottom — 0 in sheet mode, edge-gap in floating mode. */
+  --panel-bottom-gap: 0rem;
 }
 
-.no-scrollbar {
-  scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-/* disables pinch-to-zoom over UI elements keeping pan for horizontal and vertical scrolling.*/
-.ui-no-pinch,
-.ui-no-pinch * {
-  touch-action: pan-y pan-x;
+/* sm: breakpoint — panel switches from bottom-sheet (bottom-0) to floating (bottom: edge-gap). */
+@media (min-width: 40rem) {
+  :root {
+    --panel-bottom-gap: var(--ui-edge-gap);
+  }
 }
 
+/* Panel layout — sheet by default; floating at sm: breakpoint or on short viewports. */
+.panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: min(
+    var(--panel-expanded-height),
+    calc(100dvh - var(--ui-edge-gap) - var(--ui-edge-gap))
+  );
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+}
+
+@media (min-width: 40rem), (max-height: 500px) {
+  .panel {
+    top: auto;
+    bottom: var(--ui-edge-gap);
+    left: var(--ui-edge-gap);
+    right: var(--ui-edge-gap);
+    max-width: var(--container-md);
+    border-radius: 0.75rem;
+  }
+}
+
+/* Dropdown height when no panel is open — free to grow up to its preferred cap. */
 .search-dropdown {
   max-height: var(--search-dropdown-max-height);
 }
 
+/* Dropdown height when a panel is open — shrinks first so the panel keeps its height. */
 .search-dropdown-with-panel {
   max-height: min(
     var(--search-dropdown-max-height),
     calc(
       100dvh - var(--ui-edge-gap) - var(--search-input-height) -
         var(--search-dropdown-gap) - var(--ui-between-gap) -
-        var(--panel-expanded-height)
+        var(--panel-expanded-height) - var(--panel-bottom-gap)
     )
   );
 }
 
-/* Keep bottom content above mobile browser safe areas. */
+/* Short viewports: hide the searchbar (no room to coexist with the panel). */
+@media (max-height: 500px) {
+  .short-viewport-hidden {
+    display: none;
+  }
+}
+
+/* Bottom padding that clears iOS/Android browser chrome (home indicator, URL bar). */
 .safe-bottom {
   padding-bottom: calc(var(--ui-between-gap) + env(safe-area-inset-bottom));
 }
 
-@media (orientation: landscape) and (max-height: 500px) and (max-width: 900px) {
-  .phone-landscape-hidden {
-    display: none;
-  }
-
-  .phone-landscape-panel {
-    top: auto;
-    left: var(--ui-edge-gap);
-    bottom: var(--ui-edge-gap);
-    right: auto;
-    width: min(
-      var(--container-md),
-      calc(100vw - var(--ui-edge-gap) - var(--ui-edge-gap))
-    );
-    max-height: calc(100dvh - var(--ui-edge-gap) - var(--ui-edge-gap));
-    border-radius: var(--radius-xl);
-  }
+/* Disable pinch-to-zoom on UI elements while preserving pan gestures (scrolling still works). */
+.ui-no-pinch,
+.ui-no-pinch * {
+  touch-action: pan-y pan-x;
 }
 
-@media (orientation: landscape) and (max-height: 500px) and (max-width: 520px) {
-  .phone-landscape-panel {
-    right: var(--ui-edge-gap);
-    width: auto;
-  }
+/* Hide scrollbars while keeping scroll behaviour — used for horizontal scrollers and lists. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 html,

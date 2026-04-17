@@ -267,7 +267,7 @@ export default function Search({ navigate, panelOpen }: SearchProps) {
   return (
     <div
       ref={containerRef}
-      className="absolute top-3 z-100 w-[90%] left-1/2 -translate-x-1/2 phone-landscape-hidden
+      className="absolute top-3 z-100 w-[90%] left-1/2 -translate-x-1/2 short-viewport-hidden
       sm:w-md sm:left-3 sm:translate-x-0 ui-no-pinch"
       onBlur={handleBlur}
       // these will prevent UI interaction to bubble up to the map
