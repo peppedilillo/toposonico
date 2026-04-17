@@ -34,6 +34,7 @@ const MIN_VISUAL_RADIUS = 1;
 const MIN_HIT_RADIUS = 11;
 const HIT_STROKE_OPACITY = 0.003;
 const HIT_FILL_OPACITY = 0.004;
+const HOVER_QUERY_THROTTLE_MS = 10;
 const INTERACTIVE_LAYER_IDS = ["tracks", "labels-hit", "artists-hit", "albums"];
 
 // MapLibre requires absolute URLs for tile sources. In dev the env var is a relative path
@@ -216,7 +217,7 @@ export default function MapView({
           "circle-stroke-width": 1,
         },
       });
-      // Ghost hit layer keeps small label outlines easy to tap without changing the visible stroke.
+      // ghost hit layer keeps small label outlines easy to tap without changing the visible stroke.
       map.addLayer({
         id: "labels-hit",
         type: "circle",
@@ -228,7 +229,7 @@ export default function MapView({
           "circle-opacity": HIT_FILL_OPACITY,
         },
       });
-      // Ghost hit layer keeps small artist outlines easy to tap without changing the visible stroke.
+      // ghost hit layer keeps small artist outlines easy to tap without changing the visible stroke.
       map.addLayer({
         id: "artists-hit",
         type: "circle",
@@ -269,6 +270,7 @@ export default function MapView({
         },
       });
 
+      // select the highest-popularity entity under the clicked point.
       map.on("click", (e) => {
         const features = map.queryRenderedFeatures(e.point, {
           layers: INTERACTIVE_LAYER_IDS,
@@ -321,7 +323,15 @@ export default function MapView({
         }
       });
 
+      let lastHoverQueryAt = 0;
+
+      // show a pointer cursor while hovering interactive entity layers.
       map.on("mousemove", (e) => {
+        // throttle, avoid querying rendered features on every raw mousemove event.
+        const now = performance.now();
+        if (now - lastHoverQueryAt < HOVER_QUERY_THROTTLE_MS) return;
+
+        lastHoverQueryAt = now;
         const hasInteractiveFeature =
           map.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYER_IDS })
             .length > 0;
@@ -343,7 +353,7 @@ export default function MapView({
     });
 
     return () => map.remove();
-    // Runs once on mount; initialView and callbacks are read via refs.
+    // runs once on mount; initialView and callbacks are read via refs.
   }, []);
 
   useEffect(() => {
