@@ -601,7 +601,7 @@ function RecBody({
   );
 }
 
-/** A collapsible recommendations section, cachine recommendations on the nav-stack. **/
+/** A collapsible recommendations section, caching recommendations on the nav stack. */
 function RecsSection({
   entity,
   navigate,
@@ -644,18 +644,24 @@ function RecsSection({
       });
   };
 
+  const trigger = (
+    <button
+      type="button"
+      onClick={handleToggle}
+      className={`block w-full cursor-pointer px-4 text-left text-xs select-none
+      bg-linear-to-r from-gray-500 via-gray-50 to-gray-500 bg-size-[200%_auto] bg-clip-text text-transparent
+      ${!open ? "animate-sweep" : ""}`}
+    >
+      More like this
+    </button>
+  );
+  const hasVisibleRecs = open && entity.recs != null && entity.recs.length > 0;
+
   return (
-    <div className="mt-3 border-t border-muted/20 pt-2 min-h-0 flex flex-col overflow-hidden">
-      <div
-        onClick={handleToggle}
-        className={`text-xs flex items-center gap-1 cursor-pointer w-full px-4 py-1 -my-1 select-none
-        bg-linear-to-r from-gray-500 via-gray-50 to-gray-500 bg-size-[200%_auto] bg-clip-text text-transparent
-        ${!open ? "animate-sweep" : ""}`}
-      >
-        More like this..
-      </div>
-      {open && (
-        <div className="min-h-0 flex-1 max-h-40 overflow-y-auto overscroll-contain no-scrollbar">
+    <div className="mt-3 border-t border-muted/20 pt-2">
+      {hasVisibleRecs ? (
+        <div className="max-h-40 overflow-y-auto overscroll-contain no-scrollbar">
+          {trigger}
           <RecBody
             recs={entity.recs}
             fetchStatus={fetchStatus}
@@ -663,6 +669,18 @@ function RecsSection({
             navigate={navigate}
           />
         </div>
+      ) : (
+        <>
+          {trigger}
+          {open && (
+            <RecBody
+              recs={entity.recs}
+              fetchStatus={fetchStatus}
+              entityType={entity.entity_type}
+              navigate={navigate}
+            />
+          )}
+        </>
       )}
     </div>
   );
