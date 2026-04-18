@@ -1,5 +1,7 @@
 # Usage
 
+## Development setup
+
 Install tippecanoe with:
 
 ```shell
@@ -21,3 +23,15 @@ For local development with Docker Compose:
 ```shell
 docker compose up
 ```
+
+## Production setup
+
+1. Create `config.prod.env`, you can use `config.prod.sample.env` for template.
+2. Launch docker. The backend health check requires the search index to exist. To create the index you are supposed to
+   manually launch `backend/scripts/build_search_index.py`.
+    ```shell
+    docker compose -f docker-compose.prod.yml --env-file config.prod.env up -d meilisearch
+    docker compose -f docker-compose.prod.yml --env-file config.prod.env run --rm --no-deps backend \
+      uv run --no-sync python scripts/build_search_index.py
+    docker compose -f docker-compose.prod.yml --env-file config.prod.env up -d
+    ```

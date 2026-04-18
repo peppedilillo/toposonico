@@ -1,0 +1,80 @@
+services:
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: sick-web:prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      tiles:
+        condition: service_started
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: sick-backend:prod
+    environment:
+      MEILI_KEY: ${MEILI_KEY:?MEILI_KEY is required}
+      MEILI_UID: ${MEILI_UID:?MEILI_UID is required}
+      MEILI_URL: http://meilisearch:7700
+      SICK_DB: /data/sick.db
+      SICK_FAISS_TRACK: /data/faiss_track.index
+      SICK_FAISS_ALBUM: /data/faiss_album.index
+      SICK_FAISS_ARTIST: /data/faiss_artist.index
+      SICK_FAISS_LABEL: /data/faiss_label.index
+    expose:
+      - "8000"
+    volumes:
+      - ${SICK_DB:?SICK_DB is required}:/data/sick.db:ro
+      - ${SICK_FAISS_TRACK:?SICK_FAISS_TRACK is required}:/data/faiss_track.index:ro
+      - ${SICK_FAISS_ALBUM:?SICK_FAISS_ALBUM is required}:/data/faiss_album.index:ro
+      - ${SICK_FAISS_ARTIST:?SICK_FAISS_ARTIST is required}:/data/faiss_artist.index:ro
+      - ${SICK_FAISS_LABEL:?SICK_FAISS_LABEL is required}:/data/faiss_label.index:ro
+    depends_on:
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--output-document=/dev/null", "http://127.0.0.1:8000/api/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.38.2
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_KEY:?MEILI_KEY is required}
+      MEILI_ENV: production
+    expose:
+      - "7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://127.0.0.1:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  tiles:
+    image: nginx:1.27-alpine
+    expose:
+      - "8080"
+    volumes:
+      - ${SICK_TILES_DIR:?SICK_TILES_DIR is required}:/usr/share/nginx/html/tiles:ro
+      - ./tileserver/default.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
+volumes:
+  meilisearch_data:
+    name: sick_prod_meilisearch_data
