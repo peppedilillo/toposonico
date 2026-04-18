@@ -8,6 +8,7 @@ import {
 import { type EntityType, formatPlaylistCount } from "./utils.ts";
 import { makeAbortable } from "./requests.ts";
 import { getRowid } from "./utils.ts";
+import { displayTrackName } from "./utils.ts";
 
 // --- Search types mirroring backend TypedDicts ---
 
@@ -69,7 +70,7 @@ function getSummary(hit: SearchHit) {
     case "track":
       return (
         <TrackSummary
-          trackName={hit.track_name_norm}
+          track={displayTrackName(hit.track_name_norm)}
           artist={hit.artist_name}
         />
       );

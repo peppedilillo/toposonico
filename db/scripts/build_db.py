@@ -184,7 +184,10 @@ def normalize_title(name: str) -> str:
     """Strip a small set of trailing edition markers from titles."""
     s = " ".join(name.split())
     s = re.sub(r"\.{3,}", "..", s)
-    match = re.search(r"(\s*\-([^()]*)\s*$)|(\s*\[([^()]*)\]\s*$)|(\s*\(([^()]*)\)\s*$)", s)
+    # Match only a trailing variant suffix after at least one title character:
+    # spaced hyphen suffixes, bracket suffixes, or parenthesized suffixes.
+    # The lookbehind keeps bracket-led titles from normalizing to an empty string.
+    match = re.search(r"(?<=.)(\s+-\s*[^()]*$|\s*\[.*\]\s*$|\s*\([^()]*\)\s*$)", s)
     if not match:
         return s
 

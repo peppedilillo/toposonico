@@ -22,6 +22,7 @@ class TrackInfo(TypedDict):
     artist_name: str
     album_rowid: int
     album_name: str
+    album_name_norm: str
     label_rowid: int
     label: str
     lon: float
@@ -89,25 +90,27 @@ def info_fetch(entity: Entity, rowid: int, db: sqlite3.Connection) -> Info | Non
             info_cls = TrackInfo
             query = """
                 SELECT
-                    track_rowid,
-                    track_name_norm,
-                    artist_rowid,
-                    artist_name,
-                    album_rowid,
-                    album_name,
-                    label_rowid,
-                    label,
-                    lon,
-                    lat,
-                    album_lon,
-                    album_lat,
-                    artist_lon,
-                    artist_lat,
-                    label_lon,
-                    label_lat,
-                    logcount,
-                    release_date
+                    tracks.track_rowid,
+                    tracks.track_name_norm,
+                    tracks.artist_rowid,
+                    tracks.artist_name,
+                    tracks.album_rowid,
+                    tracks.album_name,
+                    albums.album_name_norm AS album_name_norm,
+                    tracks.label_rowid,
+                    tracks.label,
+                    tracks.lon,
+                    tracks.lat,
+                    tracks.album_lon,
+                    tracks.album_lat,
+                    tracks.artist_lon,
+                    tracks.artist_lat,
+                    tracks.label_lon,
+                    tracks.label_lat,
+                    tracks.logcount,
+                    tracks.release_date
                 FROM tracks
+                JOIN albums ON tracks.album_rowid = albums.album_rowid
                 WHERE track_rowid = ?
             """
         case AlbumEntity():

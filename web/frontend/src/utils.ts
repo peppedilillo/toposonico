@@ -32,3 +32,10 @@ export function formatPlaylistCount(logcount: number): string {
 }
 
 export type EntityType = "track" | "album" | "artist" | "label";
+
+/** Standard format for blank track names. **/
+const NO_TRACK_NAME = "[no track name]";
+
+export function displayTrackName(trackNameNorm: string) {
+  return trackNameNorm || NO_TRACK_NAME;
+}

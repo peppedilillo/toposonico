@@ -179,6 +179,13 @@ def _rows_as_dicts(db, sql):
         ("Foo.....Bar", "Foo..Bar"),
         ("...Album [Deluxe]", "..Album"),
         ("..And Justice For All", "..And Justice For All"),
+        ("[L] [DELUXE]", "[L]"),
+        ("[What's the Story] Morning Glory? [Remastered]", "[What's the Story] Morning Glory?"),
+        ("D-Sides [Special Edition]", "D-Sides"),
+        ("The Post COVID-19 Mixtape - Chill Edition", "The Post COVID-19 Mixtape"),
+        ("Rap-a-Lot 25th Anniversary", "Rap-a-Lot 25th Anniversary"),
+        ("それは小さな光のような-special edition", "それは小さな光のような-special edition"),
+        ("The Perfect Girl [(Instrumental) [Alternate Versions]]", "The Perfect Girl"),
     ],
     ids=[
         "plain",
@@ -191,6 +198,13 @@ def _rows_as_dicts(db, sql):
         "mid-string-dot-run-collapsed",
         "dot-run-plus-marker-stripped",
         "double-dots-unchanged",
+        "leading-bracket-title",
+        "leading-bracket-title-plus-remaster",
+        "internal-hyphen-plus-bracket-marker",
+        "internal-hyphen-plus-edition",
+        "internal-hyphen-non-marker",
+        "attached-hyphen-marker-kept",
+        "nested-bracket-marker",
     ],
 )
 def test_normalize_title(title, expected):

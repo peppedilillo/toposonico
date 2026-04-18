@@ -15,6 +15,12 @@ from src.utils import LABEL
 from src.utils import TRACK
 
 
+def has_no_blank(conn: sqlite3.Connection, key: str, table: str) -> bool:
+    return conn.execute(
+        f"SELECT 1 FROM {table} WHERE {key} = '' LIMIT 1"
+    ).fetchone() is None
+
+
 @cache
 def get_entity_ids(conn: sqlite3.Connection, key: str, table: str) -> list[Any]:
     cursor = conn.cursor()
@@ -56,8 +62,9 @@ def main():
         raise ValueError("--db / $SICK_DB not set")
 
     BOLD = "" if args.raw else "\033[1m"
-    GREEN = "" if args.raw else "\033[92m"
     RED = "" if args.raw else "\033[91m"
+    GREEN = "" if args.raw else "\033[92m"
+    YELLOW = "" if args.raw else "\033[93m"
     RESET = "" if args.raw else "\033[0m"
     DIM = "" if args.raw else "\033[2m"
 
@@ -66,30 +73,52 @@ def main():
 
     failed = False
 
-    def report(label: str, ok: bool) -> None:
+    def report(label: str, ok: bool, acceptable: bool = False) -> None:
         nonlocal failed
         if ok:
-            print(f"  {label}  {GREEN}{BOLD}ok{RESET}")
-        else:
-            print(f"  {label}  {RED}{BOLD}failed{RESET}")
-            failed = True
-
-    def check(conn: sqlite3.Connection, entity: Entity, t1: str, t2: str) -> None:
-        ok = table_id_set_inclusion(conn, entity, t1, t2)
-        report(f"{t1}.{entity.key} ⊆ {t2}.{entity.key}", ok)
+            print(f"  {label}  {GREEN}{BOLD}true{RESET}")
+            return
+        # acceptable means this false result is expected for current data semantics.
+        if acceptable:
+            print(f"  {label}  {YELLOW}{BOLD}false{RESET}")
+            return
+        print(f"  {label}  {RED}{BOLD}false{RESET}")
+        failed = True
 
     with sqlite3.connect(args.db) as conn:
+        print("blank names")
+        for key, table in (
+            ("track_name", TRACK.table),
+            ("track_name_norm", TRACK.table),
+            ("album_name", TRACK.table),
+            ("artist_name", TRACK.table),
+            ("label", TRACK.table),
+            ("album_name", ALBUM.table),
+            ("album_name_norm", ALBUM.table),
+            ("artist_name", ALBUM.table),
+            ("label", ALBUM.table),
+            ("artist_name", ARTIST.table),
+            ("label", LABEL.table),
+        ):
+            # there are tracks with empty names and we choose to respect them
+            acceptable = table == TRACK.table and key in {"track_name", "track_name_norm"}
+            report(f"no blanks in {table}.{key}", has_no_blank(conn, key, table), acceptable)
+
         print("table inclusions")
         for entity in ENTITIES:
             for child in entity_child(entity):
-                check(conn, child, entity.table, child.table)
-                check(conn, child, child.table, entity.table)
+                for t1, t2 in ((entity.table, child.table), (child.table, entity.table)):
+                    ok = table_id_set_inclusion(conn, child, t1, t2)
+                    # we have extra artist entries from features
+                    acceptable = child == ARTIST and t1 == ARTIST.table and t2 == ALBUM.table
+                    report(f"{t1}.{child.key} ⊆ {t2}.{child.key}", ok, acceptable)
 
         print("repr inclusions")
         for entity in (ALBUM, ARTIST, LABEL):
             rpr = entity.repr
             assert rpr is not None
-            check(conn, entity, rpr, entity.table)
+            ok = table_id_set_inclusion(conn, entity, rpr, entity.table)
+            report(f"{rpr}.{entity.key} ⊆ {entity.table}.{entity.key}", ok)
 
         print("searchable repr coverage")
         for entity in ENTITIES:
@@ -117,8 +146,9 @@ def main():
 
         print("embedding inclusions")
         for entity in ENTITIES:
-            check(conn, entity, entity.embedding, entity.table)
-            check(conn, entity, entity.table, entity.embedding)
+            for t1, t2 in ((entity.embedding, entity.table), (entity.table, entity.embedding)):
+                ok = table_id_set_inclusion(conn, entity, t1, t2)
+                report(f"{t1}.{entity.key} ⊆ {t2}.{entity.key}", ok)
 
     if failed:
         raise SystemExit(1)

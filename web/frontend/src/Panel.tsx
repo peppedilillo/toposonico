@@ -5,7 +5,12 @@ import {
   LabelSummary,
   TrackSummary,
 } from "./Summary.tsx";
-import { type EntityType, formatPlaylistCount, getRowid } from "./utils.ts";
+import {
+  displayTrackName,
+  type EntityType,
+  formatPlaylistCount,
+  getRowid,
+} from "./utils.ts";
 import { makeAbortable } from "./requests";
 
 // --- Types mirroring backend TypedDicts ---
@@ -18,6 +23,7 @@ type TrackInfo = {
   artist_name: string;
   album_rowid: number;
   album_name: string;
+  album_name_norm: string;
   label_rowid: number;
   label: string;
   lon: number;
@@ -309,7 +315,7 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
   return (
     <>
       <TrackSummary
-        trackName={s.track_name_norm}
+        track={displayTrackName(s.track_name_norm)}
         artist={
           <Link
             onClick={() =>
@@ -322,37 +328,35 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
           </Link>
         }
         album={
-          s.album_name ? (
-            <Link
-              onClick={() =>
-                navigate("album", s.album_rowid, s.album_lon, s.album_lat)
-              }
-              color="var(--color-album)"
-              className={INLINE_LINK_CLASS}
-            >
-              {s.album_name}
-            </Link>
-          ) : undefined
+          <Link
+            onClick={() =>
+              navigate("album", s.album_rowid, s.album_lon, s.album_lat)
+            }
+            color="var(--color-album)"
+            className={INLINE_LINK_CLASS}
+          >
+            {s.album_name_norm}
+          </Link>
         }
         debugId={s.track_rowid}
       />
-      {(s.label || s.release_date) && (
-        <div className="text-sm text-muted truncate">
-          {s.label && (
-            <Link
-              onClick={() =>
-                navigate("label", s.label_rowid, s.label_lon, s.label_lat)
-              }
-              color="var(--color-label)"
-              className={INLINE_LINK_CLASS}
-            >
-              {s.label}
-            </Link>
-          )}
-          {s.label && s.release_date && " · "}
-          {s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
-        </div>
-      )}
+      <div className="text-sm text-muted truncate">
+        <Link
+          onClick={() =>
+            navigate("label", s.label_rowid, s.label_lon, s.label_lat)
+          }
+          color="var(--color-label)"
+          className={INLINE_LINK_CLASS}
+        >
+          {s.label}
+        </Link>
+        {s.release_date && (
+          <>
+            {" "}
+            · <span>{s.release_date.slice(0, 4)}</span>
+          </>
+        )}
+      </div>
       <div className="text-sm text-muted mt-0.5 truncate">
         {formatPlaylistCount(s.logcount)}
       </div>
@@ -366,37 +370,35 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
       <AlbumSummary
         albumName={s.album_name_norm}
         artist={
-          s.artist_name ? (
-            <Link
-              onClick={() =>
-                navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)
-              }
-              color="var(--color-artist)"
-              className={INLINE_LINK_CLASS}
-            >
-              {s.artist_name}
-            </Link>
-          ) : undefined
+          <Link
+            onClick={() =>
+              navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)
+            }
+            color="var(--color-artist)"
+            className={INLINE_LINK_CLASS}
+          >
+            {s.artist_name}
+          </Link>
         }
         debugId={s.album_rowid}
       />
-      {(s.label || s.release_date) && (
-        <div className="text-sm text-muted truncate">
-          {s.label && (
-            <Link
-              onClick={() =>
-                navigate("label", s.label_rowid, s.label_lon, s.label_lat)
-              }
-              color="var(--color-label)"
-              className={INLINE_LINK_CLASS}
-            >
-              {s.label}
-            </Link>
-          )}
-          {s.label && s.release_date && " · "}
-          {s.release_date && <span>{s.release_date.slice(0, 4)}</span>}
-        </div>
-      )}
+      <div className="text-sm text-muted truncate">
+        <Link
+          onClick={() =>
+            navigate("label", s.label_rowid, s.label_lon, s.label_lat)
+          }
+          color="var(--color-label)"
+          className={INLINE_LINK_CLASS}
+        >
+          {s.label}
+        </Link>
+        {s.release_date && (
+          <>
+            {" "}
+            · <span>{s.release_date.slice(0, 4)}</span>
+          </>
+        )}
+      </div>
       <div className="text-sm text-muted mt-0.5 truncate">
         {formatPlaylistCount(s.logcount)}
       </div>
@@ -411,7 +413,7 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
                 color="var(--color-album)"
                 className={INLINE_LINK_CLASS}
               >
-                {r.track_name_norm}
+                {displayTrackName(r.track_name_norm)}
               </Link>
             </span>
           ))}
@@ -516,7 +518,7 @@ function getRecDisplay(
   switch (entityType) {
     case "track":
       return {
-        name: (rec as TrackRecommend).track_name_norm,
+        name: displayTrackName((rec as TrackRecommend).track_name_norm),
         sub: (rec as TrackRecommend).artist_name + " · " + playlists,
       };
     case "album":

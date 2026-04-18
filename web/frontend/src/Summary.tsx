@@ -24,7 +24,7 @@ function Badge({ entityType }: BadgeProps) {
 }
 
 type TrackSummaryProps = {
-  trackName: React.ReactNode;
+  track: React.ReactNode;
   artist: React.ReactNode;
   album?: React.ReactNode;
   debugId?: number;
@@ -57,7 +57,7 @@ function DebugId({ debugId }: { debugId?: number }) {
 
 /** Summary header for track entities. */
 export function TrackSummary({
-  trackName,
+  track,
   artist,
   album,
   debugId,
@@ -67,7 +67,7 @@ export function TrackSummary({
       <Badge entityType="track" />
       <div className="flex items-baseline gap-2">
         <div className="min-w-0 flex-1 text-lg font-semibold leading-snug text-white truncate">
-          {trackName}
+          {track}
         </div>
         <DebugId debugId={debugId} />
       </div>
