@@ -1,3 +1,5 @@
+name: sick-prod
+
 services:
   web:
     build:
