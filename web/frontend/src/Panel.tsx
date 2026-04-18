@@ -338,7 +338,6 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
             {s.album_name_norm}
           </Link>
         }
-        debugId={s.track_rowid}
       />
       <div className="text-sm text-muted truncate">
         <Link
@@ -380,7 +379,6 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
             {s.artist_name}
           </Link>
         }
-        debugId={s.album_rowid}
       />
       <div className="text-sm text-muted truncate">
         <Link
@@ -430,7 +428,6 @@ function ArtistPanel({ s, navigate }: { s: ArtistInfo; navigate: NavigateFn }) {
         artistName={s.artist_name}
         genre={s.artist_genre ?? undefined}
         playlistCount={formatPlaylistCount(s.logcount)}
-        debugId={s.artist_rowid}
       />
       {s.reprs?.length > 0 && (
         <ReprRow>
@@ -459,7 +456,6 @@ function LabelPanel({ s, navigate }: { s: LabelInfo; navigate: NavigateFn }) {
       <LabelSummary
         labelName={s.label}
         playlistCount={formatPlaylistCount(s.logcount)}
-        debugId={s.label_rowid}
       />
       {s.reprs?.length > 0 && (
         <ReprRow>
