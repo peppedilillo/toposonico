@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /tiles/
+
+Sitemap: https://sickrec.com/sitemap.xml
