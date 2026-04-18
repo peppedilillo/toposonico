@@ -596,9 +596,8 @@ function RecBody({
   }
   if (fetchStatus === "error")
     return <div className="text-muted text-xs py-2 px-4">Failed to load.</div>;
-  return (
-    <div className="text-muted text-xs py-2 animate-pulse px-4">Loading...</div>
-  );
+  // fetchStatus is "loading": we update the "More like" button without filling RecsSection.
+  return null;
 }
 
 /** A collapsible recommendations section, caching recommendations on the nav stack. */
@@ -652,7 +651,7 @@ function RecsSection({
       bg-linear-to-r from-gray-500 via-gray-50 to-gray-500 bg-size-[200%_auto] bg-clip-text text-transparent
       ${!open ? "animate-sweep" : ""}`}
     >
-      More like this
+      {fetchStatus === "loading" ? "Loading..." : "More like this"}
     </button>
   );
   const hasVisibleRecs = open && entity.recs != null && entity.recs.length > 0;
