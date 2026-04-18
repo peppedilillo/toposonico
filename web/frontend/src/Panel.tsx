@@ -659,9 +659,9 @@ function RecsSection({
   const hasVisibleRecs = open && entity.recs != null && entity.recs.length > 0;
 
   return (
-    <div className="mt-3 border-t border-muted/20 pt-2">
+    <div className="mt-3 border-t border-muted/20 pt-2 min-h-0 flex flex-col">
       {hasVisibleRecs ? (
-        <div className="max-h-40 overflow-y-auto overscroll-contain no-scrollbar">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar">
           {trigger}
           <RecBody
             recs={entity.recs}
