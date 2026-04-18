@@ -12,9 +12,6 @@ wheels/
 # ide
 .idea
 
-# data
-assets
-
 # Virtual environments
 .venv
 

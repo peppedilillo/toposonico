@@ -4,7 +4,7 @@ import Panel from "./Panel.tsx";
 import MapView, { type MapCommand, type ViewState } from "./MapView.tsx";
 import { makeAbortable } from "./requests.ts";
 import { type EntityType, getRowid } from "./utils.ts";
-import earwaxLogo from "./assets/earwax_simple.svg";
+import Logo from "./assets/logo.svg";
 import type { Selection, UpdateFn } from "./Panel.tsx";
 
 const MAX_HISTORY = 20;
@@ -247,10 +247,10 @@ export default function App() {
         goBack={stack.length > 1 ? pop : null}
       />
       <img
-        src={earwaxLogo}
+        src={Logo}
         alt="earwax"
-        className="fixed z-5 sm:w-28 w-16 pointer-events-none
-                   bottom-4 right-4 select-none"
+        className="fixed z-5 sm:w-6 w-6 pointer-events-none
+                   bottom-[var(--ui-edge-gap)] right-[var(--ui-edge-gap)] select-none"
       />
     </div>
   );
