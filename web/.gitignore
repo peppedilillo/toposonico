@@ -3,6 +3,7 @@
 
 # local config
 config.env
+config.prod.env
 
 # frontend
 frontend/node_modules
