@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.info import router as info_router
 from src.panel import router as panel_router
+from src.ready import router as ready_router
 from src.recommend import router as recommend_router
 from src.repr import router as repr_router
 from src.search import router as search_router
@@ -30,6 +31,7 @@ app.include_router(info_router)
 app.include_router(panel_router)
 app.include_router(recommend_router)
 app.include_router(repr_router)
+app.include_router(ready_router)
 
 
 @app.get("/")
