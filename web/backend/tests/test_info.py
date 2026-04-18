@@ -15,6 +15,7 @@ def test_info_track(db):
         "artist_name": "Miles Davis",
         "album_rowid": 20,
         "album_name": "Kind of Blue",
+        "album_name_norm": "kind of blue",
         "label_rowid": 30,
         "label": "Columbia",
         "lon": 1.1,
