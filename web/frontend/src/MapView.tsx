@@ -46,6 +46,10 @@ const TILE_URL = TILE_URL_RAW.startsWith("http")
   ? TILE_URL_RAW
   : window.location.origin + TILE_URL_RAW;
 
+const TILE_BOUNDS: [number, number, number, number] = [
+  -21.011852, -21.409018, 21.01185, 21.409019,
+];
+
 /** Reads a CSS custom property value (e.g. "#3bda28") from :root. */
 function cssVar(name: string): string {
   return getComputedStyle(document.documentElement)
@@ -184,6 +188,7 @@ export default function MapView({
       map.addSource("entities", {
         type: "vector",
         tiles: [TILE_URL],
+        bounds: TILE_BOUNDS,
         minzoom: VIEW_CONSTRAINTS.minZoom,
         maxzoom: VIEW_CONSTRAINTS.maxZoom,
       });
