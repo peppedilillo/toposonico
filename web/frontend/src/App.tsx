@@ -10,9 +10,9 @@ import type { Selection, UpdateFn } from "./Panel.tsx";
 const MAX_HISTORY = 20;
 
 const INITIAL_VIEW: ViewState = {
-  lon: 9.93,
-  lat: -4.64,
-  zoom: 8,
+  lon: 0.,
+  lat: -4.,
+  zoom: 7.,
 };
 
 /** Returns true when the parsed hash entity matches one of the supported entities. */
