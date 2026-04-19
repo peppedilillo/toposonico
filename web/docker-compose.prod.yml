@@ -1,11 +1,18 @@
 name: sick-prod
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   web:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     image: sick-web:prod
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"
@@ -24,6 +31,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     image: sick-backend:prod
+    logging: *default-logging
     environment:
       MEILI_KEY: ${MEILI_KEY:?MEILI_KEY is required}
       MEILI_UID: ${MEILI_UID:?MEILI_UID is required}
@@ -54,6 +62,7 @@ services:
 
   meilisearch:
     image: getmeili/meilisearch:v1.38.2
+    logging: *default-logging
     environment:
       MEILI_MASTER_KEY: ${MEILI_KEY:?MEILI_KEY is required}
       MEILI_ENV: production
@@ -71,6 +80,7 @@ services:
 
   tiles:
     image: nginx:1.27-alpine
+    logging: *default-logging
     expose:
       - "8080"
     volumes:
