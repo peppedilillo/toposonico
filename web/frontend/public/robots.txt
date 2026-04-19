@@ -4,4 +4,4 @@ Allow: /
 Disallow: /api/
 Disallow: /tiles/
 
-Sitemap: https://sickrec.com/sitemap.xml
+Sitemap: https://hummap.xyz/sitemap.xml

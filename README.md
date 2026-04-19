@@ -1,4 +1,4 @@
-# Sick
+# Hummap
 
 Welcome!
 
