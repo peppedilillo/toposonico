@@ -645,7 +645,7 @@ function RecsSection({
     <button
       type="button"
       onClick={handleToggle}
-      className={`block w-full cursor-pointer px-4 text-left text-xs select-none
+      className={`block w-full cursor-pointer px-4 text-left text-xs 
       bg-linear-to-r from-gray-500 via-gray-50 to-gray-500 bg-size-[200%_auto] bg-clip-text text-transparent
       ${!open ? "animate-sweep" : ""}`}
     >
@@ -714,7 +714,7 @@ export default function Panel({
     <div
       className="panel z-10 flex flex-col overflow-hidden
       bg-surface font-sans text-base text-white
-      shadow-xl ui-no-pinch safe-bottom"
+      shadow-xl ui-no-pinch safe-bottom select-none"
       onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={(e) => e.stopPropagation()}
     >
