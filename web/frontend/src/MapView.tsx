@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { FeatureCollection } from "geojson";
-import type { ExpressionSpecification } from "maplibre-gl";
+import type { FeatureCollection, Point } from "geojson";
+import type { ExpressionSpecification, GeoJSONSource } from "maplibre-gl";
+import type { CircleLayerSpecification } from "@maplibre/maplibre-gl-style-spec";
 import type { EntityType } from "./utils.ts";
+import type { LoadedSelection } from "./types.ts";
 
 export type ViewState = {
   lon: number;
@@ -17,9 +19,12 @@ export type MapCommand = null | {
   zoom?: number;
 };
 
+type CirclePaint = NonNullable<CircleLayerSpecification["paint"]>;
+
 type MapViewProps = {
   initialView: ViewState;
   command: MapCommand;
+  selection: LoadedSelection | null;
   onMoveEnd: (view: ViewState) => void;
   onFeatureSelect: (entityType: EntityType, rowid: number) => void;
 };
@@ -49,6 +54,11 @@ const TILE_URL = TILE_URL_RAW.startsWith("http")
 const TILE_BOUNDS: [number, number, number, number] = [
   -21.011852, -21.409018, 21.01185, 21.409019,
 ];
+
+const EMPTY_SELECTION: FeatureCollection<Point> = {
+  type: "FeatureCollection",
+  features: [],
+};
 
 /** Reads a CSS custom property value (e.g. "#3bda28") from :root. */
 function cssVar(name: string): string {
@@ -126,16 +136,166 @@ function getHitRadiusExpression() {
   ] as ExpressionSpecification;
 }
 
+/** Entity color chosen from feature properties for shared selection styling. */
+function getEntityColorExpression() {
+  return [
+    "match",
+    ["get", "entity_type"],
+    "track",
+    cssVar("--color-track"),
+    "album",
+    cssVar("--color-album"),
+    "artist",
+    cssVar("--color-artist"),
+    "label",
+    cssVar("--color-label"),
+    "transparent",
+  ] as ExpressionSpecification;
+}
+
+/** Visible track layer style. The low-opacity stroke only pads the hit target. */
+function getTrackPaint(): CirclePaint {
+  return {
+    "circle-radius": getVisualRadiusExpression(),
+    "circle-color": cssVar("--color-track"),
+    "circle-opacity": 0.5,
+    "circle-stroke-color": cssVar("--color-track"),
+    "circle-stroke-opacity": HIT_STROKE_OPACITY,
+    "circle-stroke-width": getHitStrokeWidthExpression(),
+  };
+}
+
+/** Visible album layer style. The low-opacity stroke only pads the hit target. */
+function getAlbumPaint(): CirclePaint {
+  return {
+    "circle-radius": getVisualRadiusExpression(),
+    "circle-color": cssVar("--color-album"),
+    "circle-opacity": 0.6,
+    "circle-stroke-color": cssVar("--color-album"),
+    "circle-stroke-opacity": HIT_STROKE_OPACITY,
+    "circle-stroke-width": getHitStrokeWidthExpression(),
+  };
+}
+
+/** Visible artist layer style. */
+function getArtistPaint(): CirclePaint {
+  return {
+    "circle-radius": getVisualRadiusExpression(),
+    "circle-color": "transparent",
+    "circle-stroke-color": cssVar("--color-artist"),
+    "circle-stroke-opacity": 0.7,
+    "circle-stroke-width": 1,
+  };
+}
+
+/** Visible label layer style. */
+function getLabelPaint(): CirclePaint {
+  return {
+    "circle-radius": getVisualRadiusExpression(),
+    "circle-color": "transparent",
+    "circle-stroke-color": cssVar("--color-label"),
+    "circle-stroke-opacity": 0.7,
+    "circle-stroke-width": 1,
+  };
+}
+
+/** Selection layer style that mirrors the selected entity's visible layer style. */
+function getSelectionPaint(): CirclePaint {
+  return {
+    "circle-radius": getVisualRadiusExpression(),
+    "circle-color": [
+      "match",
+      ["get", "entity_type"],
+      "track",
+      cssVar("--color-track"),
+      "album",
+      cssVar("--color-album"),
+      "transparent",
+    ] as ExpressionSpecification,
+    "circle-opacity": [
+      "match",
+      ["get", "entity_type"],
+      "track",
+      0.5,
+      "album",
+      0.6,
+      1,
+    ] as ExpressionSpecification,
+    "circle-stroke-color": getEntityColorExpression(),
+    "circle-stroke-opacity": [
+      "match",
+      ["get", "entity_type"],
+      "track",
+      HIT_STROKE_OPACITY,
+      "album",
+      HIT_STROKE_OPACITY,
+      "artist",
+      0.7,
+      "label",
+      0.7,
+      0,
+    ] as ExpressionSpecification,
+    "circle-stroke-width": [
+      "match",
+      ["get", "entity_type"],
+      "track",
+      getHitStrokeWidthExpression(),
+      "album",
+      getHitStrokeWidthExpression(),
+      "artist",
+      1,
+      "label",
+      1,
+      0,
+    ] as ExpressionSpecification,
+  };
+}
+
+/** Converts app selection state into the tiny GeoJSON source rendered by the selection layer. */
+function getSelectionGeoJson(
+  selection: LoadedSelection | null,
+): FeatureCollection<Point> {
+  if (!selection) return EMPTY_SELECTION;
+
+  return {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [selection.lon, selection.lat],
+        },
+        properties: {
+          entity_type: selection.entity_type,
+          logcount: selection.logcount,
+        },
+      },
+    ],
+  };
+}
+
+/** Updates the runtime selection source when it has been added to the map style. */
+function setSelectionData(
+  map: maplibregl.Map | null,
+  selection: LoadedSelection | null,
+) {
+  const source = map?.getSource("selection") as GeoJSONSource | undefined;
+  source?.setData(getSelectionGeoJson(selection));
+}
+
 /** MapLibre wrapper responsible only for map rendering and imperative camera commands. */
 export default function MapView({
   initialView,
   command,
+  selection,
   onMoveEnd,
   onFeatureSelect,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const initialViewRef = useRef(initialView);
+  const selectionRef = useRef(selection);
   const onFeatureSelectRef = useRef(onFeatureSelect);
   const onMoveEndRef = useRef(onMoveEnd);
 
@@ -144,6 +304,11 @@ export default function MapView({
     onFeatureSelectRef.current = onFeatureSelect;
     onMoveEndRef.current = onMoveEnd;
   });
+
+  useEffect(() => {
+    selectionRef.current = selection;
+    setSelectionData(mapRef.current, selection);
+  }, [selection]);
 
   useEffect(() => {
     const { lon, lat, zoom } = initialViewRef.current;
@@ -199,28 +364,14 @@ export default function MapView({
         type: "circle",
         source: "entities",
         "source-layer": "tracks",
-        paint: {
-          "circle-radius": getVisualRadiusExpression(),
-          "circle-color": cssVar("--color-track"),
-          "circle-opacity": 0.5,
-          // Outer stroke pads the hit target so tiny track dots stay clickable.
-          "circle-stroke-color": cssVar("--color-track"),
-          "circle-stroke-opacity": HIT_STROKE_OPACITY,
-          "circle-stroke-width": getHitStrokeWidthExpression(),
-        },
+        paint: getTrackPaint(),
       });
       map.addLayer({
         id: "labels",
         type: "circle",
         source: "entities",
         "source-layer": "labels",
-        paint: {
-          "circle-radius": getVisualRadiusExpression(),
-          "circle-color": "transparent",
-          "circle-stroke-color": cssVar("--color-label"),
-          "circle-stroke-opacity": 0.7,
-          "circle-stroke-width": 1,
-        },
+        paint: getLabelPaint(),
       });
       // ghost hit layer keeps small label outlines easy to tap without changing the visible stroke.
       map.addLayer({
@@ -251,28 +402,25 @@ export default function MapView({
         type: "circle",
         source: "entities",
         "source-layer": "artists",
-        paint: {
-          "circle-radius": getVisualRadiusExpression(),
-          "circle-color": "transparent",
-          "circle-stroke-color": cssVar("--color-artist"),
-          "circle-stroke-opacity": 0.7,
-          "circle-stroke-width": 1,
-        },
+        paint: getArtistPaint(),
       });
       map.addLayer({
         id: "albums",
         type: "circle",
         source: "entities",
         "source-layer": "albums",
-        paint: {
-          "circle-radius": getVisualRadiusExpression(),
-          "circle-color": cssVar("--color-album"),
-          "circle-opacity": 0.6,
-          // Outer stroke pads the hit target so tiny album dots stay clickable.
-          "circle-stroke-color": cssVar("--color-album"),
-          "circle-stroke-opacity": HIT_STROKE_OPACITY,
-          "circle-stroke-width": getHitStrokeWidthExpression(),
-        },
+        paint: getAlbumPaint(),
+      });
+
+      map.addSource("selection", {
+        type: "geojson",
+        data: getSelectionGeoJson(selectionRef.current),
+      });
+      map.addLayer({
+        id: "selection-ring",
+        type: "circle",
+        source: "selection",
+        paint: getSelectionPaint(),
       });
 
       // select the highest-popularity entity under the clicked point.

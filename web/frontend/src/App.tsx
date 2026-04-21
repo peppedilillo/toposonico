@@ -5,7 +5,7 @@ import MapView, { type MapCommand, type ViewState } from "./MapView.tsx";
 import { makeAbortable } from "./requests.ts";
 import { type EntityType, getRowid } from "./utils.ts";
 import Logo from "./assets/logo.svg";
-import type { Selection, UpdateFn } from "./Panel.tsx";
+import type { Selection, UpdateFn } from "./types.ts";
 
 const MAX_HISTORY = 20;
 
@@ -235,6 +235,7 @@ export default function App() {
       <MapView
         initialView={initHash.view}
         command={mapCommand}
+        selection={current?.status === "loaded" ? current : null}
         onMoveEnd={setViewState}
         onFeatureSelect={select}
       />
