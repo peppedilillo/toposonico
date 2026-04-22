@@ -36,3 +36,7 @@ docker compose -f docker-compose.prod.yml --env-file config.prod.env run --rm --
    uv run --no-sync python scripts/build_search_index.py
 docker compose -f docker-compose.prod.yml --env-file config.prod.env up -d
 ```
+
+## Utils
+
+The script `scripts/tile_size_stats.py` produces a few tiles summary. Useful for keeping tiles size at check while experimenting with tippecanoe parameters.

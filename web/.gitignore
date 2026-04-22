@@ -10,8 +10,8 @@ frontend/node_modules
 frontend/dist
 tileserver/tiles
 
-# backend
-backend/.venv
-backend/.python-version
-backend/__pycache__/
-backend/**/*.py[oc]
+# python scripts and backend
+.venv/
+.python-version
+__pycache__/
+*.py[oc]

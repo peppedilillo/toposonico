@@ -57,7 +57,7 @@ echo "=== Building tiles ==="
 echo "Output: $SICK_TILES_DIR"
 
 tippecanoe -e "$SICK_TILES_DIR" \
-    --full-detail=7 --low-detail=7 \
+    --full-detail=10 --low-detail=10 \
     --maximum-zoom=14 --minimum-zoom=5 --drop-rate=1.75 \
     --drop-densest-as-needed \
     --read-parallel --force \
