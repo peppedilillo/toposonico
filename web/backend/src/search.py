@@ -1,6 +1,5 @@
 import re
-from typing import Literal
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from fastapi import APIRouter
 from fastapi import Query

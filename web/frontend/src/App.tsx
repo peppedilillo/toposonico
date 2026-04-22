@@ -66,29 +66,29 @@ export default function App() {
   const current = stack.length > 0 ? stack[stack.length - 1] : null;
 
   /** Replaces the pending top entry when its identity still matches the finished request. */
-  const resolveTop = useCallback(
-    (entity: Entity, next: Selection) => {
-      setStack((prev) => {
-        const top = prev[prev.length - 1];
-        // without this guard, a late selection can pop over an already closed panel
-        if (!top) return prev;
-        // without this guard, select A and then B could still result in A being top of the stack
-        if (top.status === "loaded") return prev;
-        if (top.entity_type !== entity.entity_type) return prev;
-        if (top.rowid !== entity.rowid) return prev;
-        return [...prev.slice(0, -1), next];
-      });
-    },
-    [],
-  );
+  const resolveTop = useCallback((entity: Entity, next: Selection) => {
+    setStack((prev) => {
+      const top = prev[prev.length - 1];
+      // without this guard, a late selection can pop over an already closed panel
+      if (!top) return prev;
+      // without this guard, select A and then B could still result in A being top of the stack
+      if (top.status === "loaded") return prev;
+      if (top.entity_type !== entity.entity_type) return prev;
+      if (top.rowid !== entity.rowid) return prev;
+      return [...prev.slice(0, -1), next];
+    });
+  }, []);
 
   /** Loads entity details for the current top-of-stack identity. */
   const loadSelection = useCallback(
     (entity: Entity) => {
       const signal = nextSelection.current.nextSignal();
-      fetch(`/api/panel?rowid=${entity.rowid}&entity_name=${entity.entity_type}`, {
-        signal,
-      })
+      fetch(
+        `/api/panel?rowid=${entity.rowid}&entity_name=${entity.entity_type}`,
+        {
+          signal,
+        },
+      )
         .then((response) => {
           if (!response.ok) throw new Error(response.statusText);
           return response.json();
@@ -193,9 +193,12 @@ export default function App() {
   useEffect(() => {
     if (!initHash.entityType || initHash.rowid == null) return;
     const signal = nextSelection.current.nextSignal();
-    fetch(`/api/panel?rowid=${initHash.rowid}&entity_name=${initHash.entityType}`, {
-      signal,
-    })
+    fetch(
+      `/api/panel?rowid=${initHash.rowid}&entity_name=${initHash.entityType}`,
+      {
+        signal,
+      },
+    )
       .then((response) => {
         if (!response.ok) throw new Error(response.statusText);
         return response.json();

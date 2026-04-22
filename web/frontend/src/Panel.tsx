@@ -5,10 +5,7 @@ import {
   LabelSummary,
   TrackSummary,
 } from "./Summary.tsx";
-import {
-  displayTrackName,
-  formatPlaylistCount,
-} from "./utils.ts";
+import { displayTrackName, formatPlaylistCount } from "./utils.ts";
 import { makeAbortable } from "./requests";
 import type {
   AlbumInfo,
@@ -378,13 +375,7 @@ function getRecDisplay(rec: Recommend): { name: string; sub: string } {
 }
 
 /** Single recommendation row — full-width clickable button. */
-function RecItem({
-  rec,
-  navigate,
-}: {
-  rec: Recommend;
-  navigate: NavigateFn;
-}) {
+function RecItem({ rec, navigate }: { rec: Recommend; navigate: NavigateFn }) {
   const { name, sub } = getRecDisplay(rec);
   return (
     <li>

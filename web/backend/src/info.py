@@ -1,6 +1,5 @@
 import sqlite3
-from typing import Literal
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from fastapi import APIRouter
 from fastapi import HTTPException
