@@ -46,11 +46,7 @@ type LabelSummaryProps = {
 };
 
 /** Summary header for track entities. */
-export function TrackSummary({
-  track,
-  artist,
-  album,
-}: TrackSummaryProps) {
+export function TrackSummary({ track, artist, album }: TrackSummaryProps) {
   return (
     <div className="space-y-1.5">
       <Badge entityType="track" />
@@ -66,10 +62,7 @@ export function TrackSummary({
 }
 
 /** Summary header for album entities. */
-export function AlbumSummary({
-  albumName,
-  artist,
-}: AlbumSummaryProps) {
+export function AlbumSummary({ albumName, artist }: AlbumSummaryProps) {
   return (
     <div className="space-y-1.5">
       <Badge entityType="album" />
@@ -107,10 +100,7 @@ export function ArtistSummary({
 }
 
 /** Summary header for label entities. */
-export function LabelSummary({
-  labelName,
-  playlistCount,
-}: LabelSummaryProps) {
+export function LabelSummary({ labelName, playlistCount }: LabelSummaryProps) {
   return (
     <div className="space-y-1.5">
       <Badge entityType="label" />

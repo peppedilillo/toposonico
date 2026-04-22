@@ -6,7 +6,6 @@ import type { ExpressionSpecification, GeoJSONSource } from "maplibre-gl";
 import type { EntityType } from "./utils.ts";
 import type { LoadedSelection } from "./types.ts";
 
-
 // MapLibre requires absolute URLs for tile sources. In dev the env var is a relative path
 // and we prepend the page origin so it works on both localhost and LAN.
 const TILE_URL_RAW =
@@ -15,7 +14,6 @@ const TILE_URL_RAW =
 const TILE_URL = TILE_URL_RAW.startsWith("http")
   ? TILE_URL_RAW
   : window.location.origin + TILE_URL_RAW;
-
 
 export type ViewState = {
   lon: number;
@@ -321,7 +319,7 @@ export default function MapView({
           "circle-stroke-width": getHitStrokeWidthExpression(),
         },
       });
-      
+
       // selection source. it may contain either zero or one selected feature.
       map.addSource("selection", {
         type: "geojson",
