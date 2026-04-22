@@ -1,45 +1,50 @@
 import type { EntityType } from "./utils.ts";
 
+export type Entity = {
+  entity_type: EntityType;
+  rowid: number;
+  lon: number;
+  lat: number;
+  logcount: number;
+};
+
 // --- Types mirroring backend TypedDicts ---
 
-export type TrackInfo = {
+export type TrackInfo = Entity & {
   entity_type: "track";
-  track_rowid: number;
   track_name_norm: string;
   artist_rowid: number;
   artist_name: string;
+  artist_logcount: number;
   album_rowid: number;
   album_name: string;
   album_name_norm: string;
+  album_logcount: number;
   label_rowid: number;
   label: string;
-  lon: number;
-  lat: number;
+  label_logcount: number;
   album_lon: number;
   album_lat: number;
   artist_lon: number;
   artist_lat: number;
   label_lon: number;
   label_lat: number;
-  logcount: number;
   release_date: string | null;
 };
 
-export type AlbumInfo = {
+export type AlbumInfo = Entity & {
   entity_type: "album";
-  album_rowid: number;
   album_name_norm: string;
   artist_rowid: number;
   artist_name: string;
+  artist_logcount: number;
   label_rowid: number;
   label: string;
-  lon: number;
-  lat: number;
+  label_logcount: number;
   artist_lon: number;
   artist_lat: number;
   label_lon: number;
   label_lat: number;
-  logcount: number;
   nrepr: number;
   total_tracks: number | null;
   release_date: string | null;
@@ -47,13 +52,9 @@ export type AlbumInfo = {
   reprs: TrackRepr[];
 };
 
-export type ArtistInfo = {
+export type ArtistInfo = Entity & {
   entity_type: "artist";
-  artist_rowid: number;
   artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
   ntrack: number;
   nalbum: number;
   nrepr: number;
@@ -61,13 +62,9 @@ export type ArtistInfo = {
   reprs: AlbumRepr[];
 };
 
-export type LabelInfo = {
+export type LabelInfo = Entity & {
   entity_type: "label";
-  label_rowid: number;
   label: string;
-  lon: number;
-  lat: number;
-  logcount: number;
   ntrack: number;
   nalbum: number;
   nartist: number;
@@ -79,42 +76,30 @@ export type EntityInfo = TrackInfo | AlbumInfo | ArtistInfo | LabelInfo;
 
 // --- Recommendation types mirroring backend TypedDicts ---
 
-export type TrackRecommend = {
-  track_rowid: number;
+export type TrackRecommend = Entity & {
+  entity_type: "track";
   track_name_norm: string;
   artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
   simscore: number;
 };
 
-export type AlbumRecommend = {
-  album_rowid: number;
+export type AlbumRecommend = Entity & {
+  entity_type: "album";
   album_name_norm: string;
   artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
   simscore: number;
 };
 
-export type ArtistRecommend = {
-  artist_rowid: number;
+export type ArtistRecommend = Entity & {
+  entity_type: "artist";
   artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
   simscore: number;
   artist_genre: string | null;
 };
 
-export type LabelRecommend = {
-  label_rowid: number;
+export type LabelRecommend = Entity & {
+  entity_type: "label";
   label: string;
-  lon: number;
-  lat: number;
-  logcount: number;
   simscore: number;
 };
 
@@ -126,27 +111,21 @@ export type Recommend =
 
 // --- Repr types mirroring backend TypedDicts ---
 
-export type TrackRepr = {
-  track_rowid: number;
+export type TrackRepr = Entity & {
+  entity_type: "track";
   track_name_norm: string;
   artist_name: string;
-  lon: number;
-  lat: number;
 };
 
-export type AlbumRepr = {
-  album_rowid: number;
+export type AlbumRepr = Entity & {
+  entity_type: "album";
   album_name_norm: string;
   artist_name: string;
-  lon: number;
-  lat: number;
 };
 
-export type ArtistRepr = {
-  artist_rowid: number;
+export type ArtistRepr = Entity & {
+  entity_type: "artist";
   artist_name: string;
-  lon: number;
-  lat: number;
 };
 
 /**
@@ -154,8 +133,8 @@ export type ArtistRepr = {
  * Loading/error keep entity identity so hash sync can stay declarative.
  */
 export type Selection =
-  | { status: "loading"; entity_type: EntityType; rowid: number }
-  | { status: "error"; entity_type: EntityType; rowid: number }
+  | ({ status: "loading" } & Entity)
+  | ({ status: "error" } & Entity)
   | ({ status: "loaded"; recs?: Recommend[] } & EntityInfo);
 
 export type LoadedSelection = Extract<Selection, { status: "loaded" }>;

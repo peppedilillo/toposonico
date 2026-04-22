@@ -1,22 +1,52 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App.tsx";
+import type { Entity, Selection } from "../types.ts";
+
+const latestMapSelection: { current: Selection | null } = { current: null };
 
 vi.mock("../MapView.tsx", () => ({
   default: ({
     onFeatureSelect,
+    selection,
   }: {
-    onFeatureSelect: (entityType: "artist", rowid: number) => void;
-  }) => (
-    <>
-      <button type="button" onClick={() => onFeatureSelect("artist", 1)}>
-        Select artist 1
-      </button>
-      <button type="button" onClick={() => onFeatureSelect("artist", 2)}>
-        Select artist 2
-      </button>
-    </>
-  ),
+    onFeatureSelect: (entity: Entity) => void;
+    selection: Selection | null;
+  }) => {
+    latestMapSelection.current = selection;
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() =>
+            onFeatureSelect({
+              entity_type: "artist",
+              rowid: 1,
+              lon: 10,
+              lat: 15,
+              logcount: 3,
+            })
+          }
+        >
+          Select artist 1
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onFeatureSelect({
+              entity_type: "artist",
+              rowid: 2,
+              lon: 20,
+              lat: 30,
+              logcount: 4,
+            })
+          }
+        >
+          Select artist 2
+        </button>
+      </>
+    );
+  },
 }));
 
 // Lets the test release each response payload at a specific moment, so we can
@@ -32,7 +62,8 @@ function deferred<T>() {
 }
 
 type ArtistPayload = {
-  artist_rowid: number;
+  entity_type: "artist";
+  rowid: number;
   artist_name: string;
   lon: number;
   lat: number;
@@ -47,6 +78,7 @@ type ArtistPayload = {
 describe("App", () => {
   beforeEach(() => {
     window.location.hash = "";
+    latestMapSelection.current = null;
   });
 
   afterEach(() => {
@@ -88,7 +120,8 @@ describe("App", () => {
     // Selection 2 settles first and becomes the visible current selection.
     await act(async () => {
       secondJson.resolve({
-        artist_rowid: 2,
+        entity_type: "artist",
+        rowid: 2,
         artist_name: "Current Artist",
         lon: 20,
         lat: 30,
@@ -109,7 +142,8 @@ describe("App", () => {
     // newer selection.
     await act(async () => {
       firstJson.resolve({
-        artist_rowid: 1,
+        entity_type: "artist",
+        rowid: 1,
         artist_name: "Stale Artist",
         lon: 10,
         lat: 15,
@@ -125,5 +159,33 @@ describe("App", () => {
 
     expect(screen.getByText("Current Artist")).toBeInTheDocument();
     expect(screen.queryByText("Stale Artist")).not.toBeInTheDocument();
+  });
+
+  it("passes loading selections with marker data to the map before details settle", async () => {
+    const user = userEvent.setup();
+    const pendingJson = deferred<ArtistPayload>();
+
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        statusText: "OK",
+        json: () => pendingJson.promise,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Select artist 1" }));
+
+    expect(latestMapSelection.current).toEqual({
+      status: "loading",
+      entity_type: "artist",
+      rowid: 1,
+      lon: 10,
+      lat: 15,
+      logcount: 3,
+    });
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 });

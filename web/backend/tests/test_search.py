@@ -16,7 +16,7 @@ def test_search_map_track():
     result = search_map(hit)
     assert result == {
         "entity_type": "track",
-        "track_rowid": 1,
+        "rowid": 1,
         "track_name_norm": "Blue in Green",
         "artist_name": "Miles Davis",
         "lon": 1.1,
@@ -37,7 +37,7 @@ def test_search_map_album():
     result = search_map(hit)
     assert result == {
         "entity_type": "album",
-        "album_rowid": 2,
+        "rowid": 2,
         "album_name_norm": "Kind of Blue",
         "artist_name": "Miles Davis",
         "lon": 3.3,
@@ -57,7 +57,7 @@ def test_search_map_artist():
     result = search_map(hit)
     assert result == {
         "entity_type": "artist",
-        "artist_rowid": 3,
+        "rowid": 3,
         "artist_name": "Miles Davis",
         "lon": 5.5,
         "lat": 6.6,
@@ -76,7 +76,7 @@ def test_search_map_label():
     result = search_map(hit)
     assert result == {
         "entity_type": "label",
-        "label_rowid": 4,
+        "rowid": 4,
         "label": "Columbia",
         "lon": 7.7,
         "lat": 8.8,

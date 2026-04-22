@@ -9,15 +9,19 @@ def test_info_track(db):
     result = info_fetch(TRACK, 1, db)
 
     assert result == {
-        "track_rowid": 1,
+        "entity_type": "track",
+        "rowid": 1,
         "track_name_norm": "Blue in Green",
         "artist_rowid": 10,
         "artist_name": "Miles Davis",
+        "artist_logcount": 7.3,
         "album_rowid": 20,
         "album_name": "Kind of Blue",
         "album_name_norm": "kind of blue",
+        "album_logcount": 6.1,
         "label_rowid": 30,
         "label": "Columbia",
+        "label_logcount": 5.0,
         "lon": 1.1,
         "lat": 2.2,
         "album_lon": 3.3,
@@ -35,12 +39,15 @@ def test_info_album(db):
     result = info_fetch(ALBUM, 20, db)
 
     assert result == {
-        "album_rowid": 20,
+        "entity_type": "album",
+        "rowid": 20,
         "album_name_norm": "kind of blue",
         "artist_rowid": 10,
         "artist_name": "Miles Davis",
+        "artist_logcount": 7.3,
         "label_rowid": 30,
         "label": "Columbia",
+        "label_logcount": 5.0,
         "lon": 3.3,
         "lat": 4.4,
         "artist_lon": 5.5,
@@ -59,7 +66,8 @@ def test_info_artist(db):
     result = info_fetch(ARTIST, 10, db)
 
     assert result == {
-        "artist_rowid": 10,
+        "entity_type": "artist",
+        "rowid": 10,
         "artist_name": "Miles Davis",
         "lon": 5.5,
         "lat": 6.6,
@@ -75,7 +83,8 @@ def test_info_label(db):
     result = info_fetch(LABEL, 30, db)
 
     assert result == {
-        "label_rowid": 30,
+        "entity_type": "label",
+        "rowid": 30,
         "label": "Columbia",
         "lon": 7.7,
         "lat": 8.8,

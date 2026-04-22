@@ -1,4 +1,5 @@
 import sqlite3
+from typing import Literal
 from typing import TypedDict
 
 from fastapi import APIRouter
@@ -16,15 +17,19 @@ router = APIRouter()
 
 
 class TrackInfo(TypedDict):
-    track_rowid: int
+    entity_type: Literal["track"]
+    rowid: int
     track_name_norm: str
     artist_rowid: int
     artist_name: str
+    artist_logcount: float
     album_rowid: int
     album_name: str
     album_name_norm: str
+    album_logcount: float
     label_rowid: int
     label: str
+    label_logcount: float
     lon: float
     lat: float
     album_lon: float
@@ -38,12 +43,15 @@ class TrackInfo(TypedDict):
 
 
 class AlbumInfo(TypedDict):
-    album_rowid: int
+    entity_type: Literal["album"]
+    rowid: int
     album_name_norm: str
     artist_rowid: int
     artist_name: str
+    artist_logcount: float
     label_rowid: int
     label: str
+    label_logcount: float
     lon: float
     lat: float
     artist_lon: float
@@ -58,7 +66,8 @@ class AlbumInfo(TypedDict):
 
 
 class ArtistInfo(TypedDict):
-    artist_rowid: int
+    entity_type: Literal["artist"]
+    rowid: int
     artist_name: str
     lon: float
     lat: float
@@ -70,7 +79,8 @@ class ArtistInfo(TypedDict):
 
 
 class LabelInfo(TypedDict):
-    label_rowid: int
+    entity_type: Literal["label"]
+    rowid: int
     label: str
     lon: float
     lat: float
@@ -90,39 +100,45 @@ def info_fetch(entity: Entity, rowid: int, db: sqlite3.Connection) -> Info | Non
             info_cls = TrackInfo
             query = """
                 SELECT
-                    tracks.track_rowid,
-                    tracks.track_name_norm,
-                    tracks.artist_rowid,
-                    tracks.artist_name,
-                    tracks.album_rowid,
-                    tracks.album_name,
-                    albums.album_name_norm AS album_name_norm,
-                    tracks.label_rowid,
-                    tracks.label,
-                    tracks.lon,
-                    tracks.lat,
-                    tracks.album_lon,
-                    tracks.album_lat,
-                    tracks.artist_lon,
-                    tracks.artist_lat,
-                    tracks.label_lon,
-                    tracks.label_lat,
-                    tracks.logcount,
-                    tracks.release_date
+                    'track' AS entity_type,
+                    track_rowid AS rowid,
+                    track_name_norm,
+                    artist_rowid,
+                    artist_name,
+                    artist_logcount,
+                    album_rowid,
+                    album_name,
+                    album_name_norm,
+                    album_logcount,
+                    label_rowid,
+                    label,
+                    label_logcount,
+                    lon,
+                    lat,
+                    album_lon,
+                    album_lat,
+                    artist_lon,
+                    artist_lat,
+                    label_lon,
+                    label_lat,
+                    logcount,
+                    release_date
                 FROM tracks
-                JOIN albums ON tracks.album_rowid = albums.album_rowid
                 WHERE track_rowid = ?
             """
         case AlbumEntity():
             info_cls = AlbumInfo
             query = """
                 SELECT
-                    album_rowid,
+                    'album' AS entity_type,
+                    album_rowid AS rowid,
                     album_name_norm,
                     artist_rowid,
                     artist_name,
+                    artist_logcount,
                     label_rowid,
                     label,
+                    label_logcount,
                     lon,
                     lat,
                     artist_lon,
@@ -141,7 +157,8 @@ def info_fetch(entity: Entity, rowid: int, db: sqlite3.Connection) -> Info | Non
             info_cls = ArtistInfo
             query = """
                 SELECT
-                    artist_rowid,
+                    'artist' AS entity_type,
+                    artist_rowid AS rowid,
                     artist_name,
                     lon,
                     lat,
@@ -157,7 +174,8 @@ def info_fetch(entity: Entity, rowid: int, db: sqlite3.Connection) -> Info | Non
             info_cls = LabelInfo
             query = """
                 SELECT
-                    label_rowid,
+                    'label' AS entity_type,
+                    label_rowid AS rowid,
                     label,
                     lon,
                     lat,

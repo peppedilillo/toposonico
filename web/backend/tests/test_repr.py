@@ -14,18 +14,22 @@ def test_repr_album(db):
 
     assert results == [
         {
-            "track_rowid": 1,
+            "entity_type": "track",
+            "rowid": 1,
             "track_name_norm": "Blue in Green",
             "artist_name": "Miles Davis",
             "lon": 1.1,
             "lat": 2.2,
+            "logcount": 4.7,
         },
         {
-            "track_rowid": 2,
+            "entity_type": "track",
+            "rowid": 2,
             "track_name_norm": "So What",
             "artist_name": "Miles Davis",
             "lon": 1.2,
             "lat": 2.3,
+            "logcount": 4.5,
         },
     ]
 
@@ -34,7 +38,7 @@ def test_repr_album_respects_limit(db):
     results = repr_fetch(ALBUM, 20, limit=1, db=db)
 
     assert len(results) == 1
-    assert results[0]["track_rowid"] == 1
+    assert results[0]["rowid"] == 1
 
 
 def test_repr_artist(db):
@@ -42,18 +46,22 @@ def test_repr_artist(db):
 
     assert results == [
         {
-            "album_rowid": 20,
+            "entity_type": "album",
+            "rowid": 20,
             "album_name_norm": "kind of blue",
             "artist_name": "Miles Davis",
             "lon": 3.3,
             "lat": 4.4,
+            "logcount": 6.1,
         },
         {
-            "album_rowid": 21,
+            "entity_type": "album",
+            "rowid": 21,
             "album_name_norm": "nefertiti",
             "artist_name": "Miles Davis",
             "lon": 3.4,
             "lat": 4.5,
+            "logcount": 5.2,
         },
     ]
 
@@ -63,10 +71,12 @@ def test_repr_label(db):
 
     assert results == [
         {
-            "artist_rowid": 10,
+            "entity_type": "artist",
+            "rowid": 10,
             "artist_name": "Miles Davis",
             "lon": 5.5,
             "lat": 6.6,
+            "logcount": 7.3,
         },
     ]
 

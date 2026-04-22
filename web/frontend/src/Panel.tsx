@@ -7,9 +7,7 @@ import {
 } from "./Summary.tsx";
 import {
   displayTrackName,
-  type EntityType,
   formatPlaylistCount,
-  getRowid,
 } from "./utils.ts";
 import { makeAbortable } from "./requests";
 import type {
@@ -17,6 +15,7 @@ import type {
   AlbumRecommend,
   ArtistInfo,
   ArtistRecommend,
+  Entity,
   EntityInfo,
   LabelInfo,
   LabelRecommend,
@@ -27,12 +26,7 @@ import type {
   UpdateFn,
 } from "./types.ts";
 
-type NavigateFn = (
-  entityType: EntityType,
-  rowid: number,
-  lon: number,
-  lat: number,
-) => void;
+type NavigateFn = (entity: Entity) => void;
 
 type PanelProps = {
   selection: Selection | null;
@@ -168,7 +162,13 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
         artist={
           <Link
             onClick={() =>
-              navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)
+              navigate({
+                entity_type: "artist",
+                rowid: s.artist_rowid,
+                lon: s.artist_lon,
+                lat: s.artist_lat,
+                logcount: s.artist_logcount,
+              })
             }
             color="var(--color-artist)"
             className={INLINE_LINK_CLASS}
@@ -179,7 +179,13 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
         album={
           <Link
             onClick={() =>
-              navigate("album", s.album_rowid, s.album_lon, s.album_lat)
+              navigate({
+                entity_type: "album",
+                rowid: s.album_rowid,
+                lon: s.album_lon,
+                lat: s.album_lat,
+                logcount: s.album_logcount,
+              })
             }
             color="var(--color-album)"
             className={INLINE_LINK_CLASS}
@@ -191,7 +197,13 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
       <div className="text-sm text-muted truncate">
         <Link
           onClick={() =>
-            navigate("label", s.label_rowid, s.label_lon, s.label_lat)
+            navigate({
+              entity_type: "label",
+              rowid: s.label_rowid,
+              lon: s.label_lon,
+              lat: s.label_lat,
+              logcount: s.label_logcount,
+            })
           }
           color="var(--color-label)"
           className={INLINE_LINK_CLASS}
@@ -220,7 +232,13 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
         artist={
           <Link
             onClick={() =>
-              navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)
+              navigate({
+                entity_type: "artist",
+                rowid: s.artist_rowid,
+                lon: s.artist_lon,
+                lat: s.artist_lat,
+                logcount: s.artist_logcount,
+              })
             }
             color="var(--color-artist)"
             className={INLINE_LINK_CLASS}
@@ -232,7 +250,13 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
       <div className="text-sm text-muted truncate">
         <Link
           onClick={() =>
-            navigate("label", s.label_rowid, s.label_lon, s.label_lat)
+            navigate({
+              entity_type: "label",
+              rowid: s.label_rowid,
+              lon: s.label_lon,
+              lat: s.label_lat,
+              logcount: s.label_logcount,
+            })
           }
           color="var(--color-label)"
           className={INLINE_LINK_CLASS}
@@ -253,10 +277,10 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
         <ReprRow>
           <span className="text-muted mr-1.5">features:</span>
           {s.reprs.map((r, i) => (
-            <span key={r.track_rowid}>
+            <span key={r.rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
               <Link
-                onClick={() => navigate("track", r.track_rowid, r.lon, r.lat)}
+                onClick={() => navigate(r)}
                 color="var(--color-album)"
                 className={INLINE_LINK_CLASS}
               >
@@ -282,10 +306,10 @@ function ArtistPanel({ s, navigate }: { s: ArtistInfo; navigate: NavigateFn }) {
         <ReprRow>
           <span className="text-muted mr-1.5">top albums:</span>
           {s.reprs.map((r, i) => (
-            <span key={r.album_rowid}>
+            <span key={r.rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
               <Link
-                onClick={() => navigate("album", r.album_rowid, r.lon, r.lat)}
+                onClick={() => navigate(r)}
                 color="var(--color-album)"
                 className={INLINE_LINK_CLASS}
               >
@@ -310,10 +334,10 @@ function LabelPanel({ s, navigate }: { s: LabelInfo; navigate: NavigateFn }) {
         <ReprRow>
           <span className="text-muted mr-1.5">top artists:</span>
           {s.reprs.map((r, i) => (
-            <span key={r.artist_rowid}>
+            <span key={r.rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
               <Link
-                onClick={() => navigate("artist", r.artist_rowid, r.lon, r.lat)}
+                onClick={() => navigate(r)}
                 color="var(--color-artist)"
                 className={INLINE_LINK_CLASS}
               >
@@ -329,38 +353,10 @@ function LabelPanel({ s, navigate }: { s: LabelInfo; navigate: NavigateFn }) {
 
 // --- Recommendation helpers and components ---
 
-/** Extracts navigation args from a recommendation. */
-function getRecNav(
-  rec: Recommend,
-  entityType: EntityType,
-): [EntityType, number, number, number] {
-  switch (entityType) {
-    case "track": {
-      const r = rec as TrackRecommend;
-      return ["track", r.track_rowid, r.lon, r.lat];
-    }
-    case "album": {
-      const r = rec as AlbumRecommend;
-      return ["album", r.album_rowid, r.lon, r.lat];
-    }
-    case "artist": {
-      const r = rec as ArtistRecommend;
-      return ["artist", r.artist_rowid, r.lon, r.lat];
-    }
-    default: {
-      const r = rec as LabelRecommend;
-      return ["label", r.label_rowid, r.lon, r.lat];
-    }
-  }
-}
-
 /** Returns display name and subtitle for a recommendation. */
-function getRecDisplay(
-  rec: Recommend,
-  entityType: EntityType,
-): { name: string; sub: string } {
+function getRecDisplay(rec: Recommend): { name: string; sub: string } {
   const playlists = formatPlaylistCount(rec.logcount);
-  switch (entityType) {
+  switch (rec.entity_type) {
     case "track":
       return {
         name: displayTrackName((rec as TrackRecommend).track_name_norm),
@@ -384,21 +380,18 @@ function getRecDisplay(
 /** Single recommendation row — full-width clickable button. */
 function RecItem({
   rec,
-  entityType,
   navigate,
 }: {
   rec: Recommend;
-  entityType: EntityType;
   navigate: NavigateFn;
 }) {
-  const { name, sub } = getRecDisplay(rec, entityType);
-  const [et, rowid, lon, lat] = getRecNav(rec, entityType);
+  const { name, sub } = getRecDisplay(rec);
   return (
     <li>
       <button
         onClick={(e) => {
           e.stopPropagation();
-          navigate(et, rowid, lon, lat);
+          navigate(rec);
         }}
         className="text-left w-full cursor-pointer hover:bg-overlay py-1.5 px-4"
       >
@@ -415,12 +408,10 @@ type FetchStatus = "idle" | "loading" | "error";
 function RecBody({
   recs,
   fetchStatus,
-  entityType,
   navigate,
 }: {
   recs: Recommend[] | undefined;
   fetchStatus: FetchStatus;
-  entityType: EntityType;
   navigate: NavigateFn;
 }) {
   if (recs) {
@@ -430,11 +421,10 @@ function RecBody({
       );
     return (
       <ol className="mt-1">
-        {recs.map((rec, i) => (
+        {recs.map((rec) => (
           <RecItem
-            key={i}
+            key={`${rec.entity_type}:${rec.rowid}`}
             rec={rec}
-            entityType={entityType}
             navigate={navigate}
           />
         ))}
@@ -460,7 +450,7 @@ function RecsSection({
   const [open, setOpen] = useState(entity.recs != null);
   const [fetchStatus, setFetchStatus] = useState<FetchStatus>("idle");
   const aborter = useRef(makeAbortable());
-  const rowid = getRowid(entity);
+  const rowid = entity.rowid;
   const RECSNUMBER = 10;
 
   const handleToggle = () => {
@@ -511,7 +501,6 @@ function RecsSection({
           <RecBody
             recs={entity.recs}
             fetchStatus={fetchStatus}
-            entityType={entity.entity_type}
             navigate={navigate}
           />
         </div>
@@ -522,7 +511,6 @@ function RecsSection({
             <RecBody
               recs={entity.recs}
               fetchStatus={fetchStatus}
-              entityType={entity.entity_type}
               navigate={navigate}
             />
           )}
@@ -590,7 +578,7 @@ export default function Panel({
       </div>
       {selection.status === "loaded" && (
         <RecsSection
-          key={`${selection.entity_type}:${getRowid(selection)}`}
+          key={`${selection.entity_type}:${selection.rowid}`}
           entity={selection}
           navigate={navigate}
           update={update}

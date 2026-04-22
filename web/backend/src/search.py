@@ -1,4 +1,5 @@
 import re
+from typing import Literal
 from typing import TypedDict
 
 from fastapi import APIRouter
@@ -19,8 +20,8 @@ SEARCH_ID_RE = re.compile(rf"^({'|'.join(re.escape(e.name) for e in ENTITIES)})_
 
 
 class TrackHit(TypedDict):
-    entity_type: str
-    track_rowid: int
+    entity_type: Literal["track"]
+    rowid: int
     track_name_norm: str
     artist_name: str
     lon: float
@@ -29,8 +30,8 @@ class TrackHit(TypedDict):
 
 
 class AlbumHit(TypedDict):
-    entity_type: str
-    album_rowid: int
+    entity_type: Literal["album"]
+    rowid: int
     album_name_norm: str
     artist_name: str
     lon: float
@@ -39,8 +40,8 @@ class AlbumHit(TypedDict):
 
 
 class ArtistHit(TypedDict):
-    entity_type: str
-    artist_rowid: int
+    entity_type: Literal["artist"]
+    rowid: int
     artist_name: str
     lon: float
     lat: float
@@ -48,8 +49,8 @@ class ArtistHit(TypedDict):
 
 
 class LabelHit(TypedDict):
-    entity_type: str
-    label_rowid: int
+    entity_type: Literal["label"]
+    rowid: int
     label: str
     lon: float
     lat: float
@@ -70,8 +71,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
     match entity:
         case TrackEntity():
             return TrackHit(
-                entity_type=entity.name,
-                track_rowid=rowid,
+                entity_type="track",
+                rowid=rowid,
                 track_name_norm=hit["track_name_norm"],
                 artist_name=hit["artist_name"],
                 lon=hit["lon"],
@@ -80,8 +81,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
             )
         case AlbumEntity():
             return AlbumHit(
-                entity_type=entity.name,
-                album_rowid=rowid,
+                entity_type="album",
+                rowid=rowid,
                 album_name_norm=hit["album_name_norm"],
                 artist_name=hit["artist_name"],
                 lon=hit["lon"],
@@ -90,8 +91,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
             )
         case ArtistEntity():
             return ArtistHit(
-                entity_type=entity.name,
-                artist_rowid=rowid,
+                entity_type="artist",
+                rowid=rowid,
                 artist_name=hit["artist_name"],
                 lon=hit["lon"],
                 lat=hit["lat"],
@@ -99,8 +100,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
             )
         case LabelEntity():
             return LabelHit(
-                entity_type=entity.name,
-                label_rowid=rowid,
+                entity_type="label",
+                rowid=rowid,
                 label=hit["label"],
                 lon=hit["lon"],
                 lat=hit["lat"],

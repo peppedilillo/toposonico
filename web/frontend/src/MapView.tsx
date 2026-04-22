@@ -4,7 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, Point } from "geojson";
 import type { ExpressionSpecification, GeoJSONSource } from "maplibre-gl";
 import type { EntityType } from "./utils.ts";
-import type { LoadedSelection } from "./types.ts";
+import type { Entity, Selection } from "./types.ts";
 
 // MapLibre requires absolute URLs for tile sources. In dev the env var is a relative path
 // and we prepend the page origin so it works on both localhost and LAN.
@@ -30,9 +30,9 @@ export type MapCommand = null | {
 type MapViewProps = {
   initialView: ViewState;
   command: MapCommand;
-  selection: LoadedSelection | null;
+  selection: Selection | null;
   onMoveEnd: (view: ViewState) => void;
-  onFeatureSelect: (entityType: EntityType, rowid: number) => void;
+  onFeatureSelect: (entity: Entity) => void;
 };
 
 const VIEW_CONSTRAINTS = {
@@ -135,7 +135,7 @@ function getHitRadiusExpression() {
 
 /** Converts app selection state into the tiny GeoJSON source rendered by the selection layer. */
 function getSelectionGeoJson(
-  selection: LoadedSelection | null,
+  selection: Selection | null,
 ): FeatureCollection<Point> {
   if (!selection) return EMPTY_SELECTION;
 
@@ -160,7 +160,7 @@ function getSelectionGeoJson(
 /** Updates the runtime selection source when it has been added to the map style. */
 function setSelectionData(
   map: maplibregl.Map | null,
-  selection: LoadedSelection | null,
+  selection: Selection | null,
 ) {
   const source = map?.getSource("selection") as GeoJSONSource | undefined;
   source?.setData(getSelectionGeoJson(selection));
@@ -389,11 +389,7 @@ export default function MapView({
           layers: INTERACTIVE_LAYER_IDS,
         });
 
-        let bestSelection: {
-          entityType: EntityType;
-          rowid: number;
-          logcount: number;
-        } | null = null;
+        let bestSelection: Entity | null = null;
 
         for (const feature of features) {
           let entityType: EntityType;
@@ -425,14 +421,21 @@ export default function MapView({
           if (bestSelection != null && logcount <= bestSelection.logcount)
             continue;
 
-          bestSelection = { entityType, rowid, logcount };
+          if (feature.geometry.type !== "Point") continue;
+          const [lon, lat] = feature.geometry.coordinates;
+          if (typeof lon !== "number" || typeof lat !== "number") continue;
+
+          bestSelection = {
+            entity_type: entityType,
+            rowid,
+            lon,
+            lat,
+            logcount,
+          };
         }
 
         if (bestSelection != null) {
-          onFeatureSelectRef.current(
-            bestSelection.entityType,
-            bestSelection.rowid,
-          );
+          onFeatureSelectRef.current(bestSelection);
         }
       });
 
