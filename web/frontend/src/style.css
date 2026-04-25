@@ -8,9 +8,9 @@
   --color-muted: #7e7d7d;
   --color-overlay: rgba(25, 25, 25, 0.8);
   --color-border: #303030;
-  --color-track: #3bda28;
-  --color-artist: #58e1bd;
-  --color-album: #bad747;
+  --color-track: #3fea2b;
+  --color-artist: #35b5ab;
+  --color-album: #ceed50;
   --color-label: #ca53fa;
 
   @keyframes sweep {

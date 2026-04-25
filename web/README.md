@@ -18,11 +18,18 @@ chmod +x build.sh
 ./build.sh
 ```
 
+For iterative tuning, comment out the layer build blocks you want to reuse from
+the previous run. `SICK_TILES_BUILD_DIR` is preserved across runs, so cached
+layer MBTiles remain available for the final `tile-join`.
+
 For local development with Docker Compose:
 
 ```shell
 docker compose up
 ```
+
+The frontend requests tiles directly from Martin at
+`/sick-tiles/{z}/{x}/{y}`.
 
 ## Production setup
 
@@ -40,6 +47,12 @@ docker compose -f docker-compose.prod.yml --env-file config.prod.env up -d
 ## Utils
 
 The script `scripts/tile_size_stats.py` produces a few tiles summary. Useful for keeping tiles size at check while experimenting with tippecanoe parameters.
+
+Example:
+
+```shell
+python scripts/tile_size_stats.py --tiles /path/to/sick.mbtiles
+```
 
 
 ## Linter

@@ -1,8 +1,9 @@
-"""Report size statistics for a tile directory."""
+"""Report size statistics for an MBTiles archive."""
 
 import argparse
 import os
 from pathlib import Path
+import sqlite3
 
 
 def format_bytes(size: float) -> str:
@@ -15,12 +16,6 @@ def format_bytes(size: float) -> str:
     raise AssertionError("unreachable")
 
 
-def iter_tiles(root: Path):
-    for path in root.rglob("*.pbf"):
-        if path.is_file():
-            yield path
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Report total, mean, max, and count statistics for map tiles.",
@@ -28,31 +23,45 @@ def main():
     )
     parser.add_argument(
         "--tiles",
-        default=os.environ.get("SICK_TILES_DIR"),
+        default=os.environ.get("SICK_TILES_MB"),
         metavar="PATH",
-        help="Path to tiles directory. $SICK_TILES_DIR",
+        help="Path to MBTiles archive. $SICK_TILES_MB",
     )
     args = parser.parse_args()
 
     if args.tiles is None:
-        raise ValueError("--tiles / $SICK_TILES_DIR not set")
+        raise ValueError("--tiles / $SICK_TILES_MB not set")
 
     tiles = Path(args.tiles)
+    if not tiles.is_file():
+        raise FileNotFoundError(f"MBTiles file not found: {tiles}")
 
-    count = 0
-    total_size = 0
-    max_size = 0
-    max_path = None
+    conn = sqlite3.connect(tiles)
+    count, total_size, mean_size, max_size = conn.execute(
+        """
+        SELECT
+            COUNT(*),
+            COALESCE(SUM(LENGTH(tile_data)), 0),
+            COALESCE(AVG(LENGTH(tile_data)), 0),
+            COALESCE(MAX(LENGTH(tile_data)), 0)
+        FROM tiles
+        """
+    ).fetchone()
+    max_tile = conn.execute(
+        """
+        SELECT
+            zoom_level,
+            tile_column,
+            ((1 << zoom_level) - 1 - tile_row) AS tile_row_xyz
+        FROM tiles
+        ORDER BY LENGTH(tile_data) DESC, zoom_level DESC, tile_column DESC, tile_row DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    conn.close()
 
-    for path in iter_tiles(tiles):
-        size = path.stat().st_size
-        count += 1
-        total_size += size
-        if size > max_size:
-            max_size = size
-            max_path = path
-
-    mean_size = total_size / count if count > 0 else 0
+    if count == 0:
+        mean_size = 0
 
     print("tile size stats")
     print(tiles)
@@ -61,8 +70,9 @@ def main():
     print(f"  total size  {total_size:>12,}  {format_bytes(total_size)}")
     print(f"  mean size   {mean_size:>12,.2f}  {format_bytes(mean_size)}")
     print(f"  max size    {max_size:>12,}  {format_bytes(max_size)}")
-    if max_path is not None:
-        print(f"  max tile    {max_path.relative_to(tiles)}")
+    if max_tile is not None:
+        zoom, x, y = max_tile
+        print(f"  max tile    {zoom}/{x}/{y}")
 
 
 if __name__ == "__main__":

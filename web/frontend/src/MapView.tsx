@@ -10,7 +10,7 @@ import type { Entity, Selection } from "./types.ts";
 // and we prepend the page origin so it works on both localhost and LAN.
 const TILE_URL_RAW =
   (import.meta.env.VITE_TILES_URL as string | undefined) ??
-  "/tiles/{z}/{x}/{y}.pbf";
+  "/sick-tiles/{z}/{x}/{y}";
 const TILE_URL = TILE_URL_RAW.startsWith("http")
   ? TILE_URL_RAW
   : window.location.origin + TILE_URL_RAW;
