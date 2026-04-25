@@ -69,7 +69,7 @@ export default function App() {
 
   const zoomForEntity = useCallback(
     (entity: Entity) => Math.min(SOURCE_MAX_ZOOM, ENTITY_BASE_ZOOMS[entity.entity_type] + ZOOM_PADDING),
-    [viewState.zoom],
+    [],
   );
 
   /** Replaces the pending top entry when its identity still matches the finished request. */

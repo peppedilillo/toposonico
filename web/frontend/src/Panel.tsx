@@ -73,7 +73,7 @@ function Link({
   );
 }
 
-const INLINE_LINK_CLASS = "inline cursor-pointer text-left transition-colors";
+const INLINE_LINK_CLASS = "inline cursor-pointer text-left text-white transition-colors";
 
 /** Horizontal scrollable row with wheel-to-scroll and gradient overflow fades. */
 function ReprRow({ children }: { children: React.ReactNode }) {
