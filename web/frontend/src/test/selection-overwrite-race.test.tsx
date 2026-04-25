@@ -1,19 +1,14 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App.tsx";
-import type { Entity, Selection } from "../types.ts";
-
-const latestMapSelection: { current: Selection | null } = { current: null };
+import type { Entity } from "../types.ts";
 
 vi.mock("../MapView.tsx", () => ({
   default: ({
     onFeatureSelect,
-    selection,
   }: {
     onFeatureSelect: (entity: Entity) => void;
-    selection: Selection | null;
   }) => {
-    latestMapSelection.current = selection;
     return (
       <>
         <button
@@ -78,7 +73,6 @@ type ArtistPayload = {
 describe("App", () => {
   beforeEach(() => {
     window.location.hash = "";
-    latestMapSelection.current = null;
   });
 
   afterEach(() => {
@@ -159,33 +153,5 @@ describe("App", () => {
 
     expect(screen.getByText("Current Artist")).toBeInTheDocument();
     expect(screen.queryByText("Stale Artist")).not.toBeInTheDocument();
-  });
-
-  it("passes loading selections with marker data to the map before details settle", async () => {
-    const user = userEvent.setup();
-    const pendingJson = deferred<ArtistPayload>();
-
-    const fetchMock = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        statusText: "OK",
-        json: () => pendingJson.promise,
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: "Select artist 1" }));
-
-    expect(latestMapSelection.current).toEqual({
-      status: "loading",
-      entity_type: "artist",
-      rowid: 1,
-      lon: 10,
-      lat: 15,
-      logcount: 3,
-    });
-    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 });

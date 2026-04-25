@@ -18,10 +18,6 @@ chmod +x build.sh
 ./build.sh
 ```
 
-For iterative tuning, comment out the layer build blocks you want to reuse from
-the previous run. `SICK_TILES_BUILD_DIR` is preserved across runs, so cached
-layer MBTiles remain available for the final `tile-join`.
-
 For local development with Docker Compose:
 
 ```shell

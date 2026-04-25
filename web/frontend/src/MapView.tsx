@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { FeatureCollection, Point } from "geojson";
-import type { ExpressionSpecification, GeoJSONSource } from "maplibre-gl";
-import type { EntityType } from "./utils.ts";
-import type { Entity, Selection } from "./types.ts";
+import type { FeatureCollection } from "geojson";
+import type { ExpressionSpecification } from "maplibre-gl";
+import { SOURCE_MAX_ZOOM, type EntityType } from "./utils.ts";
+import type { Entity } from "./types.ts";
 
 // MapLibre requires absolute URLs for tile sources. In dev the env var is a relative path
 // and we prepend the page origin so it works on both localhost and LAN.
@@ -30,14 +30,14 @@ export type MapCommand = null | {
 type MapViewProps = {
   initialView: ViewState;
   command: MapCommand;
-  selection: Selection | null;
   onMoveEnd: (view: ViewState) => void;
   onFeatureSelect: (entity: Entity) => void;
 };
 
 const VIEW_CONSTRAINTS = {
   minZoom: 5,
-  maxZoom: 14,
+  // this enables over overzooming
+  maxZoom: SOURCE_MAX_ZOOM + 2,
   pitch: 10,
 };
 
@@ -51,11 +51,6 @@ const INTERACTIVE_LAYER_IDS = ["tracks", "labels-hit", "artists-hit", "albums"];
 const TILE_BOUNDS: [number, number, number, number] = [
   -21.011852, -21.409018, 21.01185, 21.409019,
 ];
-
-const EMPTY_SELECTION: FeatureCollection<Point> = {
-  type: "FeatureCollection",
-  features: [],
-};
 
 /** Reads a CSS custom property value (e.g. "#3bda28") from :root. */
 function cssVar(name: string): string {
@@ -133,51 +128,16 @@ function getHitRadiusExpression() {
   ] as ExpressionSpecification;
 }
 
-/** Converts app selection state into the tiny GeoJSON source rendered by the selection layer. */
-function getSelectionGeoJson(
-  selection: Selection | null,
-): FeatureCollection<Point> {
-  if (!selection) return EMPTY_SELECTION;
-
-  return {
-    type: "FeatureCollection",
-    features: [
-      {
-        type: "Feature",
-        geometry: {
-          type: "Point",
-          coordinates: [selection.lon, selection.lat],
-        },
-        properties: {
-          entity_type: selection.entity_type,
-          logcount: selection.logcount,
-        },
-      },
-    ],
-  };
-}
-
-/** Updates the runtime selection source when it has been added to the map style. */
-function setSelectionData(
-  map: maplibregl.Map | null,
-  selection: Selection | null,
-) {
-  const source = map?.getSource("selection") as GeoJSONSource | undefined;
-  source?.setData(getSelectionGeoJson(selection));
-}
-
 /** MapLibre wrapper responsible only for map rendering and imperative camera commands. */
 export default function MapView({
   initialView,
   command,
-  selection,
   onMoveEnd,
   onFeatureSelect,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const initialViewRef = useRef(initialView);
-  const selectionRef = useRef(selection);
   const onFeatureSelectRef = useRef(onFeatureSelect);
   const onMoveEndRef = useRef(onMoveEnd);
 
@@ -186,11 +146,6 @@ export default function MapView({
     onFeatureSelectRef.current = onFeatureSelect;
     onMoveEndRef.current = onMoveEnd;
   });
-
-  useEffect(() => {
-    selectionRef.current = selection;
-    setSelectionData(mapRef.current, selection);
-  }, [selection]);
 
   useEffect(() => {
     const { lon, lat, zoom } = initialViewRef.current;
@@ -237,7 +192,7 @@ export default function MapView({
         tiles: [TILE_URL],
         bounds: TILE_BOUNDS,
         minzoom: VIEW_CONSTRAINTS.minZoom,
-        maxzoom: VIEW_CONSTRAINTS.maxZoom,
+        maxzoom: SOURCE_MAX_ZOOM,
       });
 
       // there are much more tracks than any other entity class, we place them at z-order bottom
@@ -319,69 +274,6 @@ export default function MapView({
           "circle-stroke-width": getHitStrokeWidthExpression(),
         },
       });
-
-      // selection source. it may contain either zero or one selected feature.
-      map.addSource("selection", {
-        type: "geojson",
-        data: EMPTY_SELECTION,
-      });
-      map.addLayer({
-        id: "selection-marker-track",
-        type: "circle",
-        source: "selection",
-        filter: ["==", ["get", "entity_type"], "track"],
-        paint: {
-          "circle-radius": getVisualRadiusExpression(),
-          "circle-color": cssVar("--color-track"),
-          "circle-opacity": 1,
-          "circle-stroke-color": cssVar("--color-track"),
-          "circle-stroke-opacity": 1,
-          "circle-stroke-width": 0,
-        },
-      });
-      map.addLayer({
-        id: "selection-marker-album",
-        type: "circle",
-        source: "selection",
-        filter: ["==", ["get", "entity_type"], "album"],
-        paint: {
-          "circle-radius": getVisualRadiusExpression(),
-          "circle-color": cssVar("--color-album"),
-          "circle-opacity": 1,
-          "circle-stroke-color": cssVar("--color-album"),
-          "circle-stroke-opacity": 1,
-          "circle-stroke-width": 0,
-        },
-      });
-      map.addLayer({
-        id: "selection-marker-artist",
-        type: "circle",
-        source: "selection",
-        filter: ["==", ["get", "entity_type"], "artist"],
-        paint: {
-          "circle-radius": getVisualRadiusExpression(),
-          "circle-color": "transparent",
-          "circle-opacity": 1,
-          "circle-stroke-color": cssVar("--color-artist"),
-          "circle-stroke-opacity": 1,
-          "circle-stroke-width": 1,
-        },
-      });
-      map.addLayer({
-        id: "selection-marker-label",
-        type: "circle",
-        source: "selection",
-        filter: ["==", ["get", "entity_type"], "label"],
-        paint: {
-          "circle-radius": getVisualRadiusExpression(),
-          "circle-color": "transparent",
-          "circle-opacity": 1,
-          "circle-stroke-color": cssVar("--color-label"),
-          "circle-stroke-opacity": 1,
-          "circle-stroke-width": 1,
-        },
-      });
-      setSelectionData(map, selectionRef.current);
 
       // select the highest-popularity entity under the clicked point.
       map.on("click", (e) => {

@@ -3,7 +3,7 @@ import Search from "./Search.tsx";
 import Panel from "./Panel.tsx";
 import MapView, { type MapCommand, type ViewState } from "./MapView.tsx";
 import { makeAbortable } from "./requests.ts";
-import { type EntityType } from "./utils.ts";
+import {ENTITY_BASE_ZOOMS, type EntityType, SOURCE_MAX_ZOOM} from "./utils.ts";
 import Logo from "./assets/logo.svg";
 import type { Entity, EntityInfo, Selection, UpdateFn } from "./types.ts";
 
@@ -56,6 +56,8 @@ function updateHash(updates: Record<string, string | number | null>) {
   history.replaceState(null, "", "#" + params.toString());
 }
 
+const ZOOM_PADDING = 0.25
+
 /** Root application component — owns navigation state, hash sync, and fetch coordination. */
 export default function App() {
   const [initHash] = useState(parseHash);
@@ -64,6 +66,11 @@ export default function App() {
   const [mapCommand, setMapCommand] = useState<MapCommand>(null);
   const nextSelection = useRef(makeAbortable());
   const current = stack.length > 0 ? stack[stack.length - 1] : null;
+
+  const zoomForEntity = useCallback(
+    (entity: Entity) => Math.min(SOURCE_MAX_ZOOM, ENTITY_BASE_ZOOMS[entity.entity_type] + ZOOM_PADDING),
+    [viewState.zoom],
+  );
 
   /** Replaces the pending top entry when its identity still matches the finished request. */
   const resolveTop = useCallback((entity: Entity, next: Selection) => {
@@ -160,8 +167,9 @@ export default function App() {
     setMapCommand({
       type: "flyTo",
       center: [next.lon, next.lat],
+      zoom: zoomForEntity(next),
     });
-  }, [stack]);
+  }, [stack, zoomForEntity]);
 
   /** Closes the panel and clears the nav stack. */
   const handlePanelClose = useCallback(() => {
@@ -175,10 +183,11 @@ export default function App() {
       setMapCommand({
         type: "flyTo",
         center: [entity.lon, entity.lat],
+        zoom: zoomForEntity(entity),
       });
       push(entity);
     },
-    [push],
+    [push, zoomForEntity],
   );
 
   /** Handles map feature clicks, which select without issuing a redundant fly-to. */
@@ -236,7 +245,6 @@ export default function App() {
       <MapView
         initialView={initHash.view}
         command={mapCommand}
-        selection={current}
         onMoveEnd={setViewState}
         onFeatureSelect={select}
       />

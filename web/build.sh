@@ -32,6 +32,11 @@ required_vars=(
     SICK_JSON_ALBUM
     SICK_JSON_ARTIST
     SICK_JSON_LABEL
+    SICK_MAX_ZOOM
+    SICK_BASE_ZOOM_TRACK
+    SICK_BASE_ZOOM_ALBUM
+    SICK_BASE_ZOOM_ARTIST
+    SICK_BASE_ZOOM_LABEL
     SICK_TILES_MB
     SICK_TILES_BUILD_DIR
 )
@@ -67,8 +72,8 @@ echo "Output: $SICK_TILES_MB"
 tippecanoe \
     -o "$SICK_TILES_BUILD_DIR/tracks.mbtiles" \
     --full-detail=7 --low-detail=7 \
-    --maximum-zoom=14 --minimum-zoom=5 \
-    --drop-rate=1.7 --drop-densest-as-needed \
+    --maximum-zoom="$SICK_MAX_ZOOM" --minimum-zoom=5 --base-zoom="$SICK_BASE_ZOOM_TRACK" \
+    --drop-rate=1.8 --drop-densest-as-needed \
     --read-parallel --force \
     --layer=tracks \
     "$SICK_JSON_TRACK"
@@ -76,7 +81,7 @@ tippecanoe \
 tippecanoe \
     -o "$SICK_TILES_BUILD_DIR/labels.mbtiles" \
     --full-detail=7 --low-detail=7 \
-    --maximum-zoom=14 --minimum-zoom=5 --base-zoom=12 \
+    --maximum-zoom="$SICK_MAX_ZOOM" --minimum-zoom=5 --base-zoom="$SICK_BASE_ZOOM_LABEL" \
     --drop-rate=2.05 --drop-densest-as-needed \
     --read-parallel --force \
     --layer=labels \
@@ -85,8 +90,8 @@ tippecanoe \
 tippecanoe \
     -o "$SICK_TILES_BUILD_DIR/albums.mbtiles" \
     --full-detail=7 --low-detail=7 \
-    --maximum-zoom=14 --minimum-zoom=5 --base-zoom=11 \
-    --drop-rate=2.31 --drop-densest-as-needed \
+    --maximum-zoom="$SICK_MAX_ZOOM" --minimum-zoom=5 --base-zoom="$SICK_BASE_ZOOM_ALBUM" \
+    --drop-rate=2.27 --drop-densest-as-needed \
     --read-parallel --force \
     --layer=albums \
     "$SICK_JSON_ALBUM"
@@ -94,8 +99,8 @@ tippecanoe \
 tippecanoe \
     -o "$SICK_TILES_BUILD_DIR/artists.mbtiles" \
     --full-detail=7 --low-detail=7 \
-    --maximum-zoom=14 --minimum-zoom=5 --base-zoom=11 \
-    --drop-rate=2.31 --drop-densest-as-needed \
+    --maximum-zoom="$SICK_MAX_ZOOM" --minimum-zoom=5 --base-zoom="$SICK_BASE_ZOOM_ARTIST" \
+    --drop-rate=2.36 --drop-densest-as-needed \
     --read-parallel --force \
     --layer=artists \
     "$SICK_JSON_ARTIST"
@@ -104,6 +109,7 @@ echo ""
 echo "=== Merging tiles ==="
 tile-join \
     -o "$SICK_TILES_MB" \
+    -pk \
     -f \
     "$SICK_TILES_BUILD_DIR/tracks.mbtiles" \
     "$SICK_TILES_BUILD_DIR/albums.mbtiles" \

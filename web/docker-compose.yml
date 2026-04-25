@@ -80,6 +80,12 @@ services:
     environment:
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
+      VITE_TILES_URL: ${VITE_TILES_URL}
+      VITE_SOURCE_MAX_ZOOM: ${VITE_SOURCE_MAX_ZOOM}
+      VITE_BASE_ZOOM_TRACK: ${VITE_BASE_ZOOM_TRACK}
+      VITE_BASE_ZOOM_ALBUM: ${VITE_BASE_ZOOM_ALBUM}
+      VITE_BASE_ZOOM_ARTIST: ${VITE_BASE_ZOOM_ARTIST}
+      VITE_BASE_ZOOM_LABEL: ${VITE_BASE_ZOOM_LABEL}
     volumes:
       - ..:/workspace
       - frontend_node_modules:/workspace/web/frontend/node_modules

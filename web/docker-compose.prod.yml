@@ -11,6 +11,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_TILES_URL: ${VITE_TILES_URL:?VITE_TILES_URL is required}
+        VITE_SOURCE_MAX_ZOOM: ${VITE_SOURCE_MAX_ZOOM:?VITE_SOURCE_MAX_ZOOM is required}
+        VITE_BASE_ZOOM_TRACK: ${VITE_BASE_ZOOM_TRACK:?VITE_BASE_ZOOM_TRACK is required}
+        VITE_BASE_ZOOM_ALBUM: ${VITE_BASE_ZOOM_ALBUM:?VITE_BASE_ZOOM_ALBUM is required}
+        VITE_BASE_ZOOM_ARTIST: ${VITE_BASE_ZOOM_ARTIST:?VITE_BASE_ZOOM_ARTIST is required}
+        VITE_BASE_ZOOM_LABEL: ${VITE_BASE_ZOOM_LABEL:?VITE_BASE_ZOOM_LABEL is required}
     image: sick-web:prod
     logging: *default-logging
     ports:

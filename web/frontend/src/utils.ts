@@ -13,6 +13,30 @@ export function formatPlaylistCount(logcount: number): string {
 
 export type EntityType = "track" | "album" | "artist" | "label";
 
+function parseEnvZoom(name: string, value: string | undefined): number {
+  if (value == null || value.trim() === "") {
+    throw new Error(`Missing required env var ${name}`);
+  }
+
+  const zoom = Number(value);
+  if (!Number.isFinite(zoom)) {
+    throw new Error(`Invalid ${name}: expected a finite number, got ${JSON.stringify(value)}`);
+  }
+  return zoom;
+}
+
+export const ENTITY_BASE_ZOOMS: Record<EntityType, number> = {
+  track: parseEnvZoom("VITE_BASE_ZOOM_TRACK", import.meta.env.VITE_BASE_ZOOM_TRACK),
+  album: parseEnvZoom("VITE_BASE_ZOOM_ALBUM", import.meta.env.VITE_BASE_ZOOM_ALBUM),
+  artist: parseEnvZoom("VITE_BASE_ZOOM_ARTIST", import.meta.env.VITE_BASE_ZOOM_ARTIST),
+  label: parseEnvZoom("VITE_BASE_ZOOM_LABEL", import.meta.env.VITE_BASE_ZOOM_LABEL),
+};
+
+export const SOURCE_MAX_ZOOM = parseEnvZoom(
+  "VITE_SOURCE_MAX_ZOOM",
+  import.meta.env.VITE_SOURCE_MAX_ZOOM,
+);
+
 /** Standard format for blank track names. **/
 const NO_TRACK_NAME = "[no track name]";
 
