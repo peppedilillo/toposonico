@@ -78,9 +78,9 @@ function ZoomTitle({
 /** Summary header for track entities. */
 export function TrackSummary({ track, artist, album, onZoomIn }: TrackSummaryProps) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <Badge entityType="track" />
-      <div className="text-lg font-semibold leading-snug text-white truncate">
+      <div className="text-lg font-semibold leading-snug text-white truncate pt-1">
         <ZoomTitle onZoomIn={onZoomIn}>{track}</ZoomTitle>
       </div>
       <div className="text-sm text-muted leading-tight truncate">
@@ -94,9 +94,9 @@ export function TrackSummary({ track, artist, album, onZoomIn }: TrackSummaryPro
 /** Summary header for album entities. */
 export function AlbumSummary({ albumName, artist, onZoomIn }: AlbumSummaryProps) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <Badge entityType="album" />
-      <div className="text-lg font-semibold leading-snug text-white truncate">
+      <div className="text-lg font-semibold leading-snug text-white truncate pt-1">
         <ZoomTitle onZoomIn={onZoomIn}>{albumName}</ZoomTitle>
       </div>
       <div className="text-sm text-muted leading-tight truncate">{artist}</div>
@@ -112,9 +112,9 @@ export function ArtistSummary({
   onZoomIn,
 }: ArtistSummaryProps) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <Badge entityType="artist" />
-      <div className="text-lg font-semibold leading-snug text-white truncate">
+      <div className="text-lg font-semibold leading-snug text-white truncate pt-1">
         <ZoomTitle onZoomIn={onZoomIn}>{artistName}</ZoomTitle>
       </div>
       <div className="text-sm text-muted leading-tight truncate">
@@ -133,9 +133,9 @@ export function ArtistSummary({
 /** Summary header for label entities. */
 export function LabelSummary({ labelName, playlistCount, onZoomIn }: LabelSummaryProps) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <Badge entityType="label" />
-      <div className="text-lg font-semibold leading-snug text-white truncate">
+      <div className="text-lg font-semibold leading-snug text-white truncate pt-1">
         <ZoomTitle onZoomIn={onZoomIn}>{labelName}</ZoomTitle>
       </div>
       <div className="text-sm text-muted leading-tight truncate">

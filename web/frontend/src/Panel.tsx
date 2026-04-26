@@ -5,6 +5,7 @@ import {
   LabelSummary,
   TrackSummary,
 } from "./Summary.tsx";
+import { ChevronLeftIcon, CloseIcon, HelpIcon } from "./Icons.tsx";
 import { displayTrackName, formatPlaylistCount } from "./utils.ts";
 import { makeAbortable } from "./requests";
 import type {
@@ -76,6 +77,8 @@ function Link({
 
 const INLINE_LINK_CLASS = "inline cursor-pointer text-left text-white transition-colors";
 const HELP_LINK_CLASS = "text-muted hover:text-white transition-colors cursor-pointer";
+const PANEL_ICON_BUTTON_CLASS = "text-muted hover:text-white transition-colors p-2";
+const PANEL_ICON_CLASS = "w-4 h-4";
 
 /** Horizontal scrollable row with wheel-to-scroll and gradient overflow fades. */
 function ReprRow({ children }: { children: React.ReactNode }) {
@@ -672,31 +675,31 @@ export default function Panel({
         ) : (
           body
         )}
-        <div className="absolute top-0 right-0 flex gap-1 items-center">
+        <div className="absolute top-3 right-3 flex gap-0.5 items-center">
           {!helpOpen && goBack && (
             <button
               onClick={goBack}
-              className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
+              className={PANEL_ICON_BUTTON_CLASS}
               aria-label="Go back"
             >
-              &lt;
+              <ChevronLeftIcon className={PANEL_ICON_CLASS} />
             </button>
           )}
           {!helpOpen && (
             <button
               onClick={() => setHelpSelectionKey(selectionKey)}
-              className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
+              className={PANEL_ICON_BUTTON_CLASS}
               aria-label="Help"
             >
-              ?
+              <HelpIcon className={PANEL_ICON_CLASS} />
             </button>
           )}
           <button
             onClick={helpOpen ? () => setHelpSelectionKey(null) : onClose}
-            className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
+            className={PANEL_ICON_BUTTON_CLASS}
             aria-label={helpOpen ? "Close help" : "Close"}
           >
-            ×
+            <CloseIcon className={PANEL_ICON_CLASS} />
           </button>
         </div>
       </div>
