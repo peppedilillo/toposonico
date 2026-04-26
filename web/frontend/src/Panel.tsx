@@ -76,7 +76,6 @@ function Link({
 }
 
 const INLINE_LINK_CLASS = "inline cursor-pointer text-left text-white transition-colors";
-const HELP_LINK_CLASS = "text-muted hover:text-white transition-colors cursor-pointer";
 const PANEL_ICON_BUTTON_CLASS = "text-muted hover:text-white transition-colors p-2";
 const PANEL_ICON_CLASS = "w-4 h-4";
 
@@ -159,7 +158,6 @@ function LoadingBody() {
 function HelpBody() {
   return (
     <div className="space-y-3 mt-1">
-
       <div className="text-lg font-semibold leading-snug text-white">
         What is Hummap?
       </div>
@@ -205,13 +203,13 @@ function HelpBody() {
       <div className=" text-muted text-xs leading-relaxed space-y-2">
         <p>
           Hummap was made in 2026 by{" "}
-          <a href="https://gdilillo.com/" className={HELP_LINK_CLASS}>
+          <a href="https://gdilillo.com/" className="text-white cursor-pointer">
             Giuseppe Dilillo
           </a>
           . The source code is open, and you can find it on{" "}
           <a
             href="https://github.com/peppedilillo/hummap"
-            className={HELP_LINK_CLASS}
+            className="text-white cursor-pointer"
           >
             GitHub
           </a>
