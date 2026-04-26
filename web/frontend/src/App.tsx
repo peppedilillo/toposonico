@@ -10,8 +10,8 @@ import type { Entity, EntityInfo, Selection, UpdateFn } from "./types.ts";
 const MAX_HISTORY = 20;
 
 const INITIAL_VIEW: ViewState = {
-  lon: -1.96,
-  lat: -3.68,
+  lon: 9.93,
+  lat: -4.64,
   zoom: 6,
 };
 

@@ -163,9 +163,8 @@ function HelpBody() {
       </div>
         <div className=" text-muted text-xs leading-relaxed space-y-2">
           <p>Hummap is a map and recommender for 17 million discographic entities across tracks, albums, artists and labels.</p>
-          <p>Actually it's two maps, one small and one large.
-            You can't see the large one because it lives in a space with 128 dimensions.
-            The small one you can see, it's the one on your screen. It's a simplified representation, a projection, of the large one.
+          <p>Actually it is two maps, one small and one large. You cannot see the large one because it lives in a space with 128 dimensions.
+            The small one you can see is the one on your screen. It is a simplified representation, a projection, of the large one.
           </p>
         </div>
 
