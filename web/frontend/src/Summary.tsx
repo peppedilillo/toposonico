@@ -27,31 +27,61 @@ type TrackSummaryProps = {
   track: React.ReactNode;
   artist: React.ReactNode;
   album?: React.ReactNode;
+  onZoomIn?: (() => void) | null;
 };
 
 type AlbumSummaryProps = {
   albumName: React.ReactNode;
   artist: React.ReactNode;
+  onZoomIn?: (() => void) | null;
 };
 
 type ArtistSummaryProps = {
   artistName: React.ReactNode;
   genre?: React.ReactNode;
   playlistCount: React.ReactNode;
+  onZoomIn?: (() => void) | null;
 };
 
 type LabelSummaryProps = {
   labelName: React.ReactNode;
   playlistCount: React.ReactNode;
+  onZoomIn?: (() => void) | null;
 };
 
+function ZoomTitle({
+  children,
+  onZoomIn,
+}: {
+  children: React.ReactNode;
+  onZoomIn?: (() => void) | null;
+}) {
+  if (!onZoomIn) return <>{children}</>;
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={onZoomIn}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        onZoomIn();
+      }}
+      className="cursor-pointer"
+    >
+      {children}
+    </span>
+  );
+}
+
 /** Summary header for track entities. */
-export function TrackSummary({ track, artist, album }: TrackSummaryProps) {
+export function TrackSummary({ track, artist, album, onZoomIn }: TrackSummaryProps) {
   return (
     <div className="space-y-1.5">
       <Badge entityType="track" />
       <div className="text-lg font-semibold leading-snug text-white truncate">
-        {track}
+        <ZoomTitle onZoomIn={onZoomIn}>{track}</ZoomTitle>
       </div>
       <div className="text-sm text-muted leading-tight truncate">
         {artist}
@@ -62,12 +92,12 @@ export function TrackSummary({ track, artist, album }: TrackSummaryProps) {
 }
 
 /** Summary header for album entities. */
-export function AlbumSummary({ albumName, artist }: AlbumSummaryProps) {
+export function AlbumSummary({ albumName, artist, onZoomIn }: AlbumSummaryProps) {
   return (
     <div className="space-y-1.5">
       <Badge entityType="album" />
       <div className="text-lg font-semibold leading-snug text-white truncate">
-        {albumName}
+        <ZoomTitle onZoomIn={onZoomIn}>{albumName}</ZoomTitle>
       </div>
       <div className="text-sm text-muted leading-tight truncate">{artist}</div>
     </div>
@@ -79,12 +109,13 @@ export function ArtistSummary({
   artistName,
   genre,
   playlistCount,
+  onZoomIn,
 }: ArtistSummaryProps) {
   return (
     <div className="space-y-1.5">
       <Badge entityType="artist" />
       <div className="text-lg font-semibold leading-snug text-white truncate">
-        {artistName}
+        <ZoomTitle onZoomIn={onZoomIn}>{artistName}</ZoomTitle>
       </div>
       <div className="text-sm text-muted leading-tight truncate">
         {genre ? (
@@ -100,12 +131,12 @@ export function ArtistSummary({
 }
 
 /** Summary header for label entities. */
-export function LabelSummary({ labelName, playlistCount }: LabelSummaryProps) {
+export function LabelSummary({ labelName, playlistCount, onZoomIn }: LabelSummaryProps) {
   return (
     <div className="space-y-1.5">
       <Badge entityType="label" />
       <div className="text-lg font-semibold leading-snug text-white truncate">
-        {labelName}
+        <ZoomTitle onZoomIn={onZoomIn}>{labelName}</ZoomTitle>
       </div>
       <div className="text-sm text-muted leading-tight truncate">
         {playlistCount}

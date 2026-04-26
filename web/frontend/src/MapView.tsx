@@ -36,7 +36,7 @@ type MapViewProps = {
 
 const VIEW_CONSTRAINTS = {
   minZoom: 5,
-  // this enables over overzooming
+  // enables overzooming
   maxZoom: SOURCE_MAX_ZOOM + 2,
   pitch: 10,
 };

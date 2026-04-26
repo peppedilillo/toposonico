@@ -3,7 +3,7 @@ import Search from "./Search.tsx";
 import Panel from "./Panel.tsx";
 import MapView, { type MapCommand, type ViewState } from "./MapView.tsx";
 import { makeAbortable } from "./requests.ts";
-import {ENTITY_BASE_ZOOMS, type EntityType, SOURCE_MAX_ZOOM} from "./utils.ts";
+import { ENTITY_BASE_ZOOMS, type EntityType, SOURCE_MAX_ZOOM } from "./utils.ts";
 import Logo from "./assets/logo.svg";
 import type { Entity, EntityInfo, Selection, UpdateFn } from "./types.ts";
 
@@ -56,7 +56,7 @@ function updateHash(updates: Record<string, string | number | null>) {
   history.replaceState(null, "", "#" + params.toString());
 }
 
-const ZOOM_PADDING = 0.25
+const ZOOM_PADDING = 0.25;
 
 /** Root application component — owns navigation state, hash sync, and fetch coordination. */
 export default function App() {
@@ -67,9 +67,27 @@ export default function App() {
   const nextSelection = useRef(makeAbortable());
   const current = stack.length > 0 ? stack[stack.length - 1] : null;
 
-  const zoomForEntity = useCallback(
-    (entity: Entity) => Math.min(SOURCE_MAX_ZOOM, ENTITY_BASE_ZOOMS[entity.entity_type] + ZOOM_PADDING),
-    [],
+  /** Flies the map to an entity, optionally applying an explicit zoom. */
+  const flyToEntity = useCallback((entity: Entity, zoom?: number) => {
+    setMapCommand({
+      type: "flyTo",
+      center: [entity.lon, entity.lat],
+      zoom,
+    });
+  }, []);
+
+  /** Zooms the map to the canonical per-entity zoom target without changing selection. */
+  const zoomIn = useCallback(
+    (entity: Entity) => {
+      flyToEntity(
+        entity,
+        Math.min(
+          SOURCE_MAX_ZOOM,
+          ENTITY_BASE_ZOOMS[entity.entity_type] + ZOOM_PADDING,
+        ),
+      );
+    },
+    [flyToEntity],
   );
 
   /** Replaces the pending top entry when its identity still matches the finished request. */
@@ -164,12 +182,8 @@ export default function App() {
       { status: "loaded" }
     >;
     setStack((prev) => prev.slice(0, -1));
-    setMapCommand({
-      type: "flyTo",
-      center: [next.lon, next.lat],
-      zoom: zoomForEntity(next),
-    });
-  }, [stack, zoomForEntity]);
+    flyToEntity(next);
+  }, [flyToEntity, stack]);
 
   /** Closes the panel and clears the nav stack. */
   const handlePanelClose = useCallback(() => {
@@ -177,17 +191,13 @@ export default function App() {
     setStack([]);
   }, []);
 
-  /** Flies the map to the given coordinates and pushes a new selection. */
+  /** Recenters the map on an entity and pushes it onto the selection stack. */
   const navigate = useCallback(
     (entity: Entity) => {
-      setMapCommand({
-        type: "flyTo",
-        center: [entity.lon, entity.lat],
-        zoom: zoomForEntity(entity),
-      });
+      flyToEntity(entity);
       push(entity);
     },
-    [push, zoomForEntity],
+    [flyToEntity, push],
   );
 
   /** Handles map feature clicks, which select without issuing a redundant fly-to. */
@@ -252,6 +262,7 @@ export default function App() {
       <Panel
         selection={current}
         navigate={navigate}
+        zoomIn={current?.status === "loaded" ? () => zoomIn(current) : null}
         update={update}
         onClose={handlePanelClose}
         goBack={stack.length > 1 ? pop : null}

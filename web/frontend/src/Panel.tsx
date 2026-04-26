@@ -28,6 +28,7 @@ type NavigateFn = (entity: Entity) => void;
 type PanelProps = {
   selection: Selection | null;
   navigate: NavigateFn;
+  zoomIn: (() => void) | null;
   update: UpdateFn;
   onClose: () => void;
   goBack: (() => void) | null;
@@ -151,10 +152,19 @@ function LoadingBody() {
   );
 }
 
-function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
+function TrackPanel({
+  s,
+  navigate,
+  zoomIn,
+}: {
+  s: TrackInfo;
+  navigate: NavigateFn;
+  zoomIn: (() => void) | null;
+}) {
   return (
     <>
       <TrackSummary
+        onZoomIn={zoomIn}
         track={displayTrackName(s.track_name_norm)}
         artist={
           <Link
@@ -221,10 +231,19 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
   );
 }
 
-function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
+function AlbumPanel({
+  s,
+  navigate,
+  zoomIn,
+}: {
+  s: AlbumInfo;
+  navigate: NavigateFn;
+  zoomIn: (() => void) | null;
+}) {
   return (
     <>
       <AlbumSummary
+        onZoomIn={zoomIn}
         albumName={s.album_name_norm}
         artist={
           <Link
@@ -291,10 +310,19 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
   );
 }
 
-function ArtistPanel({ s, navigate }: { s: ArtistInfo; navigate: NavigateFn }) {
+function ArtistPanel({
+  s,
+  navigate,
+  zoomIn,
+}: {
+  s: ArtistInfo;
+  navigate: NavigateFn;
+  zoomIn: (() => void) | null;
+}) {
   return (
     <>
       <ArtistSummary
+        onZoomIn={zoomIn}
         artistName={s.artist_name}
         genre={s.artist_genre ?? undefined}
         playlistCount={formatPlaylistCount(s.logcount)}
@@ -320,10 +348,19 @@ function ArtistPanel({ s, navigate }: { s: ArtistInfo; navigate: NavigateFn }) {
   );
 }
 
-function LabelPanel({ s, navigate }: { s: LabelInfo; navigate: NavigateFn }) {
+function LabelPanel({
+  s,
+  navigate,
+  zoomIn,
+}: {
+  s: LabelInfo;
+  navigate: NavigateFn;
+  zoomIn: (() => void) | null;
+}) {
   return (
     <>
       <LabelSummary
+        onZoomIn={zoomIn}
         labelName={s.label}
         playlistCount={formatPlaylistCount(s.logcount)}
       />
@@ -517,6 +554,7 @@ function RecsSection({
 export default function Panel({
   selection,
   navigate,
+  zoomIn,
   update,
   onClose,
   goBack,
@@ -529,13 +567,13 @@ export default function Panel({
   } else if (selection.status === "error") {
     body = <div className="text-muted text-sm mt-1">Failed to load.</div>;
   } else if (selection.entity_type === "track") {
-    body = <TrackPanel s={selection} navigate={navigate} />;
+    body = <TrackPanel s={selection} navigate={navigate} zoomIn={zoomIn} />;
   } else if (selection.entity_type === "album") {
-    body = <AlbumPanel s={selection} navigate={navigate} />;
+    body = <AlbumPanel s={selection} navigate={navigate} zoomIn={zoomIn} />;
   } else if (selection.entity_type === "artist") {
-    body = <ArtistPanel s={selection} navigate={navigate} />;
+    body = <ArtistPanel s={selection} navigate={navigate} zoomIn={zoomIn} />;
   } else {
-    body = <LabelPanel s={selection} navigate={navigate} />;
+    body = <LabelPanel s={selection} navigate={navigate} zoomIn={zoomIn} />;
   }
 
   return (
