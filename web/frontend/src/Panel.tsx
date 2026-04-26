@@ -75,6 +75,7 @@ function Link({
 }
 
 const INLINE_LINK_CLASS = "inline cursor-pointer text-left text-white transition-colors";
+const HELP_LINK_CLASS = "text-muted hover:text-white transition-colors cursor-pointer";
 
 /** Horizontal scrollable row with wheel-to-scroll and gradient overflow fades. */
 function ReprRow({ children }: { children: React.ReactNode }) {
@@ -149,6 +150,72 @@ function LoadingBody() {
       <div className="h-3 bg-muted/20 rounded w-2/3" />
       <div className="h-3 bg-muted/20 rounded w-1/3" />
     </div>
+  );
+}
+
+function HelpBody() {
+  return (
+    <div className="space-y-3 mt-1">
+
+      <div className="text-lg font-semibold leading-snug text-white">
+        What is Hummap?
+      </div>
+        <div className=" text-muted text-xs leading-relaxed space-y-2">
+          <p>Hummap is a map and recommender for 17 million discographic entities across tracks, albums, artists and labels.</p>
+          <p>Actually it's two maps, one small and one large.
+            You can't see the large one because it lives in a space with 128 dimensions.
+            The small one you can see, it's the one on your screen. It's a simplified representation, a projection, of the large one.
+          </p>
+        </div>
+
+      <div className="text-lg font-semibold leading-snug text-white">
+        How to use Hummap?
+      </div>
+      <div className=" text-muted text-xs leading-relaxed space-y-2">
+        <p>Try clicking the dots you see on the screen.
+          Each one is associated with either a track, an album, an artist or a label.
+          Once you find a place that interests you try looking around it, you will find something similar to it there.
+        </p>
+        <p>
+          That is how you navigate the small map. How do you navigate the large one?
+          In the bottom part of this panel you will find a "More like this" button.
+          Clicking on it, the panel will show a few recommendations. These are the things closer to your selection in the large map.
+        </p>
+        <p>
+          Finally, you can use the search bar to find something you like on the map. Try moving from there.
+        </p>
+      </div>
+
+      <div className="text-lg font-semibold leading-snug text-white">
+        A map of what?
+      </div>
+      <div className=" text-muted text-xs leading-relaxed space-y-2">
+        <p>These maps are not geographical. They were built from playlists. Tracks ending up in the same playlist often share something.
+          It could be a genre, a year, or even just an atmosphere. With enough data these relations can be grasped and used to measure distances.
+          People from all over the world draw the islands and mountains of this land. It's a place we share and it lives inside us.
+        </p>
+      </div>
+
+      <div className="text-lg font-semibold leading-snug text-white">
+        Who made this website?
+      </div>
+      <div className=" text-muted text-xs leading-relaxed space-y-2">
+        <p>
+          Hummap was made in 2026 by{" "}
+          <a href="https://gdilillo.com/" className={HELP_LINK_CLASS}>
+            Giuseppe Dilillo
+          </a>
+          . The source code is open, and you can find it on{" "}
+          <a
+            href="https://github.com/peppedilillo/hummap"
+            className={HELP_LINK_CLASS}
+          >
+            GitHub
+          </a>
+          .
+        </p>
+      </div>
+  </div>
   );
 }
 
@@ -559,10 +626,17 @@ export default function Panel({
   onClose,
   goBack,
 }: PanelProps) {
+  const [helpSelectionKey, setHelpSelectionKey] = useState<string | null>(null);
+
   if (!selection) return null;
 
+  const selectionKey = `${selection.entity_type}:${selection.rowid}`;
+  const helpOpen = helpSelectionKey === selectionKey;
+
   let body: React.ReactNode;
-  if (selection.status === "loading") {
+  if (helpOpen) {
+    body = <HelpBody />;
+  } else if (selection.status === "loading") {
     body = <LoadingBody />;
   } else if (selection.status === "error") {
     body = <div className="text-muted text-sm mt-1">Failed to load.</div>;
@@ -584,10 +658,22 @@ export default function Panel({
       onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={(e) => e.stopPropagation()}
     >
-      <div className="relative px-4 pt-4 shrink-0">
-        {body}
+      <div
+        className={
+          helpOpen
+            ? "relative px-4 pt-4 min-h-0 flex flex-col flex-1"
+            : "relative px-4 pt-4 shrink-0"
+        }
+      >
+        {helpOpen ? (
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar pr-8">
+            {body}
+          </div>
+        ) : (
+          body
+        )}
         <div className="absolute top-0 right-0 flex gap-1 items-center">
-          {goBack && (
+          {!helpOpen && goBack && (
             <button
               onClick={goBack}
               className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
@@ -596,16 +682,25 @@ export default function Panel({
               &lt;
             </button>
           )}
+          {!helpOpen && (
+            <button
+              onClick={() => setHelpSelectionKey(selectionKey)}
+              className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
+              aria-label="Help"
+            >
+              ?
+            </button>
+          )}
           <button
-            onClick={onClose}
+            onClick={helpOpen ? () => setHelpSelectionKey(null) : onClose}
             className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
-            aria-label="Close"
+            aria-label={helpOpen ? "Close help" : "Close"}
           >
             ×
           </button>
         </div>
       </div>
-      {selection.status === "loaded" && (
+      {!helpOpen && selection.status === "loaded" && (
         <RecsSection
           key={`${selection.entity_type}:${selection.rowid}`}
           entity={selection}
