@@ -1,5 +1,5 @@
 import re
-from typing import Literal, TypedDict
+from typing import Literal, TypedDict, assert_never
 
 from fastapi import APIRouter
 from fastapi import Query
@@ -111,10 +111,49 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
 SearchHit = TrackHit | AlbumHit | ArtistHit | LabelHit
 
 
+def dedup_normalize(value: str) -> str:
+    return value.strip().casefold()
+
+
+def dedup_key(hit: SearchHit) -> tuple[str, str] | tuple[str, str, str]:
+    match hit["entity_type"]:
+        case "track":
+            return (
+                "track",
+                dedup_normalize(hit["track_name_norm"]),
+                dedup_normalize(hit["artist_name"]),
+            )
+        case "album":
+            return (
+                "album",
+                dedup_normalize(hit["album_name_norm"]),
+                dedup_normalize(hit["artist_name"]),
+            )
+        case "artist":
+            return ("artist", dedup_normalize(hit["artist_name"]))
+        case "label":
+            return ("label", dedup_normalize(hit["label"]))
+        case entity_type:
+            assert_never(entity_type)
+
+
+def dedup(hits: list[SearchHit]) -> list[SearchHit]:
+    seen = set()
+    out: list[SearchHit] = []
+    for hit in hits:
+        key = dedup_key(hit)
+        if key not in seen:
+            seen.add(key)
+            out.append(hit)
+    return out
+
+
 @router.get("/api/search")
 async def search(
     q: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=20),
 ) -> list[SearchHit]:
     """Search for up to `limit` entities matching `q` query."""
-    return [search_map(hit) for hit in get_meili_index().search(q, {"limit": limit})["hits"]]
+    return dedup(
+        [search_map(hit) for hit in get_meili_index().search(q, {"limit": limit})["hits"]]
+    )
