@@ -14,9 +14,9 @@ import type { Entity, EntityInfo, Selection, UpdateFn } from "./types.ts";
 const MAX_HISTORY = 20;
 
 const INITIAL_VIEW: ViewState = {
-  lon: 9.93,
-  lat: -4.64,
-  zoom: 6,
+  lon: 3.60,
+  lat: -5.50,
+  zoom: 5.00,
 };
 
 /** Returns true when the parsed hash entity matches one of the supported entities. */
