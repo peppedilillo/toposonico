@@ -3,7 +3,11 @@ import Search from "./Search.tsx";
 import Panel from "./Panel.tsx";
 import MapView, { type MapCommand, type ViewState } from "./MapView.tsx";
 import { makeAbortable } from "./requests.ts";
-import { ENTITY_BASE_ZOOMS, type EntityType, SOURCE_MAX_ZOOM } from "./utils.ts";
+import {
+  ENTITY_BASE_ZOOMS,
+  type EntityType,
+  SOURCE_MAX_ZOOM,
+} from "./utils.ts";
 import Logo from "./assets/logo.svg";
 import type { Entity, EntityInfo, Selection, UpdateFn } from "./types.ts";
 

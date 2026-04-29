@@ -32,6 +32,7 @@ The frontend requests tiles directly from Martin at
 1. Create `config.prod.env`, you can use `config.prod.sample.env` for template.
 2. Launch docker. The backend health check requires the search index to exist. To create the index you are supposed to
    manually launch `backend/scripts/build_search_index.py`.
+
 ```shell
 docker compose -f docker-compose.prod.yml --env-file config.prod.env build
 docker compose -f docker-compose.prod.yml --env-file config.prod.env up -d meilisearch
@@ -50,10 +51,9 @@ Example:
 python scripts/tile_size_stats.py --tiles /path/to/sick.mbtiles
 ```
 
-
 ## Linter
 
-In frontend: 
+In frontend:
 
 ```shell
 npx prettier src --write

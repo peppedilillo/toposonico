@@ -75,8 +75,10 @@ function Link({
   );
 }
 
-const INLINE_LINK_CLASS = "inline cursor-pointer text-left text-white transition-colors";
-const PANEL_ICON_BUTTON_CLASS = "text-muted hover:text-white transition-colors p-2";
+const INLINE_LINK_CLASS =
+  "inline cursor-pointer text-left text-white transition-colors";
+const PANEL_ICON_BUTTON_CLASS =
+  "text-muted hover:text-white transition-colors p-2";
 const PANEL_ICON_CLASS = "w-4 h-4";
 
 /** Horizontal scrollable row with wheel-to-scroll and gradient overflow fades. */
@@ -161,28 +163,38 @@ function HelpBody() {
       <div className="text-lg font-semibold leading-snug text-white">
         What is this?
       </div>
-        <div className=" text-muted text-xs leading-relaxed space-y-2">
-          <p>Toposonico is a recommender and map for music tracks, artists, albums and labels. It is a tool for discovering new music.</p>
-          <p>Actually it is two maps, one small and one large. You cannot see the large one because it lives in a space with 128 dimensions.
-            The small map is the one on your screen. It is a simplified representation, a projection, of the large map.
-          </p>
-        </div>
+      <div className=" text-muted text-xs leading-relaxed space-y-2">
+        <p>
+          Toposonico is a recommender and map for music tracks, artists, albums
+          and labels. It is a tool for discovering new music.
+        </p>
+        <p>
+          Actually it is two maps, one small and one large. You cannot see the
+          large one because it lives in a space with 128 dimensions. The small
+          map is the one on your screen. It is a simplified representation, a
+          projection, of the large map.
+        </p>
+      </div>
 
       <div className="text-lg font-semibold leading-snug text-white">
         How do I use it?
       </div>
       <div className=" text-muted text-xs leading-relaxed space-y-2">
-        <p>Try clicking the dots you see on the screen.
-          Each one is associated with either a track, an album, an artist or a label.
-          Once you find a place that interests you try looking around it, you will find something similar to it there.
+        <p>
+          Try clicking the dots you see on the screen. Each one is associated
+          with either a track, an album, an artist or a label. Once you find a
+          place that interests you try looking around it, you will find
+          something similar to it there.
         </p>
         <p>
-          That is how you navigate the small map. How do you navigate the large one?
-          In the bottom part of this panel you will find a "More like this" button.
-          Clicking on it, the panel will show a few recommendations. These are the things closer to your selection in the large map.
+          That is how you navigate the small map. How do you navigate the large
+          one? In the bottom part of this panel you will find a "More like this"
+          button. Clicking on it, the panel will show a few recommendations.
+          These are the things closer to your selection in the large map.
         </p>
         <p>
-          Finally, you can use the search bar to find something you like on the map. Try moving from there.
+          Finally, you can use the search bar to find something you like on the
+          map. Try moving from there.
         </p>
       </div>
 
@@ -190,9 +202,13 @@ function HelpBody() {
         A map of what?
       </div>
       <div className=" text-muted text-xs leading-relaxed space-y-2">
-        <p>These maps are not geographical. They were built from playlists. Tracks ending up in the same playlist often share something.
-          It could be a genre, a year, or even just an atmosphere. With enough data these relations can be grasped and used to measure distances.
-          People from all over the world draw the islands and mountains of this land. It's a place we share and it lives inside us.
+        <p>
+          These maps are not geographical. They were built from playlists.
+          Tracks ending up in the same playlist often share something. It could
+          be a genre, a year, or even just an atmosphere. With enough data these
+          relations can be grasped and used to measure distances. People from
+          all over the world draw the islands and mountains of this land. It's a
+          place we share and it lives inside us.
         </p>
       </div>
 
@@ -215,7 +231,7 @@ function HelpBody() {
           .
         </p>
       </div>
-  </div>
+    </div>
   );
 }
 

@@ -76,7 +76,12 @@ function ZoomTitle({
 }
 
 /** Summary header for track entities. */
-export function TrackSummary({ track, artist, album, onZoomIn }: TrackSummaryProps) {
+export function TrackSummary({
+  track,
+  artist,
+  album,
+  onZoomIn,
+}: TrackSummaryProps) {
   return (
     <div className="space-y-1">
       <Badge entityType="track" />
@@ -92,7 +97,11 @@ export function TrackSummary({ track, artist, album, onZoomIn }: TrackSummaryPro
 }
 
 /** Summary header for album entities. */
-export function AlbumSummary({ albumName, artist, onZoomIn }: AlbumSummaryProps) {
+export function AlbumSummary({
+  albumName,
+  artist,
+  onZoomIn,
+}: AlbumSummaryProps) {
   return (
     <div className="space-y-1">
       <Badge entityType="album" />
@@ -131,7 +140,11 @@ export function ArtistSummary({
 }
 
 /** Summary header for label entities. */
-export function LabelSummary({ labelName, playlistCount, onZoomIn }: LabelSummaryProps) {
+export function LabelSummary({
+  labelName,
+  playlistCount,
+  onZoomIn,
+}: LabelSummaryProps) {
   return (
     <div className="space-y-1">
       <Badge entityType="label" />

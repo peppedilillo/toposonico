@@ -20,16 +20,30 @@ function parseEnvZoom(name: string, value: string | undefined): number {
 
   const zoom = Number(value);
   if (!Number.isFinite(zoom)) {
-    throw new Error(`Invalid ${name}: expected a finite number, got ${JSON.stringify(value)}`);
+    throw new Error(
+      `Invalid ${name}: expected a finite number, got ${JSON.stringify(value)}`,
+    );
   }
   return zoom;
 }
 
 export const ENTITY_BASE_ZOOMS: Record<EntityType, number> = {
-  track: parseEnvZoom("VITE_BASE_ZOOM_TRACK", import.meta.env.VITE_BASE_ZOOM_TRACK),
-  album: parseEnvZoom("VITE_BASE_ZOOM_ALBUM", import.meta.env.VITE_BASE_ZOOM_ALBUM),
-  artist: parseEnvZoom("VITE_BASE_ZOOM_ARTIST", import.meta.env.VITE_BASE_ZOOM_ARTIST),
-  label: parseEnvZoom("VITE_BASE_ZOOM_LABEL", import.meta.env.VITE_BASE_ZOOM_LABEL),
+  track: parseEnvZoom(
+    "VITE_BASE_ZOOM_TRACK",
+    import.meta.env.VITE_BASE_ZOOM_TRACK,
+  ),
+  album: parseEnvZoom(
+    "VITE_BASE_ZOOM_ALBUM",
+    import.meta.env.VITE_BASE_ZOOM_ALBUM,
+  ),
+  artist: parseEnvZoom(
+    "VITE_BASE_ZOOM_ARTIST",
+    import.meta.env.VITE_BASE_ZOOM_ARTIST,
+  ),
+  label: parseEnvZoom(
+    "VITE_BASE_ZOOM_LABEL",
+    import.meta.env.VITE_BASE_ZOOM_LABEL,
+  ),
 };
 
 export const SOURCE_MAX_ZOOM = parseEnvZoom(
