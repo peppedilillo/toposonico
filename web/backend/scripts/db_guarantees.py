@@ -16,9 +16,7 @@ from src.utils import TRACK
 
 
 def has_no_blank(conn: sqlite3.Connection, key: str, table: str) -> bool:
-    return conn.execute(
-        f"SELECT 1 FROM {table} WHERE {key} = '' LIMIT 1"
-    ).fetchone() is None
+    return conn.execute(f"SELECT 1 FROM {table} WHERE {key} = '' LIMIT 1").fetchone() is None
 
 
 @cache

@@ -5,49 +5,33 @@ import {
   LabelSummary,
   TrackSummary,
 } from "./Summary.tsx";
-import { type EntityType, formatPlaylistCount } from "./utils.ts";
+import { formatPlaylistCount } from "./utils.ts";
 import { makeAbortable } from "./requests.ts";
-import { getRowid } from "./utils.ts";
 import { displayTrackName } from "./utils.ts";
+import type { Entity } from "./types.ts";
 
 // --- Search types mirroring backend TypedDicts ---
 
-type TrackHit = {
+type TrackHit = Entity & {
   entity_type: "track";
-  track_rowid: number;
   track_name_norm: string;
   artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
 };
 
-type AlbumHit = {
+type AlbumHit = Entity & {
   entity_type: "album";
-  album_rowid: number;
   album_name_norm: string;
   artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
 };
 
-type ArtistHit = {
+type ArtistHit = Entity & {
   entity_type: "artist";
-  artist_rowid: number;
   artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
 };
 
-type LabelHit = {
+type LabelHit = Entity & {
   entity_type: "label";
-  label_rowid: number;
   label: string;
-  lon: number;
-  lat: number;
-  logcount: number;
 };
 
 /** A single result from the search API. */
@@ -55,12 +39,7 @@ type SearchHit = TrackHit | AlbumHit | ArtistHit | LabelHit;
 
 /** Props for the Search component. */
 type SearchProps = {
-  navigate: (
-    entityType: EntityType,
-    rowid: number,
-    lon: number,
-    lat: number,
-  ) => void;
+  navigate: (entity: Entity) => void;
   panelOpen: boolean;
 };
 
@@ -143,7 +122,7 @@ function SearchDropdown({
             id={getOptionId(hit)}
             role="option"
             aria-selected={i === activeIdx}
-            key={`${hit.entity_type}-${getRowid(hit)}`}
+            key={`${hit.entity_type}-${hit.rowid}`}
             ref={i === activeIdx ? activeItemRef : null}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onSelect(hit)}
@@ -206,14 +185,14 @@ export default function Search({ navigate, panelOpen }: SearchProps) {
 
   /** Navigates to a hit and closes the dropdown. */
   function handleSelect(hit: SearchHit) {
-    navigate(hit.entity_type, getRowid(hit), hit.lon, hit.lat);
+    navigate(hit);
     setResults([]);
     setCanOpen(false);
     setActiveIdx(null);
   }
 
   function getOptionId(hit: SearchHit) {
-    return `${listboxId}-${hit.entity_type}-${getRowid(hit)}`;
+    return `${listboxId}-${hit.entity_type}-${hit.rowid}`;
   }
 
   /** Handles arrow key navigation, Enter to select, and Escape to clear. */

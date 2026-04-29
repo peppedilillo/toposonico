@@ -5,189 +5,31 @@ import {
   LabelSummary,
   TrackSummary,
 } from "./Summary.tsx";
-import {
-  displayTrackName,
-  type EntityType,
-  formatPlaylistCount,
-  getRowid,
-} from "./utils.ts";
+import { ChevronLeftIcon, CloseIcon, HelpIcon } from "./Icons.tsx";
+import { displayTrackName, formatPlaylistCount } from "./utils.ts";
 import { makeAbortable } from "./requests";
+import type {
+  AlbumInfo,
+  AlbumRecommend,
+  ArtistInfo,
+  ArtistRecommend,
+  Entity,
+  EntityInfo,
+  LabelInfo,
+  LabelRecommend,
+  Recommend,
+  Selection,
+  TrackInfo,
+  TrackRecommend,
+  UpdateFn,
+} from "./types.ts";
 
-// --- Types mirroring backend TypedDicts ---
-
-type TrackInfo = {
-  entity_type: "track";
-  track_rowid: number;
-  track_name_norm: string;
-  artist_rowid: number;
-  artist_name: string;
-  album_rowid: number;
-  album_name: string;
-  album_name_norm: string;
-  label_rowid: number;
-  label: string;
-  lon: number;
-  lat: number;
-  album_lon: number;
-  album_lat: number;
-  artist_lon: number;
-  artist_lat: number;
-  label_lon: number;
-  label_lat: number;
-  logcount: number;
-  release_date: string | null;
-};
-
-type AlbumInfo = {
-  entity_type: "album";
-  album_rowid: number;
-  album_name_norm: string;
-  artist_rowid: number;
-  artist_name: string;
-  label_rowid: number;
-  label: string;
-  lon: number;
-  lat: number;
-  artist_lon: number;
-  artist_lat: number;
-  label_lon: number;
-  label_lat: number;
-  logcount: number;
-  nrepr: number;
-  total_tracks: number | null;
-  release_date: string | null;
-  album_type: string | null;
-  reprs: TrackRepr[];
-};
-
-type ArtistInfo = {
-  entity_type: "artist";
-  artist_rowid: number;
-  artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
-  ntrack: number;
-  nalbum: number;
-  nrepr: number;
-  artist_genre: string | null;
-  reprs: AlbumRepr[];
-};
-
-type LabelInfo = {
-  entity_type: "label";
-  label_rowid: number;
-  label: string;
-  lon: number;
-  lat: number;
-  logcount: number;
-  ntrack: number;
-  nalbum: number;
-  nartist: number;
-  nrepr: number;
-  reprs: ArtistRepr[];
-};
-
-type EntityInfo = TrackInfo | AlbumInfo | ArtistInfo | LabelInfo;
-
-// --- Recommendation types mirroring backend TypedDicts ---
-
-type TrackRecommend = {
-  track_rowid: number;
-  track_name_norm: string;
-  artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
-  simscore: number;
-};
-
-type AlbumRecommend = {
-  album_rowid: number;
-  album_name_norm: string;
-  artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
-  simscore: number;
-};
-
-type ArtistRecommend = {
-  artist_rowid: number;
-  artist_name: string;
-  lon: number;
-  lat: number;
-  logcount: number;
-  simscore: number;
-  artist_genre: string | null;
-};
-
-type LabelRecommend = {
-  label_rowid: number;
-  label: string;
-  lon: number;
-  lat: number;
-  logcount: number;
-  simscore: number;
-};
-
-type Recommend =
-  | TrackRecommend
-  | AlbumRecommend
-  | ArtistRecommend
-  | LabelRecommend;
-
-// --- Repr types mirroring backend TypedDicts ---
-
-type TrackRepr = {
-  track_rowid: number;
-  track_name_norm: string;
-  artist_name: string;
-  lon: number;
-  lat: number;
-};
-
-type AlbumRepr = {
-  album_rowid: number;
-  album_name_norm: string;
-  artist_name: string;
-  lon: number;
-  lat: number;
-};
-
-type ArtistRepr = {
-  artist_rowid: number;
-  artist_name: string;
-  lon: number;
-  lat: number;
-};
-
-/**
- * Discriminated union representing one entry in the navigation stack.
- * Loading/error keep entity identity so hash sync can stay declarative.
- */
-export type Selection =
-  | { status: "loading"; entity_type: EntityType; rowid: number }
-  | { status: "error"; entity_type: EntityType; rowid: number }
-  | ({ status: "loaded"; recs?: Recommend[] } & EntityInfo);
-
-/** Shallow merge into the top of the nav stack when the target entity still matches. */
-export type UpdateFn = (
-  entityType: EntityType,
-  rowid: number,
-  patch: Partial<Selection & { recs: Recommend[] }>,
-) => void;
-
-type NavigateFn = (
-  entityType: EntityType,
-  rowid: number,
-  lon: number,
-  lat: number,
-) => void;
+type NavigateFn = (entity: Entity) => void;
 
 type PanelProps = {
   selection: Selection | null;
   navigate: NavigateFn;
+  zoomIn: (() => void) | null;
   update: UpdateFn;
   onClose: () => void;
   goBack: (() => void) | null;
@@ -233,7 +75,9 @@ function Link({
   );
 }
 
-const INLINE_LINK_CLASS = "inline cursor-pointer text-left transition-colors";
+const INLINE_LINK_CLASS = "inline cursor-pointer text-left text-white transition-colors";
+const PANEL_ICON_BUTTON_CLASS = "text-muted hover:text-white transition-colors p-2";
+const PANEL_ICON_CLASS = "w-4 h-4";
 
 /** Horizontal scrollable row with wheel-to-scroll and gradient overflow fades. */
 function ReprRow({ children }: { children: React.ReactNode }) {
@@ -311,15 +155,94 @@ function LoadingBody() {
   );
 }
 
-function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
+function HelpBody() {
+  return (
+    <div className="space-y-3 mt-1">
+      <div className="text-lg font-semibold leading-snug text-white">
+        What is Hummap?
+      </div>
+        <div className=" text-muted text-xs leading-relaxed space-y-2">
+          <p>Hummap is a map and recommender for 17 million discographic entities across tracks, albums, artists and labels.</p>
+          <p>Actually it is two maps, one small and one large. You cannot see the large one because it lives in a space with 128 dimensions.
+            The small one you can see is the one on your screen. It is a simplified representation, a projection, of the large one.
+          </p>
+        </div>
+
+      <div className="text-lg font-semibold leading-snug text-white">
+        How to use Hummap?
+      </div>
+      <div className=" text-muted text-xs leading-relaxed space-y-2">
+        <p>Try clicking the dots you see on the screen.
+          Each one is associated with either a track, an album, an artist or a label.
+          Once you find a place that interests you try looking around it, you will find something similar to it there.
+        </p>
+        <p>
+          That is how you navigate the small map. How do you navigate the large one?
+          In the bottom part of this panel you will find a "More like this" button.
+          Clicking on it, the panel will show a few recommendations. These are the things closer to your selection in the large map.
+        </p>
+        <p>
+          Finally, you can use the search bar to find something you like on the map. Try moving from there.
+        </p>
+      </div>
+
+      <div className="text-lg font-semibold leading-snug text-white">
+        A map of what?
+      </div>
+      <div className=" text-muted text-xs leading-relaxed space-y-2">
+        <p>These maps are not geographical. They were built from playlists. Tracks ending up in the same playlist often share something.
+          It could be a genre, a year, or even just an atmosphere. With enough data these relations can be grasped and used to measure distances.
+          People from all over the world draw the islands and mountains of this land. It's a place we share and it lives inside us.
+        </p>
+      </div>
+
+      <div className="text-lg font-semibold leading-snug text-white">
+        Who made this website?
+      </div>
+      <div className=" text-muted text-xs leading-relaxed space-y-2">
+        <p>
+          Hummap was made in 2026 by{" "}
+          <a href="https://gdilillo.com/" className="text-white cursor-pointer">
+            Giuseppe Dilillo
+          </a>
+          . The source code is open, and you can find it on{" "}
+          <a
+            href="https://github.com/peppedilillo/hummap"
+            className="text-white cursor-pointer"
+          >
+            GitHub
+          </a>
+          .
+        </p>
+      </div>
+  </div>
+  );
+}
+
+function TrackPanel({
+  s,
+  navigate,
+  zoomIn,
+}: {
+  s: TrackInfo;
+  navigate: NavigateFn;
+  zoomIn: (() => void) | null;
+}) {
   return (
     <>
       <TrackSummary
+        onZoomIn={zoomIn}
         track={displayTrackName(s.track_name_norm)}
         artist={
           <Link
             onClick={() =>
-              navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)
+              navigate({
+                entity_type: "artist",
+                rowid: s.artist_rowid,
+                lon: s.artist_lon,
+                lat: s.artist_lat,
+                logcount: s.artist_logcount,
+              })
             }
             color="var(--color-artist)"
             className={INLINE_LINK_CLASS}
@@ -330,7 +253,13 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
         album={
           <Link
             onClick={() =>
-              navigate("album", s.album_rowid, s.album_lon, s.album_lat)
+              navigate({
+                entity_type: "album",
+                rowid: s.album_rowid,
+                lon: s.album_lon,
+                lat: s.album_lat,
+                logcount: s.album_logcount,
+              })
             }
             color="var(--color-album)"
             className={INLINE_LINK_CLASS}
@@ -342,7 +271,13 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
       <div className="text-sm text-muted truncate">
         <Link
           onClick={() =>
-            navigate("label", s.label_rowid, s.label_lon, s.label_lat)
+            navigate({
+              entity_type: "label",
+              rowid: s.label_rowid,
+              lon: s.label_lon,
+              lat: s.label_lat,
+              logcount: s.label_logcount,
+            })
           }
           color="var(--color-label)"
           className={INLINE_LINK_CLASS}
@@ -363,15 +298,30 @@ function TrackPanel({ s, navigate }: { s: TrackInfo; navigate: NavigateFn }) {
   );
 }
 
-function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
+function AlbumPanel({
+  s,
+  navigate,
+  zoomIn,
+}: {
+  s: AlbumInfo;
+  navigate: NavigateFn;
+  zoomIn: (() => void) | null;
+}) {
   return (
     <>
       <AlbumSummary
+        onZoomIn={zoomIn}
         albumName={s.album_name_norm}
         artist={
           <Link
             onClick={() =>
-              navigate("artist", s.artist_rowid, s.artist_lon, s.artist_lat)
+              navigate({
+                entity_type: "artist",
+                rowid: s.artist_rowid,
+                lon: s.artist_lon,
+                lat: s.artist_lat,
+                logcount: s.artist_logcount,
+              })
             }
             color="var(--color-artist)"
             className={INLINE_LINK_CLASS}
@@ -383,7 +333,13 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
       <div className="text-sm text-muted truncate">
         <Link
           onClick={() =>
-            navigate("label", s.label_rowid, s.label_lon, s.label_lat)
+            navigate({
+              entity_type: "label",
+              rowid: s.label_rowid,
+              lon: s.label_lon,
+              lat: s.label_lat,
+              logcount: s.label_logcount,
+            })
           }
           color="var(--color-label)"
           className={INLINE_LINK_CLASS}
@@ -404,10 +360,10 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
         <ReprRow>
           <span className="text-muted mr-1.5">features:</span>
           {s.reprs.map((r, i) => (
-            <span key={r.track_rowid}>
+            <span key={r.rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
               <Link
-                onClick={() => navigate("track", r.track_rowid, r.lon, r.lat)}
+                onClick={() => navigate(r)}
                 color="var(--color-album)"
                 className={INLINE_LINK_CLASS}
               >
@@ -421,10 +377,19 @@ function AlbumPanel({ s, navigate }: { s: AlbumInfo; navigate: NavigateFn }) {
   );
 }
 
-function ArtistPanel({ s, navigate }: { s: ArtistInfo; navigate: NavigateFn }) {
+function ArtistPanel({
+  s,
+  navigate,
+  zoomIn,
+}: {
+  s: ArtistInfo;
+  navigate: NavigateFn;
+  zoomIn: (() => void) | null;
+}) {
   return (
     <>
       <ArtistSummary
+        onZoomIn={zoomIn}
         artistName={s.artist_name}
         genre={s.artist_genre ?? undefined}
         playlistCount={formatPlaylistCount(s.logcount)}
@@ -433,10 +398,10 @@ function ArtistPanel({ s, navigate }: { s: ArtistInfo; navigate: NavigateFn }) {
         <ReprRow>
           <span className="text-muted mr-1.5">top albums:</span>
           {s.reprs.map((r, i) => (
-            <span key={r.album_rowid}>
+            <span key={r.rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
               <Link
-                onClick={() => navigate("album", r.album_rowid, r.lon, r.lat)}
+                onClick={() => navigate(r)}
                 color="var(--color-album)"
                 className={INLINE_LINK_CLASS}
               >
@@ -450,10 +415,19 @@ function ArtistPanel({ s, navigate }: { s: ArtistInfo; navigate: NavigateFn }) {
   );
 }
 
-function LabelPanel({ s, navigate }: { s: LabelInfo; navigate: NavigateFn }) {
+function LabelPanel({
+  s,
+  navigate,
+  zoomIn,
+}: {
+  s: LabelInfo;
+  navigate: NavigateFn;
+  zoomIn: (() => void) | null;
+}) {
   return (
     <>
       <LabelSummary
+        onZoomIn={zoomIn}
         labelName={s.label}
         playlistCount={formatPlaylistCount(s.logcount)}
       />
@@ -461,10 +435,10 @@ function LabelPanel({ s, navigate }: { s: LabelInfo; navigate: NavigateFn }) {
         <ReprRow>
           <span className="text-muted mr-1.5">top artists:</span>
           {s.reprs.map((r, i) => (
-            <span key={r.artist_rowid}>
+            <span key={r.rowid}>
               {i > 0 && <span className="text-muted mx-1">·</span>}
               <Link
-                onClick={() => navigate("artist", r.artist_rowid, r.lon, r.lat)}
+                onClick={() => navigate(r)}
                 color="var(--color-artist)"
                 className={INLINE_LINK_CLASS}
               >
@@ -480,38 +454,10 @@ function LabelPanel({ s, navigate }: { s: LabelInfo; navigate: NavigateFn }) {
 
 // --- Recommendation helpers and components ---
 
-/** Extracts navigation args from a recommendation. */
-function getRecNav(
-  rec: Recommend,
-  entityType: EntityType,
-): [EntityType, number, number, number] {
-  switch (entityType) {
-    case "track": {
-      const r = rec as TrackRecommend;
-      return ["track", r.track_rowid, r.lon, r.lat];
-    }
-    case "album": {
-      const r = rec as AlbumRecommend;
-      return ["album", r.album_rowid, r.lon, r.lat];
-    }
-    case "artist": {
-      const r = rec as ArtistRecommend;
-      return ["artist", r.artist_rowid, r.lon, r.lat];
-    }
-    default: {
-      const r = rec as LabelRecommend;
-      return ["label", r.label_rowid, r.lon, r.lat];
-    }
-  }
-}
-
 /** Returns display name and subtitle for a recommendation. */
-function getRecDisplay(
-  rec: Recommend,
-  entityType: EntityType,
-): { name: string; sub: string } {
+function getRecDisplay(rec: Recommend): { name: string; sub: string } {
   const playlists = formatPlaylistCount(rec.logcount);
-  switch (entityType) {
+  switch (rec.entity_type) {
     case "track":
       return {
         name: displayTrackName((rec as TrackRecommend).track_name_norm),
@@ -533,23 +479,14 @@ function getRecDisplay(
 }
 
 /** Single recommendation row — full-width clickable button. */
-function RecItem({
-  rec,
-  entityType,
-  navigate,
-}: {
-  rec: Recommend;
-  entityType: EntityType;
-  navigate: NavigateFn;
-}) {
-  const { name, sub } = getRecDisplay(rec, entityType);
-  const [et, rowid, lon, lat] = getRecNav(rec, entityType);
+function RecItem({ rec, navigate }: { rec: Recommend; navigate: NavigateFn }) {
+  const { name, sub } = getRecDisplay(rec);
   return (
     <li>
       <button
         onClick={(e) => {
           e.stopPropagation();
-          navigate(et, rowid, lon, lat);
+          navigate(rec);
         }}
         className="text-left w-full cursor-pointer hover:bg-overlay py-1.5 px-4"
       >
@@ -566,12 +503,10 @@ type FetchStatus = "idle" | "loading" | "error";
 function RecBody({
   recs,
   fetchStatus,
-  entityType,
   navigate,
 }: {
   recs: Recommend[] | undefined;
   fetchStatus: FetchStatus;
-  entityType: EntityType;
   navigate: NavigateFn;
 }) {
   if (recs) {
@@ -581,11 +516,10 @@ function RecBody({
       );
     return (
       <ol className="mt-1">
-        {recs.map((rec, i) => (
+        {recs.map((rec) => (
           <RecItem
-            key={i}
+            key={`${rec.entity_type}:${rec.rowid}`}
             rec={rec}
-            entityType={entityType}
             navigate={navigate}
           />
         ))}
@@ -611,7 +545,7 @@ function RecsSection({
   const [open, setOpen] = useState(entity.recs != null);
   const [fetchStatus, setFetchStatus] = useState<FetchStatus>("idle");
   const aborter = useRef(makeAbortable());
-  const rowid = getRowid(entity);
+  const rowid = entity.rowid;
   const RECSNUMBER = 10;
 
   const handleToggle = () => {
@@ -662,7 +596,6 @@ function RecsSection({
           <RecBody
             recs={entity.recs}
             fetchStatus={fetchStatus}
-            entityType={entity.entity_type}
             navigate={navigate}
           />
         </div>
@@ -673,7 +606,6 @@ function RecsSection({
             <RecBody
               recs={entity.recs}
               fetchStatus={fetchStatus}
-              entityType={entity.entity_type}
               navigate={navigate}
             />
           )}
@@ -689,25 +621,33 @@ function RecsSection({
 export default function Panel({
   selection,
   navigate,
+  zoomIn,
   update,
   onClose,
   goBack,
 }: PanelProps) {
+  const [helpSelectionKey, setHelpSelectionKey] = useState<string | null>(null);
+
   if (!selection) return null;
 
+  const selectionKey = `${selection.entity_type}:${selection.rowid}`;
+  const helpOpen = helpSelectionKey === selectionKey;
+
   let body: React.ReactNode;
-  if (selection.status === "loading") {
+  if (helpOpen) {
+    body = <HelpBody />;
+  } else if (selection.status === "loading") {
     body = <LoadingBody />;
   } else if (selection.status === "error") {
     body = <div className="text-muted text-sm mt-1">Failed to load.</div>;
   } else if (selection.entity_type === "track") {
-    body = <TrackPanel s={selection} navigate={navigate} />;
+    body = <TrackPanel s={selection} navigate={navigate} zoomIn={zoomIn} />;
   } else if (selection.entity_type === "album") {
-    body = <AlbumPanel s={selection} navigate={navigate} />;
+    body = <AlbumPanel s={selection} navigate={navigate} zoomIn={zoomIn} />;
   } else if (selection.entity_type === "artist") {
-    body = <ArtistPanel s={selection} navigate={navigate} />;
+    body = <ArtistPanel s={selection} navigate={navigate} zoomIn={zoomIn} />;
   } else {
-    body = <LabelPanel s={selection} navigate={navigate} />;
+    body = <LabelPanel s={selection} navigate={navigate} zoomIn={zoomIn} />;
   }
 
   return (
@@ -718,30 +658,51 @@ export default function Panel({
       onPointerDown={(e) => e.stopPropagation()}
       onPointerMove={(e) => e.stopPropagation()}
     >
-      <div className="relative px-4 pt-4 shrink-0">
-        {body}
-        <div className="absolute top-0 right-0 flex gap-1 items-center">
-          {goBack && (
+      <div
+        className={
+          helpOpen
+            ? "relative px-4 pt-4 min-h-0 flex flex-col flex-1"
+            : "relative px-4 pt-4 shrink-0"
+        }
+      >
+        {helpOpen ? (
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar pr-8">
+            {body}
+          </div>
+        ) : (
+          body
+        )}
+        <div className="absolute top-3 right-3 flex gap-0.5 items-center">
+          {!helpOpen && goBack && (
             <button
               onClick={goBack}
-              className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
+              className={PANEL_ICON_BUTTON_CLASS}
               aria-label="Go back"
             >
-              &lt;
+              <ChevronLeftIcon className={PANEL_ICON_CLASS} />
+            </button>
+          )}
+          {!helpOpen && (
+            <button
+              onClick={() => setHelpSelectionKey(selectionKey)}
+              className={PANEL_ICON_BUTTON_CLASS}
+              aria-label="Help"
+            >
+              <HelpIcon className={PANEL_ICON_CLASS} />
             </button>
           )}
           <button
-            onClick={onClose}
-            className="text-muted hover:text-white transition-colors text-lg leading-none p-4"
-            aria-label="Close"
+            onClick={helpOpen ? () => setHelpSelectionKey(null) : onClose}
+            className={PANEL_ICON_BUTTON_CLASS}
+            aria-label={helpOpen ? "Close help" : "Close"}
           >
-            ×
+            <CloseIcon className={PANEL_ICON_CLASS} />
           </button>
         </div>
       </div>
-      {selection.status === "loaded" && (
+      {!helpOpen && selection.status === "loaded" && (
         <RecsSection
-          key={`${selection.entity_type}:${getRowid(selection)}`}
+          key={`${selection.entity_type}:${selection.rowid}`}
           entity={selection}
           navigate={navigate}
           update={update}

@@ -1,14 +1,26 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App.tsx";
+import type { Entity } from "../types.ts";
 
 vi.mock("../MapView.tsx", () => ({
   default: ({
     onFeatureSelect,
   }: {
-    onFeatureSelect: (entityType: "artist", rowid: number) => void;
+    onFeatureSelect: (entity: Entity) => void;
   }) => (
-    <button type="button" onClick={() => onFeatureSelect("artist", 1)}>
+    <button
+      type="button"
+      onClick={() =>
+        onFeatureSelect({
+          entity_type: "artist",
+          rowid: 1,
+          lon: 12.34,
+          lat: 45.67,
+          logcount: 3,
+        })
+      }
+    >
       Select artist
     </button>
   ),
@@ -40,7 +52,8 @@ describe("App", () => {
     // `fetch()` resolves immediately, but `response.json()` stays pending until
     // the test decides to release it. That creates the stale-commit window.
     const jsonDeferred = deferred<{
-      artist_rowid: number;
+      entity_type: "artist";
+      rowid: number;
       artist_name: string;
       lon: number;
       lat: number;
@@ -76,7 +89,8 @@ describe("App", () => {
     // A late settlement must not recreate the closed panel.
     await act(async () => {
       jsonDeferred.resolve({
-        artist_rowid: 1,
+        entity_type: "artist",
+        rowid: 1,
         artist_name: "Late Artist",
         lon: 12.34,
         lat: 45.67,

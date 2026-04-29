@@ -56,14 +56,18 @@ CREATE TABLE tracks (
     artist_name           TEXT    NOT NULL,
     artist_lon            REAL    NOT NULL,
     artist_lat            REAL    NOT NULL,
+    artist_logcount       REAL    NOT NULL,
     album_rowid           INTEGER NOT NULL REFERENCES albums(album_rowid),
     album_name            TEXT    NOT NULL,
+    album_name_norm       TEXT    NOT NULL,
     album_lon             REAL    NOT NULL,
     album_lat             REAL    NOT NULL,
+    album_logcount        REAL    NOT NULL,
     label_rowid           INTEGER NOT NULL REFERENCES labels(label_rowid),
     label                 TEXT    NOT NULL,
     label_lon             REAL    NOT NULL,
     label_lat             REAL    NOT NULL,
+    label_logcount        REAL    NOT NULL,
     track_popularity      INTEGER,
     release_date          TEXT,
     id_isrc               TEXT
@@ -84,10 +88,12 @@ CREATE TABLE albums (
     artist_name              TEXT    NOT NULL,
     artist_lon               REAL    NOT NULL,
     artist_lat               REAL    NOT NULL,
+    artist_logcount          REAL    NOT NULL,
     label                    TEXT    NOT NULL,
     label_rowid              INTEGER NOT NULL REFERENCES labels(label_rowid),
     label_lon                REAL    NOT NULL,
     label_lat                REAL    NOT NULL,
+    label_logcount           REAL    NOT NULL,
     album_type               TEXT,
     total_tracks             INTEGER,
     release_date             TEXT,
@@ -361,7 +367,7 @@ def build_labels(
     lookup: pd.DataFrame,
     geo: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Build the labels table. Returns geo for downstream denormalization."""
+    """Build the labels table. Returns label refs for downstream denormalization."""
     df = lookup.merge(geo, on=EKEYS.label)
     df["label_canonical_rowid"] = df[EKEYS.label]
     df[
@@ -378,7 +384,13 @@ def build_labels(
         ]
     ].to_sql("labels", conn, if_exists="append", index=False)
     print(f"  [labels]  {len(df):,} rows")
-    return geo
+    return df[[EKEYS.label, "lon", "lat", "logcount"]].rename(
+        columns={
+            "lon": "label_lon",
+            "lat": "label_lat",
+            "logcount": "label_logcount",
+        }
+    )
 
 
 def build_artists(
@@ -386,7 +398,7 @@ def build_artists(
     lookup: pd.DataFrame,
     geo: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Build the artists table. Returns geo for downstream denormalization."""
+    """Build the artists table. Returns artist refs for downstream denormalization."""
     df = lookup.merge(geo, on=EKEYS.artist)
     df["artist_canonical_rowid"] = df[EKEYS.artist]
     df[
@@ -403,28 +415,26 @@ def build_artists(
         ]
     ].to_sql("artists", conn, if_exists="append", index=False)
     print(f"  [artists] {len(df):,} rows")
-    return geo
+    return df[[EKEYS.artist, "lon", "lat", "logcount"]].rename(
+        columns={
+            "lon": "artist_lon",
+            "lat": "artist_lat",
+            "logcount": "artist_logcount",
+        }
+    )
 
 
 def build_albums(
     conn: sqlite3.Connection,
     lookup: pd.DataFrame,
     geo: pd.DataFrame,
-    artist_geo: pd.DataFrame,
-    label_geo: pd.DataFrame,
+    artist_ref: pd.DataFrame,
+    label_ref: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Build the albums table. Returns geo for downstream denormalization."""
+    """Build the albums table. Returns album refs for downstream denormalization."""
     df = lookup.merge(geo, on=EKEYS.album)
-    df = df.merge(
-        artist_geo.rename(columns={"lon": "artist_lon", "lat": "artist_lat"}),
-        on=EKEYS.artist,
-        how="left",
-    )
-    df = df.merge(
-        label_geo.rename(columns={"lon": "label_lon", "lat": "label_lat"}),
-        on=EKEYS.label,
-        how="left",
-    )
+    df = df.merge(artist_ref, on=EKEYS.artist, how="left")
+    df = df.merge(label_ref, on=EKEYS.label, how="left")
     df["album_name_norm"] = df["album_name"].map(normalize_title)
     df["album_canonical_rowid"] = df[EKEYS.album]
     _validate_required_columns(
@@ -433,9 +443,11 @@ def build_albums(
             "artist_name",
             "artist_lon",
             "artist_lat",
+            "artist_logcount",
             "label",
             "label_lon",
             "label_lat",
+            "label_logcount",
         ],
         "albums",
     )
@@ -453,6 +465,7 @@ def build_albums(
             "artist_name",
             "artist_lon",
             "artist_lat",
+            "artist_logcount",
             "album_type",
             "label",
             "total_tracks",
@@ -461,26 +474,29 @@ def build_albums(
             EKEYS.label,
             "label_lon",
             "label_lat",
+            "label_logcount",
         ]
     ].to_sql("albums", conn, if_exists="append", index=False)
     print(f"  [albums]  {len(df):,} rows")
-    return geo
+    return df[[EKEYS.album, "album_name_norm", "lon", "lat", "logcount"]].rename(
+        columns={
+            "lon": "album_lon",
+            "lat": "album_lat",
+            "logcount": "album_logcount",
+        }
+    )
 
 
 def build_tracks(
     conn: sqlite3.Connection,
     lookup_path: Path,
     track_geo: pd.DataFrame,
-    artist_geo: pd.DataFrame,
-    album_geo: pd.DataFrame,
-    label_geo: pd.DataFrame,
+    artist_ref: pd.DataFrame,
+    album_ref: pd.DataFrame,
+    label_ref: pd.DataFrame,
     batch_size: int,
 ) -> None:
     """Build the tracks table, streaming the lookup parquet in batches."""
-    artist_geo_r = artist_geo.rename(columns={"lon": "artist_lon", "lat": "artist_lat"})
-    album_geo_r = album_geo.rename(columns={"lon": "album_lon", "lat": "album_lat"})
-    label_geo_r = label_geo.rename(columns={"lon": "label_lon", "lat": "label_lat"})
-
     out_cols = [
         EKEYS.track,
         "track_canonical_rowid",
@@ -496,14 +512,18 @@ def build_tracks(
         "artist_name",
         "artist_lon",
         "artist_lat",
+        "artist_logcount",
         EKEYS.album,
         "album_name",
+        "album_name_norm",
         "album_lon",
         "album_lat",
+        "album_logcount",
         EKEYS.label,
         "label",
         "label_lon",
         "label_lat",
+        "label_logcount",
     ]
 
     pf = pq.ParquetFile(lookup_path)
@@ -514,9 +534,9 @@ def build_tracks(
         df = (
             batch.to_pandas()
             .merge(track_geo, on=EKEYS.track, how="inner")
-            .merge(artist_geo_r, on=EKEYS.artist, how="left")
-            .merge(album_geo_r, on=EKEYS.album, how="left")
-            .merge(label_geo_r, on=EKEYS.label, how="left")
+            .merge(artist_ref, on=EKEYS.artist, how="left")
+            .merge(album_ref, on=EKEYS.album, how="left")
+            .merge(label_ref, on=EKEYS.label, how="left")
         )
         df["track_canonical_rowid"] = df[EKEYS.track]
         df["track_name_norm"] = df["track_name"].map(normalize_title)
@@ -526,12 +546,16 @@ def build_tracks(
                 "artist_name",
                 "artist_lon",
                 "artist_lat",
+                "artist_logcount",
                 "album_name",
+                "album_name_norm",
                 "album_lon",
                 "album_lat",
+                "album_logcount",
                 "label",
                 "label_lon",
                 "label_lat",
+                "label_logcount",
             ],
             "tracks",
         )
@@ -852,9 +876,9 @@ def main():
     print()
 
     print("Building entity tables...")
-    label_geo = build_labels(conn, label_lookup, label_geo)
-    artist_geo = build_artists(conn, artist_lookup, artist_geo)
-    album_geo = build_albums(conn, album_lookup, album_geo, artist_geo, label_geo)
+    label_ref = build_labels(conn, label_lookup, label_geo)
+    artist_ref = build_artists(conn, artist_lookup, artist_geo)
+    album_ref = build_albums(conn, album_lookup, album_geo, artist_ref, label_ref)
     canonicalize_albums(conn)
     conn.commit()
 
@@ -862,9 +886,9 @@ def main():
         conn,
         lookup_paths.track,
         track_geo,
-        artist_geo,
-        album_geo,
-        label_geo,
+        artist_ref,
+        album_ref,
+        label_ref,
         args.batch_size,
     )
     canonicalize_tracks(conn)

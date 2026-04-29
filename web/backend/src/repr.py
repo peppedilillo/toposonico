@@ -1,5 +1,5 @@
 import sqlite3
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from fastapi import APIRouter
 from fastapi import HTTPException
@@ -17,26 +17,32 @@ router = APIRouter()
 
 
 class TrackRepr(TypedDict):
-    track_rowid: int
+    entity_type: Literal["track"]
+    rowid: int
     track_name_norm: str
     artist_name: str
     lon: float
     lat: float
+    logcount: float
 
 
 class AlbumRepr(TypedDict):
-    album_rowid: int
+    entity_type: Literal["album"]
+    rowid: int
     album_name_norm: str
     artist_name: str
     lon: float
     lat: float
+    logcount: float
 
 
 class ArtistRepr(TypedDict):
-    artist_rowid: int
+    entity_type: Literal["artist"]
+    rowid: int
     artist_name: str
     lon: float
     lat: float
+    logcount: float
 
 
 Repr = TrackRepr | AlbumRepr | ArtistRepr
@@ -55,11 +61,13 @@ def repr_fetch(
             child_repr_cls = TrackRepr
             query = """
                 SELECT
-                    c.track_rowid,
+                    'track' AS entity_type,
+                    c.track_rowid AS rowid,
                     c.track_name_norm,
                     c.artist_name,
                     c.lon,
-                    c.lat
+                    c.lat,
+                    c.logcount
                 FROM album_repr_tracks AS r
                 JOIN tracks AS c ON r.track_rowid = c.track_rowid
                 WHERE r.album_rowid = ?
@@ -70,11 +78,13 @@ def repr_fetch(
             child_repr_cls = AlbumRepr
             query = """
                 SELECT
-                    c.album_rowid,
+                    'album' AS entity_type,
+                    c.album_rowid AS rowid,
                     c.album_name_norm,
                     c.artist_name,
                     c.lon,
-                    c.lat
+                    c.lat,
+                    c.logcount
                 FROM artist_repr_albums AS r
                 JOIN albums AS c ON r.album_rowid = c.album_rowid
                 WHERE r.artist_rowid = ?
@@ -85,10 +95,12 @@ def repr_fetch(
             child_repr_cls = ArtistRepr
             query = """
                 SELECT
-                    c.artist_rowid,
+                    'artist' AS entity_type,
+                    c.artist_rowid AS rowid,
                     c.artist_name,
                     c.lon,
-                    c.lat
+                    c.lat,
+                    c.logcount
                 FROM label_repr_artists AS r
                 JOIN artists AS c ON r.artist_rowid = c.artist_rowid
                 WHERE r.label_rowid = ?

@@ -1,5 +1,5 @@
 import sqlite3
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from fastapi import APIRouter
 from fastapi import HTTPException
@@ -20,7 +20,8 @@ router = APIRouter()
 
 
 class TrackRecommend(TypedDict):
-    track_rowid: int
+    entity_type: Literal["track"]
+    rowid: int
     track_name_norm: str
     artist_name: str
     lon: float
@@ -30,7 +31,8 @@ class TrackRecommend(TypedDict):
 
 
 class AlbumRecommend(TypedDict):
-    album_rowid: int
+    entity_type: Literal["album"]
+    rowid: int
     album_name_norm: str
     artist_name: str
     lon: float
@@ -40,7 +42,8 @@ class AlbumRecommend(TypedDict):
 
 
 class ArtistRecommend(TypedDict):
-    artist_rowid: int
+    entity_type: Literal["artist"]
+    rowid: int
     artist_name: str
     lon: float
     lat: float
@@ -50,7 +53,8 @@ class ArtistRecommend(TypedDict):
 
 
 class LabelRecommend(TypedDict):
-    label_rowid: int
+    entity_type: Literal["label"]
+    rowid: int
     label: str
     lon: float
     lat: float
@@ -90,7 +94,8 @@ def recommend_fetch(
             """
             payload_query = """
                 SELECT
-                    track_rowid,
+                    'track' AS entity_type,
+                    track_rowid AS rowid,
                     track_name_norm,
                     artist_name,
                     lon,
@@ -112,7 +117,8 @@ def recommend_fetch(
             """
             payload_query = """
                 SELECT
-                    album_rowid,
+                    'album' AS entity_type,
+                    album_rowid AS rowid,
                     album_name_norm,
                     artist_name,
                     lon,
@@ -133,7 +139,8 @@ def recommend_fetch(
             """
             payload_query = """
                 SELECT
-                    artist_rowid,
+                    'artist' AS entity_type,
+                    artist_rowid AS rowid,
                     artist_name,
                     lon,
                     lat,
@@ -154,7 +161,8 @@ def recommend_fetch(
             """
             payload_query = """
                 SELECT
-                    label_rowid,
+                    'label' AS entity_type,
+                    label_rowid AS rowid,
                     label,
                     lon,
                     lat,
@@ -215,8 +223,8 @@ def recommend_fetch(
     rec_map = {}
     for rec in rec_rows:
         rec_data = dict(rec)
-        rec_data["simscore"] = sim_map[rec[0]]
-        rec_map[rec[0]] = rec_cls(**rec_data)
+        rec_data["simscore"] = sim_map[rec_data["rowid"]]
+        rec_map[rec_data["rowid"]] = rec_cls(**rec_data)
     return [rec_map[nid] for nid in selected_ids if nid in rec_map]
 
 

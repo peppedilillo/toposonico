@@ -2,6 +2,6 @@ User-agent: *
 Allow: /
 
 Disallow: /api/
-Disallow: /tiles/
+Disallow: /sick-tiles/
 
 Sitemap: https://hummap.xyz/sitemap.xml

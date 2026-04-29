@@ -10,7 +10,7 @@ import Search from "../Search.tsx";
 const SEARCH_RESULTS = [
   {
     entity_type: "artist" as const,
-    artist_rowid: 1,
+    rowid: 1,
     artist_name: "Result Artist",
     lon: 10,
     lat: 20,
@@ -18,7 +18,7 @@ const SEARCH_RESULTS = [
   },
   {
     entity_type: "label" as const,
-    label_rowid: 2,
+    rowid: 2,
     label: "Result Label",
     lon: 30,
     lat: 40,

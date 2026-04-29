@@ -149,13 +149,13 @@ def _write_track_parquet(tmp_path: Path) -> Path:
 
 def _build_full_db(db, tmp_path: Path):
     """Populate all entity tables so repr queries have data to work with."""
-    label_geo = build_labels(db, _label_lookup(), _label_geo())
-    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
-    album_geo = build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
+    label_ref = build_labels(db, _label_lookup(), _label_geo())
+    artist_ref = build_artists(db, _artist_lookup(), _artist_geo())
+    album_ref = build_albums(db, _album_lookup(), _album_geo(), artist_ref, label_ref)
     canonicalize_albums(db)
     db.commit()
     lookup_path = _write_track_parquet(tmp_path)
-    build_tracks(db, lookup_path, _track_geo(), artist_geo, album_geo, label_geo, batch_size=100)
+    build_tracks(db, lookup_path, _track_geo(), artist_ref, album_ref, label_ref, batch_size=100)
     canonicalize_tracks(db)
     db.commit()
 
@@ -310,24 +310,26 @@ def test_build_artists_writes_genre_and_counts(db):
     assert rows[0]["artist_canonical_rowid"] == rows[0]["artist_rowid"]
 
 
-def test_build_albums_denormalizes_artist_and_label_geo(db):
-    label_geo = build_labels(db, _label_lookup(), _label_geo())
-    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
-    build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
+def test_build_albums_denormalizes_artist_and_label_refs(db):
+    label_ref = build_labels(db, _label_lookup(), _label_geo())
+    artist_ref = build_artists(db, _artist_lookup(), _artist_geo())
+    build_albums(db, _album_lookup(), _album_geo(), artist_ref, label_ref)
 
     rows = _rows_as_dicts(db, "SELECT * FROM albums WHERE album_rowid = 201")
     row = rows[0]
     assert row["artist_lon"] == 5.0
     assert row["artist_lat"] == 50.0
+    assert row["artist_logcount"] == 3.0
     assert row["label_lon"] == 1.0
     assert row["label_lat"] == 10.0
+    assert row["label_logcount"] == 3.5
     assert row["album_name_norm"] == "Untitled"
 
 
 def test_canonicalize_albums_groups_remaster_variants(db):
-    label_geo = build_labels(db, _label_lookup(), _label_geo())
-    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
-    build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
+    label_ref = build_labels(db, _label_lookup(), _label_geo())
+    artist_ref = build_artists(db, _artist_lookup(), _artist_geo())
+    build_albums(db, _album_lookup(), _album_geo(), artist_ref, label_ref)
     canonicalize_albums(db)
     db.commit()
 
@@ -337,18 +339,18 @@ def test_canonicalize_albums_groups_remaster_variants(db):
     assert canonical[203] == 203, "unrelated album should be self-canonical"
 
 
-def test_build_tracks_denormalizes_geo_and_includes_isrc(db, tmp_path):
-    label_geo = build_labels(db, _label_lookup(), _label_geo())
-    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
-    album_geo = build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
+def test_build_tracks_denormalizes_refs_and_includes_isrc(db, tmp_path):
+    label_ref = build_labels(db, _label_lookup(), _label_geo())
+    artist_ref = build_artists(db, _artist_lookup(), _artist_geo())
+    album_ref = build_albums(db, _album_lookup(), _album_geo(), artist_ref, label_ref)
     lookup_path = _write_track_parquet(tmp_path)
     build_tracks(
         db,
         lookup_path,
         _track_geo(),
-        artist_geo,
-        album_geo,
-        label_geo,
+        artist_ref,
+        album_ref,
+        label_ref,
         batch_size=100,
     )
 
@@ -356,25 +358,29 @@ def test_build_tracks_denormalizes_geo_and_includes_isrc(db, tmp_path):
     row = rows[0]
     assert row["id_isrc"] == "ISRC001"
     assert row["artist_lon"] == 5.0
+    assert row["artist_logcount"] == 3.0
     assert row["album_lon"] == 7.0
+    assert row["album_name_norm"] == "Untitled"
+    assert row["album_logcount"] == 3.2
     assert row["label_lon"] == 1.0
+    assert row["label_logcount"] == 3.5
     assert row["track_canonical_rowid"] == 1001
 
 
 def test_build_tracks_filters_to_geo_subset(db, tmp_path):
     """Tracks absent from track_geo are excluded (implicit geo filter)."""
-    label_geo = build_labels(db, _label_lookup(), _label_geo())
-    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
-    album_geo = build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
+    label_ref = build_labels(db, _label_lookup(), _label_geo())
+    artist_ref = build_artists(db, _artist_lookup(), _artist_geo())
+    album_ref = build_albums(db, _album_lookup(), _album_geo(), artist_ref, label_ref)
     lookup_path = _write_track_parquet(tmp_path)
     partial_geo = pd.DataFrame({EKEYS.track: [1001, 1003], "lon": [0.1, 0.3], "lat": [1.1, 1.3]})
     build_tracks(
         db,
         lookup_path,
         partial_geo,
-        artist_geo,
-        album_geo,
-        label_geo,
+        artist_ref,
+        album_ref,
+        label_ref,
         batch_size=100,
     )
 
@@ -384,6 +390,9 @@ def test_build_tracks_filters_to_geo_subset(db, tmp_path):
 
 def test_build_tracks_rejects_empty_label(db, tmp_path):
     """Tracks with empty-string label fail fast under the strict schema."""
+    label_ref = build_labels(db, _label_lookup(), _label_geo())
+    artist_ref = build_artists(db, _artist_lookup(), _artist_geo())
+    album_ref = build_albums(db, _album_lookup(), _album_geo(), artist_ref, label_ref)
     track = _track_lookup().copy()
     track.loc[track[EKEYS.track] == 1001, "label"] = ""
     path = tmp_path / "lookup_track.parquet"
@@ -394,18 +403,18 @@ def test_build_tracks_rejects_empty_label(db, tmp_path):
             db,
             path,
             _track_geo(),
-            _artist_geo(),
-            _album_geo(),
-            _label_geo(),
+            artist_ref,
+            album_ref,
+            label_ref,
             batch_size=100,
         )
 
 
 def test_canonicalize_tracks_in_db(db, tmp_path):
     """Tracks with same album + normalized name share canonical in the DB."""
-    label_geo = build_labels(db, _label_lookup(), _label_geo())
-    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
-    build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
+    label_ref = build_labels(db, _label_lookup(), _label_geo())
+    artist_ref = build_artists(db, _artist_lookup(), _artist_geo())
+    album_ref = build_albums(db, _album_lookup(), _album_geo(), artist_ref, label_ref)
     canonicalize_albums(db)
     db.commit()
 
@@ -429,7 +438,7 @@ def test_canonicalize_tracks_in_db(db, tmp_path):
     tracks.to_parquet(path)
     track_geo = pd.DataFrame({EKEYS.track: [1, 2, 3], "lon": [0.1, 0.2, 0.3], "lat": [1.1, 1.2, 1.3]})
 
-    build_tracks(db, path, track_geo, _artist_geo(), _album_geo(), _label_geo(), batch_size=100)
+    build_tracks(db, path, track_geo, artist_ref, album_ref, label_ref, batch_size=100)
     canonicalize_tracks(db)
     db.commit()
 
@@ -441,9 +450,9 @@ def test_canonicalize_tracks_in_db(db, tmp_path):
 
 def test_canonicalize_tracks_across_canonical_albums(db, tmp_path):
     """Tracks with the same name in duplicate albums share a canonical track."""
-    label_geo = build_labels(db, _label_lookup(), _label_geo())
-    artist_geo = build_artists(db, _artist_lookup(), _artist_geo())
-    build_albums(db, _album_lookup(), _album_geo(), artist_geo, label_geo)
+    label_ref = build_labels(db, _label_lookup(), _label_geo())
+    artist_ref = build_artists(db, _artist_lookup(), _artist_geo())
+    album_ref = build_albums(db, _album_lookup(), _album_geo(), artist_ref, label_ref)
     canonicalize_albums(db)
     db.commit()
 
@@ -469,7 +478,7 @@ def test_canonicalize_tracks_across_canonical_albums(db, tmp_path):
     tracks.to_parquet(path)
     track_geo = pd.DataFrame({EKEYS.track: [1001, 1002], "lon": [0.1, 0.2], "lat": [1.1, 1.2]})
 
-    build_tracks(db, path, track_geo, artist_geo, _album_geo(), label_geo, batch_size=100)
+    build_tracks(db, path, track_geo, artist_ref, album_ref, label_ref, batch_size=100)
     canonicalize_tracks(db)
     db.commit()
 

@@ -13,15 +13,15 @@ def test_build_entity_writes_ndjson_features(tmp_path):
             track_rowid, track_canonical_rowid, track_name, track_name_norm,
             track_popularity,
             logcount, release_date, id_isrc, searchable, recable, lon, lat,
-            artist_rowid, artist_name, artist_lon, artist_lat,
-            album_rowid, album_name, album_lon, album_lat,
-            label_rowid, label, label_lon, label_lat
+            artist_rowid, artist_name, artist_lon, artist_lat, artist_logcount,
+            album_rowid, album_name, album_name_norm, album_lon, album_lat, album_logcount,
+            label_rowid, label, label_lon, label_lat, label_logcount
         ) VALUES (
             1001, 1001, 'Track', 'Track', 50,
             3.1, '2024-01-01', 'ISRC001', 1, 1, 0.1, 1.1,
-            101, 'Artist', 5.0, 50.0,
-            201, 'Album', 7.0, 70.0,
-            1, 'Label', 1.0, 10.0
+            101, 'Artist', 5.0, 50.0, 4.1,
+            201, 'Album', 'Album', 7.0, 70.0, 4.2,
+            1, 'Label', 1.0, 10.0, 4.3
         )
         """)
     conn.commit()

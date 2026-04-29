@@ -15,11 +15,12 @@ def test_recommend_track(db, faiss_indexes):
 
     assert results is not None
     assert len(results) == 3
-    assert all(r["track_rowid"] != 1 for r in results)
+    assert all(r["rowid"] != 1 for r in results)
     assert all(
         set(r.keys())
         == {
-            "track_rowid",
+            "entity_type",
+            "rowid",
             "track_name_norm",
             "artist_name",
             "lon",
@@ -37,7 +38,7 @@ def test_recommend_album(db, faiss_indexes):
 
     assert results is not None
     assert len(results) == 2
-    assert all(r["album_rowid"] != 20 for r in results)
+    assert all(r["rowid"] != 20 for r in results)
 
 
 def test_recommend_artist(db, faiss_indexes):
@@ -45,7 +46,8 @@ def test_recommend_artist(db, faiss_indexes):
 
     assert results == [
         {
-            "artist_rowid": 11,
+            "entity_type": "artist",
+            "rowid": 11,
             "artist_name": "Herbie Hancock",
             "lon": 5.6,
             "lat": 6.7,
@@ -62,7 +64,8 @@ def test_recommend_label(db, faiss_indexes):
 
     assert results == [
         {
-            "label_rowid": 31,
+            "entity_type": "label",
+            "rowid": 31,
             "label": "Blue Note",
             "lon": 7.8,
             "lat": 8.9,
@@ -109,7 +112,7 @@ def test_recommend_diverse_filters_and_logcount_can_underfill(db, faiss_indexes)
     assert results is not None
     assert len(results) == 1
     assert all(r["logcount"] > 5.4 for r in results)
-    assert results[0]["album_rowid"] == 22
+    assert results[0]["rowid"] == 22
 
 
 def test_recommend_logcount_filter_applies_to_artist(db, faiss_indexes):
@@ -128,7 +131,7 @@ def test_recommend_diverse_false_keeps_same_artist_candidates(db, faiss_indexes)
     results = recommend_fetch(ALBUM, 20, limit=2, diverse=False, popfloor=0, db=db, indexes=faiss_indexes)
 
     assert results is not None
-    assert [r["album_rowid"] for r in results] == [21, 22]
+    assert [r["rowid"] for r in results] == [21, 22]
 
 
 def test_recommend_track_popfloor_filters_low_count_rows(db, faiss_indexes):

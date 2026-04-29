@@ -24,6 +24,9 @@ For local development with Docker Compose:
 docker compose up
 ```
 
+The frontend requests tiles directly from Martin at
+`/sick-tiles/{z}/{x}/{y}`.
+
 ## Production setup
 
 1. Create `config.prod.env`, you can use `config.prod.sample.env` for template.
@@ -35,4 +38,31 @@ docker compose -f docker-compose.prod.yml --env-file config.prod.env up -d meili
 docker compose -f docker-compose.prod.yml --env-file config.prod.env run --rm --no-deps backend \
    uv run --no-sync python scripts/build_search_index.py
 docker compose -f docker-compose.prod.yml --env-file config.prod.env up -d
+```
+
+## Utils
+
+The script `scripts/tile_size_stats.py` produces a few tiles summary. Useful for keeping tiles size at check while experimenting with tippecanoe parameters.
+
+Example:
+
+```shell
+python scripts/tile_size_stats.py --tiles /path/to/sick.mbtiles
+```
+
+
+## Linter
+
+In frontend: 
+
+```shell
+npx prettier src --write
+npm run lint -- --fix
+```
+
+In backend:
+
+```shell
+black -l 120 .
+isort --profile google .
 ```

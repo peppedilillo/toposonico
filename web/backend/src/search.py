@@ -1,5 +1,5 @@
 import re
-from typing import TypedDict
+from typing import Literal, TypedDict, assert_never
 
 from fastapi import APIRouter
 from fastapi import Query
@@ -19,8 +19,8 @@ SEARCH_ID_RE = re.compile(rf"^({'|'.join(re.escape(e.name) for e in ENTITIES)})_
 
 
 class TrackHit(TypedDict):
-    entity_type: str
-    track_rowid: int
+    entity_type: Literal["track"]
+    rowid: int
     track_name_norm: str
     artist_name: str
     lon: float
@@ -29,8 +29,8 @@ class TrackHit(TypedDict):
 
 
 class AlbumHit(TypedDict):
-    entity_type: str
-    album_rowid: int
+    entity_type: Literal["album"]
+    rowid: int
     album_name_norm: str
     artist_name: str
     lon: float
@@ -39,8 +39,8 @@ class AlbumHit(TypedDict):
 
 
 class ArtistHit(TypedDict):
-    entity_type: str
-    artist_rowid: int
+    entity_type: Literal["artist"]
+    rowid: int
     artist_name: str
     lon: float
     lat: float
@@ -48,8 +48,8 @@ class ArtistHit(TypedDict):
 
 
 class LabelHit(TypedDict):
-    entity_type: str
-    label_rowid: int
+    entity_type: Literal["label"]
+    rowid: int
     label: str
     lon: float
     lat: float
@@ -70,8 +70,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
     match entity:
         case TrackEntity():
             return TrackHit(
-                entity_type=entity.name,
-                track_rowid=rowid,
+                entity_type="track",
+                rowid=rowid,
                 track_name_norm=hit["track_name_norm"],
                 artist_name=hit["artist_name"],
                 lon=hit["lon"],
@@ -80,8 +80,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
             )
         case AlbumEntity():
             return AlbumHit(
-                entity_type=entity.name,
-                album_rowid=rowid,
+                entity_type="album",
+                rowid=rowid,
                 album_name_norm=hit["album_name_norm"],
                 artist_name=hit["artist_name"],
                 lon=hit["lon"],
@@ -90,8 +90,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
             )
         case ArtistEntity():
             return ArtistHit(
-                entity_type=entity.name,
-                artist_rowid=rowid,
+                entity_type="artist",
+                rowid=rowid,
                 artist_name=hit["artist_name"],
                 lon=hit["lon"],
                 lat=hit["lat"],
@@ -99,8 +99,8 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
             )
         case LabelEntity():
             return LabelHit(
-                entity_type=entity.name,
-                label_rowid=rowid,
+                entity_type="label",
+                rowid=rowid,
                 label=hit["label"],
                 lon=hit["lon"],
                 lat=hit["lat"],
@@ -111,10 +111,49 @@ def search_map(hit: dict) -> TrackHit | AlbumHit | ArtistHit | LabelHit:
 SearchHit = TrackHit | AlbumHit | ArtistHit | LabelHit
 
 
+def dedup_normalize(value: str) -> str:
+    return value.strip().casefold()
+
+
+def dedup_key(hit: SearchHit) -> tuple[str, str] | tuple[str, str, str]:
+    match hit["entity_type"]:
+        case "track":
+            return (
+                "track",
+                dedup_normalize(hit["track_name_norm"]),
+                dedup_normalize(hit["artist_name"]),
+            )
+        case "album":
+            return (
+                "album",
+                dedup_normalize(hit["album_name_norm"]),
+                dedup_normalize(hit["artist_name"]),
+            )
+        case "artist":
+            return ("artist", dedup_normalize(hit["artist_name"]))
+        case "label":
+            return ("label", dedup_normalize(hit["label"]))
+        case entity_type:
+            assert_never(entity_type)
+
+
+def dedup(hits: list[SearchHit]) -> list[SearchHit]:
+    seen = set()
+    out: list[SearchHit] = []
+    for hit in hits:
+        key = dedup_key(hit)
+        if key not in seen:
+            seen.add(key)
+            out.append(hit)
+    return out
+
+
 @router.get("/api/search")
 async def search(
     q: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=20),
 ) -> list[SearchHit]:
     """Search for up to `limit` entities matching `q` query."""
-    return [search_map(hit) for hit in get_meili_index().search(q, {"limit": limit})["hits"]]
+    return dedup(
+        [search_map(hit) for hit in get_meili_index().search(q, {"limit": limit})["hits"]]
+    )

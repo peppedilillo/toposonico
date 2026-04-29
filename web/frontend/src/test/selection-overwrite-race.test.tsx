@@ -1,22 +1,47 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App.tsx";
+import type { Entity } from "../types.ts";
 
 vi.mock("../MapView.tsx", () => ({
   default: ({
     onFeatureSelect,
   }: {
-    onFeatureSelect: (entityType: "artist", rowid: number) => void;
-  }) => (
-    <>
-      <button type="button" onClick={() => onFeatureSelect("artist", 1)}>
-        Select artist 1
-      </button>
-      <button type="button" onClick={() => onFeatureSelect("artist", 2)}>
-        Select artist 2
-      </button>
-    </>
-  ),
+    onFeatureSelect: (entity: Entity) => void;
+  }) => {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() =>
+            onFeatureSelect({
+              entity_type: "artist",
+              rowid: 1,
+              lon: 10,
+              lat: 15,
+              logcount: 3,
+            })
+          }
+        >
+          Select artist 1
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onFeatureSelect({
+              entity_type: "artist",
+              rowid: 2,
+              lon: 20,
+              lat: 30,
+              logcount: 4,
+            })
+          }
+        >
+          Select artist 2
+        </button>
+      </>
+    );
+  },
 }));
 
 // Lets the test release each response payload at a specific moment, so we can
@@ -32,7 +57,8 @@ function deferred<T>() {
 }
 
 type ArtistPayload = {
-  artist_rowid: number;
+  entity_type: "artist";
+  rowid: number;
   artist_name: string;
   lon: number;
   lat: number;
@@ -88,7 +114,8 @@ describe("App", () => {
     // Selection 2 settles first and becomes the visible current selection.
     await act(async () => {
       secondJson.resolve({
-        artist_rowid: 2,
+        entity_type: "artist",
+        rowid: 2,
         artist_name: "Current Artist",
         lon: 20,
         lat: 30,
@@ -109,7 +136,8 @@ describe("App", () => {
     // newer selection.
     await act(async () => {
       firstJson.resolve({
-        artist_rowid: 1,
+        entity_type: "artist",
+        rowid: 1,
         artist_name: "Stale Artist",
         lon: 10,
         lat: 15,

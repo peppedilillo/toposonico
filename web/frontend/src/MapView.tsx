@@ -3,7 +3,17 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection } from "geojson";
 import type { ExpressionSpecification } from "maplibre-gl";
-import type { EntityType } from "./utils.ts";
+import { SOURCE_MAX_ZOOM, type EntityType } from "./utils.ts";
+import type { Entity } from "./types.ts";
+
+// MapLibre requires absolute URLs for tile sources. In dev the env var is a relative path
+// and we prepend the page origin so it works on both localhost and LAN.
+const TILE_URL_RAW =
+  (import.meta.env.VITE_TILES_URL as string | undefined) ??
+  "/sick-tiles/{z}/{x}/{y}";
+const TILE_URL = TILE_URL_RAW.startsWith("http")
+  ? TILE_URL_RAW
+  : window.location.origin + TILE_URL_RAW;
 
 export type ViewState = {
   lon: number;
@@ -21,12 +31,13 @@ type MapViewProps = {
   initialView: ViewState;
   command: MapCommand;
   onMoveEnd: (view: ViewState) => void;
-  onFeatureSelect: (entityType: EntityType, rowid: number) => void;
+  onFeatureSelect: (entity: Entity) => void;
 };
 
 const VIEW_CONSTRAINTS = {
   minZoom: 5,
-  maxZoom: 14,
+  // enables overzooming
+  maxZoom: SOURCE_MAX_ZOOM + 2,
   pitch: 10,
 };
 
@@ -36,15 +47,6 @@ const HIT_STROKE_OPACITY = 0.003;
 const HIT_FILL_OPACITY = 0.004;
 const HOVER_QUERY_THROTTLE_MS = 10;
 const INTERACTIVE_LAYER_IDS = ["tracks", "labels-hit", "artists-hit", "albums"];
-
-// MapLibre requires absolute URLs for tile sources. In dev the env var is a relative path
-// and we prepend the page origin so it works on both localhost and LAN.
-const TILE_URL_RAW =
-  (import.meta.env.VITE_TILES_URL as string | undefined) ??
-  "/tiles/{z}/{x}/{y}.pbf";
-const TILE_URL = TILE_URL_RAW.startsWith("http")
-  ? TILE_URL_RAW
-  : window.location.origin + TILE_URL_RAW;
 
 const TILE_BOUNDS: [number, number, number, number] = [
   -21.011852, -21.409018, 21.01185, 21.409019,
@@ -190,7 +192,7 @@ export default function MapView({
         tiles: [TILE_URL],
         bounds: TILE_BOUNDS,
         minzoom: VIEW_CONSTRAINTS.minZoom,
-        maxzoom: VIEW_CONSTRAINTS.maxZoom,
+        maxzoom: SOURCE_MAX_ZOOM,
       });
 
       // there are much more tracks than any other entity class, we place them at z-order bottom
@@ -203,7 +205,6 @@ export default function MapView({
           "circle-radius": getVisualRadiusExpression(),
           "circle-color": cssVar("--color-track"),
           "circle-opacity": 0.5,
-          // Outer stroke pads the hit target so tiny track dots stay clickable.
           "circle-stroke-color": cssVar("--color-track"),
           "circle-stroke-opacity": HIT_STROKE_OPACITY,
           "circle-stroke-width": getHitStrokeWidthExpression(),
@@ -268,7 +269,6 @@ export default function MapView({
           "circle-radius": getVisualRadiusExpression(),
           "circle-color": cssVar("--color-album"),
           "circle-opacity": 0.6,
-          // Outer stroke pads the hit target so tiny album dots stay clickable.
           "circle-stroke-color": cssVar("--color-album"),
           "circle-stroke-opacity": HIT_STROKE_OPACITY,
           "circle-stroke-width": getHitStrokeWidthExpression(),
@@ -281,11 +281,7 @@ export default function MapView({
           layers: INTERACTIVE_LAYER_IDS,
         });
 
-        let bestSelection: {
-          entityType: EntityType;
-          rowid: number;
-          logcount: number;
-        } | null = null;
+        let bestSelection: Entity | null = null;
 
         for (const feature of features) {
           let entityType: EntityType;
@@ -317,14 +313,21 @@ export default function MapView({
           if (bestSelection != null && logcount <= bestSelection.logcount)
             continue;
 
-          bestSelection = { entityType, rowid, logcount };
+          if (feature.geometry.type !== "Point") continue;
+          const [lon, lat] = feature.geometry.coordinates;
+          if (typeof lon !== "number" || typeof lat !== "number") continue;
+
+          bestSelection = {
+            entity_type: entityType,
+            rowid,
+            lon,
+            lat,
+            logcount,
+          };
         }
 
         if (bestSelection != null) {
-          onFeatureSelectRef.current(
-            bestSelection.entityType,
-            bestSelection.rowid,
-          );
+          onFeatureSelectRef.current(bestSelection);
         }
       });
 

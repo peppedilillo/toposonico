@@ -4,18 +4,26 @@
 # Usage:
 #   source config.env && bash build.sh
 #   bash build.sh  # auto-sources config.env if SICK_JSON_TRACK is unset
+#
+# Incremental workflow:
+#   Comment out any layer build block you want to reuse from a previous run.
+#   The script no longer wipes SICK_TILES_BUILD_DIR, so existing layer MBTiles
+#   remain available for tile-join.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+die() {
+    echo "Error: $*" >&2
+    exit 1
+}
 
 if [[ -z "${SICK_JSON_TRACK:-}" ]]; then
     if [[ -f "$SCRIPT_DIR/config.env" ]]; then
         # shellcheck source=/dev/null
         source "$SCRIPT_DIR/config.env"
     else
-        echo "Error: SICK_JSON_TRACK is not set and config.env was not found."
-        echo "Run: cp config.sample.env config.env  # fill in paths, then source it"
-        exit 1
+        die "SICK_JSON_TRACK is not set and config.env was not found."
     fi
 fi
 
@@ -24,7 +32,13 @@ required_vars=(
     SICK_JSON_ALBUM
     SICK_JSON_ARTIST
     SICK_JSON_LABEL
-    SICK_TILES_DIR
+    SICK_MAX_ZOOM
+    SICK_BASE_ZOOM_TRACK
+    SICK_BASE_ZOOM_ALBUM
+    SICK_BASE_ZOOM_ARTIST
+    SICK_BASE_ZOOM_LABEL
+    SICK_TILES_MB
+    SICK_TILES_BUILD_DIR
 )
 required_files=(
     SICK_JSON_TRACK
@@ -38,33 +52,69 @@ for var in "${required_vars[@]}"; do
     [[ -z "${!var:-}" ]] && missing+=("$var")
 done
 if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "Error: missing env vars: ${missing[*]}"
-    exit 1
+    die "missing env vars: ${missing[*]}"
 fi
 
 for path_var in "${required_files[@]}"; do
     path="${!path_var}"
     if [[ ! -f "$path" ]]; then
-        echo "Error: input file not found for $path_var: $path"
-        exit 1
+        die "input file not found for $path_var: $path"
     fi
 done
 
-rm -rf "$SICK_TILES_DIR"
-mkdir -p "$SICK_TILES_DIR"
+mkdir -p "$SICK_TILES_BUILD_DIR"
+mkdir -p "$(dirname "$SICK_TILES_MB")"
 
 echo "=== Building tiles ==="
-echo "Output: $SICK_TILES_DIR"
+echo "Scratch dir: $SICK_TILES_BUILD_DIR"
+echo "Output: $SICK_TILES_MB"
 
-tippecanoe -e "$SICK_TILES_DIR" \
+tippecanoe \
+    -o "$SICK_TILES_BUILD_DIR/tracks.mbtiles" \
     --full-detail=7 --low-detail=7 \
-    --maximum-zoom=14 --minimum-zoom=5 --drop-rate=1.75 \
-    --drop-densest-as-needed \
+    --maximum-zoom="$SICK_MAX_ZOOM" --minimum-zoom=5 --base-zoom="$SICK_BASE_ZOOM_TRACK" \
+    --drop-rate=1.8 --drop-densest-as-needed \
     --read-parallel --force \
-    --named-layer=tracks:"$SICK_JSON_TRACK" \
-    --named-layer=albums:"$SICK_JSON_ALBUM" \
-    --named-layer=artists:"$SICK_JSON_ARTIST" \
-    --named-layer=labels:"$SICK_JSON_LABEL"
+    --layer=tracks \
+    "$SICK_JSON_TRACK"
+
+tippecanoe \
+    -o "$SICK_TILES_BUILD_DIR/labels.mbtiles" \
+    --full-detail=7 --low-detail=7 \
+    --maximum-zoom="$SICK_MAX_ZOOM" --minimum-zoom=5 --base-zoom="$SICK_BASE_ZOOM_LABEL" \
+    --drop-rate=2.05 --drop-densest-as-needed \
+    --read-parallel --force \
+    --layer=labels \
+    "$SICK_JSON_LABEL"
+
+tippecanoe \
+    -o "$SICK_TILES_BUILD_DIR/albums.mbtiles" \
+    --full-detail=7 --low-detail=7 \
+    --maximum-zoom="$SICK_MAX_ZOOM" --minimum-zoom=5 --base-zoom="$SICK_BASE_ZOOM_ALBUM" \
+    --drop-rate=2.27 --drop-densest-as-needed \
+    --read-parallel --force \
+    --layer=albums \
+    "$SICK_JSON_ALBUM"
+
+tippecanoe \
+    -o "$SICK_TILES_BUILD_DIR/artists.mbtiles" \
+    --full-detail=7 --low-detail=7 \
+    --maximum-zoom="$SICK_MAX_ZOOM" --minimum-zoom=5 --base-zoom="$SICK_BASE_ZOOM_ARTIST" \
+    --drop-rate=2.36 --drop-densest-as-needed \
+    --read-parallel --force \
+    --layer=artists \
+    "$SICK_JSON_ARTIST"
+
+echo ""
+echo "=== Merging tiles ==="
+tile-join \
+    -o "$SICK_TILES_MB" \
+    -pk \
+    -f \
+    "$SICK_TILES_BUILD_DIR/tracks.mbtiles" \
+    "$SICK_TILES_BUILD_DIR/albums.mbtiles" \
+    "$SICK_TILES_BUILD_DIR/artists.mbtiles" \
+    "$SICK_TILES_BUILD_DIR/labels.mbtiles"
 
 echo ""
 echo "Done."

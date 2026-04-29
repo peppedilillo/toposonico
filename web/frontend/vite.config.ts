@@ -14,7 +14,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": "http://backend:8000",
-      "/tiles": "http://tiles:8080",
+      "/sick-tiles": "http://tiles:3000",
     },
   },
 });
