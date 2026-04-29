@@ -4,4 +4,4 @@ Allow: /
 Disallow: /api/
 Disallow: /sick-tiles/
 
-Sitemap: https://hummap.xyz/sitemap.xml
+Sitemap: https://toposonico.com/sitemap.xml

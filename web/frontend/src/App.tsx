@@ -269,7 +269,7 @@ export default function App() {
       />
       <img
         src={Logo}
-        alt="Hummap"
+        alt="Toposonico"
         className="fixed z-5 sm:w-6 w-6 pointer-events-none
                    bottom-[var(--ui-edge-gap)] right-[var(--ui-edge-gap)] select-none"
       />

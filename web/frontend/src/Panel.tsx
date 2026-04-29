@@ -159,17 +159,17 @@ function HelpBody() {
   return (
     <div className="space-y-3 mt-1">
       <div className="text-lg font-semibold leading-snug text-white">
-        What is Hummap?
+        What is this?
       </div>
         <div className=" text-muted text-xs leading-relaxed space-y-2">
-          <p>Hummap is a map and recommender for 17 million discographic entities across tracks, albums, artists and labels.</p>
+          <p>Toposonico is a map and recommender for 17 million discographic entities across tracks, albums, artists and labels.</p>
           <p>Actually it is two maps, one small and one large. You cannot see the large one because it lives in a space with 128 dimensions.
             The small one you can see is the one on your screen. It is a simplified representation, a projection, of the large one.
           </p>
         </div>
 
       <div className="text-lg font-semibold leading-snug text-white">
-        How to use Hummap?
+        How do I use it?
       </div>
       <div className=" text-muted text-xs leading-relaxed space-y-2">
         <p>Try clicking the dots you see on the screen.
@@ -201,13 +201,13 @@ function HelpBody() {
       </div>
       <div className=" text-muted text-xs leading-relaxed space-y-2">
         <p>
-          Hummap was made in 2026 by{" "}
+          Toposonico was made in 2026 by{" "}
           <a href="https://gdilillo.com/" className="text-white cursor-pointer">
             Giuseppe Dilillo
           </a>
           . The source code is open, and you can find it on{" "}
           <a
-            href="https://github.com/peppedilillo/hummap"
+            href="https://github.com/peppedilillo/toposonico"
             className="text-white cursor-pointer"
           >
             GitHub

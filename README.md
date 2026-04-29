@@ -1,8 +1,8 @@
-# Hummap
+# Toposonico
 
 Welcome!
 
-This monorepo contains all code used for Hummap (will likely change, codename: sick), a recommender and navigable map for 17M discographic entities. A beta is live at [hummap.xyz](https://www.hummap.xyz). The project is structured in three main sections:
+This monorepo contains all code used for toposonico.com (codename: sick), a recommender and navigable map for 17M discographic entities. The project is structured in three main sections:
 
 * `ml` contains all things necessary to train the recommender model, export its embeddings and UMAP representation, and to build lookup tables.
 * `db` implements a pipeline transforming the previous data products into a proper database and a collection of GEOJson.
