@@ -162,9 +162,9 @@ function HelpBody() {
         What is this?
       </div>
         <div className=" text-muted text-xs leading-relaxed space-y-2">
-          <p>Toposonico is a map and recommender for 17 million discographic entities across tracks, albums, artists and labels.</p>
+          <p>Toposonico is a recommender and map for music tracks, artists, albums and labels. It is a tool for discovering new music.</p>
           <p>Actually it is two maps, one small and one large. You cannot see the large one because it lives in a space with 128 dimensions.
-            The small one you can see is the one on your screen. It is a simplified representation, a projection, of the large one.
+            The small map is the one on your screen. It is a simplified representation, a projection, of the large map.
           </p>
         </div>
 
