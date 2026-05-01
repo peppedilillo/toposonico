@@ -9,9 +9,10 @@ The project is structured in three main sections:
 
 Each of these projects hosts a README describing in more detail each component usage and goal. 
 
-## Screenshots
+<div align="center">
+<img src="screenshot_mobile.png" width="400" alt="Toposonico Mobile View">
+</div>
 
-<img src="screenshot_desktop.png" width="900" alt="Toposonico Desktop View">
 
 ## How it works
 
@@ -23,7 +24,7 @@ The model was trained in the cloud with a NVIDIA A100. UMAP was trained there to
 Indexes were built and tuned with [FAISS](https://github.com/facebookresearch/faiss).
 The frontend uses [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/). The slippy map tiles were built with [tippecanoe](https://github.com/mapbox/tippecanoe). 
 
-## Why I made this
+## But why
 
 I like listening to music but found the standard item-list UX of modern recommender systems limiting. 
 They are low density. Spatial data can pack much more information within the same space.
