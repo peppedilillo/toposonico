@@ -165,13 +165,12 @@ function HelpBody() {
       </div>
       <div className=" text-muted text-xs leading-relaxed space-y-2">
         <p>
-          Toposonico is a recommender and map for music tracks, artists, albums
-          and labels. It is a tool for discovering new music.
+          Toposonico is a tool for discovering new music.
         </p>
         <p>
-          Actually it is two maps, one small and one large. You cannot see the
-          large one because it lives in a space with 128 dimensions. The small
-          map is the one on your screen. It is a simplified representation, a
+          It is made of two maps, one small, one large.
+          You cannot see the large map because it lives in a space with many dimensions.
+          The small map is the one on your screen. It is a simplified representation, a
           projection, of the large map.
         </p>
       </div>
@@ -183,8 +182,8 @@ function HelpBody() {
         <p>
           Try clicking the dots you see on the screen. Each one is associated
           with either a track, an album, an artist or a label. Once you find a
-          place that interests you try looking around it, you will find
-          something similar to it there.
+          place that interests you, look around it. You will find
+          something similar nearby.
         </p>
         <p>
           That is how you navigate the small map. How do you navigate the large
@@ -206,9 +205,9 @@ function HelpBody() {
           These maps are not geographical. They were built from playlists.
           Tracks ending up in the same playlist often share something. It could
           be a genre, a year, or even just an atmosphere. With enough data these
-          relations can be grasped and used to measure distances. People from
-          all over the world draw the islands and mountains of this land. It's a
-          place we share and it lives inside us.
+          relations can be captured and used to measure distances. People from
+          all over the world made these playlists. They drew the islands and
+          mountains of this land.
         </p>
       </div>
 
@@ -221,12 +220,12 @@ function HelpBody() {
           <a href="https://gdilillo.com/" className="text-white cursor-pointer">
             Giuseppe Dilillo
           </a>
-          . The source code is open, and you can find it on{" "}
+          . The code is open source, and you can find it{" "}
           <a
             href="https://github.com/peppedilillo/toposonico"
             className="text-white cursor-pointer"
           >
-            GitHub
+            online
           </a>
           .
         </p>
