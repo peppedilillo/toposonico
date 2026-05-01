@@ -30,9 +30,10 @@ Each of these subprojects contains a README describing in more detail each compo
 
 ## Post scriptum
 
-I used to visit records fairs. They were a mess but I always ended up finding something novel there.
-To find a new record you didn't sit down and listen to tens of records in a row, selected based on a supposed model of your personality. 
+Before moving out and selling my turntable, I used to visit record fairs. 
+They were a mess but I always ended up finding something novel there.
+To find a new record you didn't sit down and listen to ten records in a row, selected based on a supposed model of your personality. 
 You wandered around, speaking with dealers and looking through the crates they brought with them.
-There were huge stalls and there were small ones. Some were filled with crap. Some were good. Finding oddities was very easy.
+There were huge stalls and there were small ones. Some were filled with crap. Finding oddities was very easy.
 The crates often leaned on some genre more than another, reflecting the dealer's history and taste.
 I wanted to write something that felt like that. 
