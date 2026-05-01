@@ -11,8 +11,8 @@ Each of these projects hosts a README describing in more detail each component u
 
 ## Screenshots
 
-![A screenshot of toposonico on desktop](screenshot_desktop.png)
-![A screenshot of toposonico on mobile](screenshot_mobile.png)
+<img src="screenshot_desktop.png" width="900" alt="Toposonico Desktop View">
+<img src="screenshot_mobile.png" width="300" alt="Toposonico Mobile View">
 
 
 ## How it works
