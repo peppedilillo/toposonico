@@ -9,7 +9,7 @@ This monorepo contains all code used for [toposonico.com](https://toposonico.com
 
 ## How it works
 
-Toposonico is built around a skipgram [word2vec](https://en.wikipedia.org/wiki/Word2vec) model trained over ~7B playlists.
+Toposonico is built around a skipgram [word2vec](https://en.wikipedia.org/wiki/Word2vec) model trained over ~6M playlists.
 Tracks are embedded in a 128d space. 
 Embeddings for albums, artists and labels are computed marginalizing over tracks.
 The 2D map was built with [UMAP](https://umap-learn.readthedocs.io/en/latest/how_umap_works.html).
